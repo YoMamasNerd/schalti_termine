@@ -9,47 +9,253 @@ wiederkehrende Rhythmen hinterlegen, aus denen die App Termine automatisch für
 mehrere Wochen im Voraus bereitstellt. Gesetzliche Feiertage werden dabei
 anhand des Bundeslands übersprungen.
 
+![Öffentliche Buchungsseite mit Monatskalender](docs/bilder/buchungsseite.png)
+
+> Grün hinterlegte Tage haben freie Termine; der gewählte Tag steht rechts mit
+> seinen Uhrzeiten. Die Filter oben erscheinen nur, wenn es tatsächlich etwas
+> zu wählen gibt – bei einem Fahrlehrer und einer Terminart entfallen sie.
+
+---
+
+## Inhalt
+
+- [Was die App kann](#was-die-app-kann)
+- [Der Weg des Interessenten](#der-weg-des-interessenten)
+- [Die zwei Planungswege](#die-zwei-planungswege)
+- [Der interne Bereich](#der-interne-bereich)
+- [Wie der Login gelöst ist](#wie-der-login-gelöst-ist)
+- [Technik](#technik)
+- [Schnellstart](#schnellstart-entwicklung)
+- [Betrieb mit Docker](#betrieb-mit-docker)
+- [Terminplanung einrichten](#so-richtet-man-die-terminplanung-ein)
+- [Kommandos](#kommandos)
+- [Kalender-Abo](#kalender-abo-einrichten)
+- [Datenschutz](#datenschutz)
+- [Grenzen und offene Punkte](#grenzen-und-offene-punkte)
+- [Aufbau des Codes](#aufbau-des-codes)
+
+---
+
 ## Was die App kann
 
-**Für Interessenten (öffentlich, ohne Login)**
+### Für Interessenten (öffentlich, ohne Login)
 
-- Monatskalender mit allen freien Terminen, filterbar nach Terminart und Fahrlehrer
-- Die Filterleiste erscheint nur, wo es etwas zu wählen gibt: Bei einer
-  Fahrschule mit einem Fahrlehrer und einer Terminart landet der Kunde direkt
-  im Kalender
+- Monatskalender mit allen freien Terminen
+- Filter nach Terminart und Fahrlehrer – aber nur dort, wo es etwas zu wählen gibt
 - Buchung mit Name, E-Mail, Telefon, Führerscheinklasse und Nachricht
-- Double-Opt-in: der Termin wird erst nach Klick auf den Link in der E-Mail verbindlich
-- Bestätigungsmail mit Kalendereintrag (.ics) im Anhang
+- Double-Opt-in: verbindlich erst nach Klick auf den Link in der E-Mail
+- Bestätigungsmail mit Kalendereintrag (`.ics`) im Anhang
 - Selbstständiges Absagen über einen persönlichen Link
 - Erinnerungsmail vor dem Termin
 
-**Für die Fahrschule (interner Bereich)**
+### Für die Fahrschule (interner Bereich)
 
 - **Tagesplanung**: Wochenansicht, in der jeder Tag einzeln beplant wird
   („am 17.09. von 14:00 bis 17:00 Beratungen anbieten“)
-- **Rhythmus-Regeln**: wiederkehrende Verfügbarkeiten, wahlweise wöchentlich
-  oder in mehrwöchigem Takt, mit Gültigkeitszeitraum
+- **Rhythmus-Regeln**: wiederkehrende Verfügbarkeiten, wöchentlich oder in
+  mehrwöchigem Takt, mit Gültigkeitszeitraum
 - **Feiertage pro Bundesland**: werden bei der automatischen Planung ausgelassen
 - **Sperrzeiten** für Urlaub und Abwesenheit
 - Buchungsübersicht mit Absage-Funktion (der Kunde wird automatisch informiert)
-- **Kalender-Abo** (.ics-URL) für Outlook, Google Kalender oder Apple Kalender
+- **Kalender-Abo** (`.ics`-URL) für Outlook, Google Kalender oder Apple Kalender
 - Mehrere Fahrlehrer, jeder mit eigenen Regeln, eigenem Bundesland und eigenem Kalender
 - Django-Admin für die Stammdaten
+
+---
+
+## Der Weg des Interessenten
+
+Vier Schritte, kein Benutzerkonto. Wer einen Termin buchen will, soll buchen –
+nicht sich registrieren.
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**1 · Termin wählen und Formular ausfüllen**
+
+Die Zusammenfassung oben zeigt Zeit, Terminart, Fahrlehrer und Ort. Die
+Führerscheinklasse lässt sich pro Terminart ein- und ausblenden.
+
+<img src="docs/bilder/buchungsformular.png" alt="Buchungsformular">
+
+</td>
+<td width="50%" valign="top">
+
+**2 · E-Mail bestätigen**
+
+Der Termin ist reserviert, aber noch nicht gebucht. Bleibt der Klick aus, wird
+er nach 30 Minuten automatisch wieder freigegeben.
+
+<img src="docs/bilder/bestaetigung-ausstehend.png" alt="Hinweis: Bitte E-Mail-Adresse bestätigen">
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+**3 · Termin steht**
+
+Nach dem Klick ist die Buchung verbindlich. Kunde und Fahrlehrer bekommen je
+eine Mail, beide mit Kalendereintrag im Anhang.
+
+<img src="docs/bilder/buchung-bestaetigt.png" alt="Bestätigungsseite">
+
+</td>
+<td width="50%" valign="top">
+
+**4 · Später absagen**
+
+Derselbe Link bleibt gültig. Sagt der Kunde ab, wird der Termin sofort wieder
+für andere freigegeben.
+
+<img src="docs/bilder/termin-verwalten.png" alt="Terminseite mit Absage-Möglichkeit">
+
+</td>
+</tr>
+</table>
+
+---
+
+## Die zwei Planungswege
+
+Termine sind **konkrete Zeilen in der Datenbank**, keine Regeln, die bei jedem
+Seitenaufruf durchgerechnet werden. Genau deshalb lässt sich ein einzelner
+Termin löschen, ohne die Regel anzufassen – und deshalb können Handplanung und
+Automatik dieselbe Sorte Termin erzeugen und friedlich nebeneinander leben.
+
+Der Generator (`termine/services/planung.py`) läuft täglich als Hintergrundjob
+und lässt sich jederzeit von Hand anstoßen. Er hält vier Zusagen ein, die alle
+durch Tests abgesichert sind:
+
+1. Er fasst **nur die Zukunft** an.
+2. Er löscht **nie** einen gebuchten oder reservierten Termin.
+3. Er löscht **nie** einen von Hand angelegten Termin.
+4. Er ist **idempotent** – zweimal laufen lassen ändert nichts.
+
+Wird eine Regel geändert oder deaktiviert, verschwinden die noch freien Termine
+aus dieser Regel; bereits gebuchte bleiben stehen. Das ist genau das Verhalten,
+das man will: eine Planänderung darf niemandem den Termin unter dem Stuhl
+wegziehen.
+
+---
+
+## Der interne Bereich
+
+### Tagesplanung
+
+Die Wochenansicht ist der Arbeitsplatz. Grün markierte Termine sind frei und
+lassen sich einzeln mit dem `×` entfernen, rote sind gebucht und tragen den
+Namen des Interessenten. Darunter das Formular für die schnelle Einzelplanung:
+Tag, Zeitfenster, Terminart – die App zerlegt das Fenster selbst in einzelne
+Termine.
+
+![Tagesplanung als Wochenansicht](docs/bilder/tagesplanung.png)
+
+### Rhythmus-Regeln
+
+Eine Regel beschreibt eine wiederkehrende Verfügbarkeit. Die Vorschau rechts
+zeigt sofort, welche Termine dabei herauskommen – man muss nicht erst speichern
+und dann nachsehen.
+
+![Regelformular mit Vorschau der erzeugten Termine](docs/bilder/rhythmus-regel.png)
+
+### Buchungen
+
+Alle Anmeldungen mit Kontaktdaten, Führerscheinklasse und Nachricht. Eine
+Absage von hier aus gibt den Termin wieder frei und schickt dem Kunden
+automatisch eine Mail samt Storno-Kalendereintrag.
+
+![Buchungsliste im internen Bereich](docs/bilder/buchungsliste.png)
+
+---
+
+## Wie der Login gelöst ist
+
+Es gibt **kein Kundenkonto**. Interessenten buchen ohne Registrierung; ihre
+eigene Buchung erreichen sie über einen geheimen Link aus der E-Mail. Ein
+Passwort brauchen nur die Leute in der Fahrschule.
+
+| Wer | Wie | Was sichtbar ist |
+| --- | --- | --- |
+| **Interessent** | gar kein Login | Kalender, freie Termine, Buchungsformular |
+| **Eigener Termin** | geheimer Link aus der E-Mail | nur die eigene Buchung: ansehen, bestätigen, absagen |
+| **Kalender-Abo** | geheime `.ics`-URL | Nur-Lese-Feed der bestätigten Termine eines Fahrlehrers |
+| **Fahrlehrer** | Benutzername + Passwort | ausschließlich die **eigene** Planung, eigene Regeln, eigene Buchungen |
+| **Inhaber** | Benutzername + Passwort, `is_staff` | alle Fahrlehrer, zusätzlich der Django-Admin für Stammdaten |
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+<img src="docs/bilder/anmeldung.png" alt="Anmeldeseite des internen Bereichs">
+
+Anmeldung unter `/intern/anmelden/` – Djangos eingebaute `LoginView`, nur mit
+eigener Vorlage.
+
+</td>
+<td width="50%" valign="top">
+
+<img src="docs/bilder/uebersicht-fahrlehrer.png" alt="Übersicht aus Sicht einer Fahrlehrerin">
+
+Dieselbe Übersichtsseite als Fahrlehrerin Anna: nur ihre eigene Zeile, und in
+der Navigation fehlt der Punkt „Stammdaten“.
+
+</td>
+</tr>
+</table>
+
+### Wie die Trennung technisch durchgesetzt wird
+
+Ein Fahrlehrer-Datensatz kann mit einem Django-Benutzer verknüpft werden.
+Daraus ergibt sich die Sichtbarkeit – an genau zwei Stellen, nicht verstreut
+über die Seiten:
+
+```python
+# 1. Türsteher: eingeloggt UND (Staff ODER mit Fahrlehrer-Profil)
+if not (request.user.is_staff or hasattr(request.user, "fahrlehrer")):
+    raise PermissionDenied("Kein Zugriff auf den internen Bereich.")
+
+# 2. Sichtbarkeit: Staff sieht alle, ein Fahrlehrer nur sich selbst
+def _erlaubte_fahrlehrer(user):
+    if user.is_staff:
+        return Fahrlehrer.objects.filter(aktiv=True)
+    return Fahrlehrer.objects.filter(pk=user.fahrlehrer.pk)
+```
+
+Jede Abfrage und jede Aktion im internen Bereich filtert über diese eine
+Funktion. Greift jemand auf einen fremden Termin zu, kommt `404` zurück und
+nicht `403` – die App verrät damit nicht einmal, dass es den Termin gibt.
+
+### Was sonst noch abgesichert ist
+
+| Bereich | Umsetzung |
+| --- | --- |
+| **Passwörter** | Djangos Standardverfahren (PBKDF2-SHA256). Das schnelle Testverfahren ist hinter einer Abfrage abgeriegelt und kann im Betrieb nicht aktiv werden. |
+| **Links in E-Mails** | 256-Bit-Zufallstoken aus `secrets.token_urlsafe(32)`, eindeutig und nicht über die Oberfläche änderbar. |
+| **Kalender-Abo** | Eigener Token pro Fahrlehrer. Ist er in falsche Hände geraten, setzt eine Aktion im Admin ihn neu – das alte Abo wird damit ungültig. |
+| **Sitzungen** | Session- und CSRF-Cookie werden im Betrieb nur über HTTPS gesendet; alle Formulare sind CSRF-geschützt. |
+| **Formular-Spam** | Verstecktes Honigtopf-Feld im Buchungsformular; ausgefüllt bedeutet Bot, und die Buchung wird verworfen. |
+| **Doppelbuchung** | Drei Ebenen: Sperre auf der Termin-Zeile, Statusprüfung in derselben Transaktion und ein Unique-Index in der Datenbank. |
+
+---
 
 ## Technik
 
 | Baustein | Wahl | Warum |
-|---|---|---|
+| --- | --- | --- |
 | Backend | Django 5.2 | Admin, Migrationen, Auth und Formulare sind fertig dabei |
 | Frontend | Serverseitige Templates + htmx | Ein Projekt statt zwei, funktioniert auch ohne JavaScript |
 | Styling | Handgeschriebenes CSS (`static/css/app.css`) | Kein Node-Build-Schritt im Deployment |
 | Datenbank | PostgreSQL, alternativ SQLite | SQLite reicht für eine Einzelplatz-Installation |
 | Hintergrundjobs | django-q2 | Nutzt die vorhandene Datenbank, kein Redis nötig |
 | Feiertage | [`holidays`](https://pypi.org/project/holidays/) | Alle 16 Bundesländer, komplett offline |
-| Kalender | `icalendar` | .ics-Anhang und Abo-Feed |
+| Kalender | `icalendar` | `.ics`-Anhang und Abo-Feed |
 
 htmx liegt als eine Datei unter `static/js/` – es gibt bewusst keinen
 Paketmanager fürs Frontend.
+
+---
 
 ## Schnellstart (Entwicklung)
 
@@ -68,13 +274,15 @@ python manage.py runserver
 Danach erreichbar:
 
 | Adresse | Was |
-|---|---|
+| --- | --- |
 | <http://localhost:8000/> | Öffentliche Buchungsseite |
 | <http://localhost:8000/intern/> | Interner Bereich (`admin` / `admin`) |
 | <http://localhost:8000/django-admin/> | Stammdaten |
 
 Ohne `EMAIL_HOST` in der `.env` werden alle E-Mails auf der Konsole ausgegeben –
 die Bestätigungslinks lassen sich also direkt aus dem Terminal kopieren.
+
+---
 
 ## Betrieb mit Docker
 
@@ -91,6 +299,8 @@ automatisch mit.
 
 Vor die App gehört ein Reverse Proxy mit TLS (nginx, Caddy, Traefik). Der
 Webserver lauscht absichtlich nur auf `127.0.0.1`.
+
+---
 
 ## So richtet man die Terminplanung ein
 
@@ -116,20 +326,7 @@ Webserver lauscht absichtlich nur auf `127.0.0.1`.
 Manuell angelegte Termine und die aus Regeln erzeugten leben friedlich
 nebeneinander – der Generator fasst manuelle Termine nie an.
 
-## Was der Generator garantiert
-
-Der Generator (`termine/services/planung.py`) läuft täglich als Hintergrundjob
-und lässt sich jederzeit von Hand anstoßen. Er hält vier Zusagen ein:
-
-- Er fasst **nur die Zukunft** an.
-- Er löscht **nie** einen gebuchten oder reservierten Termin.
-- Er löscht **nie** einen von Hand angelegten Termin.
-- Er ist **idempotent** – zweimal laufen lassen ändert nichts.
-
-Wird eine Regel geändert oder deaktiviert, verschwinden die noch freien Termine
-aus dieser Regel; bereits gebuchte bleiben stehen. Das ist genau das Verhalten,
-das man will: eine Planänderung darf niemandem den Termin unter dem Stuhl
-wegziehen.
+---
 
 ## Kommandos
 
@@ -150,6 +347,8 @@ Wer keinen Worker betreiben möchte, kann stattdessen `cron` benutzen:
 */5 * * * * cd /pfad/zur/app && .venv/bin/python manage.py buchungen_pflegen
 ```
 
+---
+
 ## Kalender-Abo einrichten
 
 Jeder Fahrlehrer hat eine persönliche Abo-URL (Django-Admin → Fahrlehrer, oder
@@ -161,6 +360,8 @@ Die URL enthält ein Geheimnis und sollte nicht weitergegeben werden. Ist sie
 doch einmal in falsche Hände geraten, setzt die Aktion „Kalender-Abo-Token
 zurücksetzen“ im Admin sie neu.
 
+---
+
 ## Datenschutz
 
 - Buchungen werden nach `DATA_RETENTION_DAYS` (Vorgabe: 180 Tage) automatisch
@@ -171,13 +372,28 @@ zurücksetzen“ im Admin sie neu.
 - Impressum und Datenschutzerklärung werden über `IMPRESSUM_URL` und
   `DATENSCHUTZ_URL` in den Seitenfuß eingebunden.
 
-## Bekannte Grenze
+---
 
-Die Feiertagsauswahl arbeitet auf Ebene der **Bundesländer**. Örtlich begrenzte
-Feiertage kennt sie nicht – etwa Mariä Himmelfahrt, das in Bayern nur in
-überwiegend katholischen Gemeinden gilt, oder das Augsburger Friedensfest. Für
-solche Tage genügt eine **Sperrzeit** über den betreffenden Tag; die
-automatische Planung lässt ihn dann ebenfalls aus.
+## Grenzen und offene Punkte
+
+**Feiertage sind auf Bundesland-Ebene.** Örtlich begrenzte Feiertage kennt die
+App nicht – etwa Mariä Himmelfahrt, das in Bayern nur in überwiegend
+katholischen Gemeinden gilt, oder das Augsburger Friedensfest. Für solche Tage
+genügt eine **Sperrzeit** über den betreffenden Tag; die automatische Planung
+lässt ihn dann ebenfalls aus.
+
+Bewusst nicht gebaut, weil nicht besprochen:
+
+- **Kalender nur in eine Richtung.** Das Abo zeigt gebuchte Termine im
+  Kalenderprogramm an. Umgekehrt blockieren private Kalendereinträge noch keine
+  Slots – dafür bräuchte es CalDAV-Zugangsdaten. Ersatzweise: Sperrzeit eintragen.
+- Ein Termin fasst genau eine Person, keine Gruppenberatung.
+- Keine Zahlung und keine Anzahlung.
+- Nur Deutsch, keine Übersetzungsdateien.
+- Bei einem einzelnen Fahrlehrer bleiben die Auswahlfelder in den internen
+  Formularen sichtbar (auf der öffentlichen Seite entfallen sie).
+
+---
 
 ## Aufbau des Codes
 
@@ -197,8 +413,9 @@ termine/
     verfuegbarkeit.py  Abfragen für die öffentliche Seite
     ics.py             Kalendereinträge und Abo-Feed
     mail.py            E-Mail-Versand
-  tests/           71 Tests für Generator, Buchung und internen Bereich
+  tests/           75 Tests für Generator, Buchung und internen Bereich
 static/            CSS und htmx
+docs/bilder/       Screenshots für diese README
 ```
 
 Die Geschäftslogik liegt vollständig in `services/`. Views und Kommandos rufen
