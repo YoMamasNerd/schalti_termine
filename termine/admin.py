@@ -7,6 +7,11 @@ from .models import Buchung, Fahrlehrer, RhythmusRegel, Sperrzeit, Termin, Termi
 from .services import buchung as buchungs_service
 from .services.planung import generiere_termine
 
+# Wer hier ankommt und noch keinen Superuser hat, kann sich nicht anmelden und
+# erfährt sonst nirgends, warum. Die eigene Vorlage ergänzt die des Admins nur
+# um den Einrichtungshinweis.
+admin.site.login_template = "staff/admin_anmelden.html"
+
 
 class RhythmusRegelInline(admin.TabularInline):
     model = RhythmusRegel

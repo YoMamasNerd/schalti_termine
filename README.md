@@ -283,6 +283,26 @@ Danach erreichbar:
 Ohne `EMAIL_HOST` in der `.env` werden alle E-Mails auf der Konsole ausgegeben –
 die Bestätigungslinks lassen sich also direkt aus dem Terminal kopieren.
 
+### Der erste Schritt: ein Verwaltungskonto
+
+Wer `beispieldaten` überspringt, steht nach `migrate` vor einer leeren
+Installation: Es gibt keinen Superuser, also kommt niemand in den Admin; ohne
+Admin gibt es keine Terminart und keinen Fahrlehrer; und ohne die beiden ist
+der Kalender leer. Alles funktioniert – nur passiert nichts.
+
+Damit das nicht wie ein Defekt aussieht, sagen es die betroffenen Seiten
+selbst. Solange kein Superuser existiert, steht auf der Anmeldeseite des
+internen Bereichs, auf der Anmeldung des Django-Admins und auf der öffentlichen
+Buchungsseite ein Hinweis mit dem passenden Befehl:
+
+```bash
+python manage.py createsuperuser
+```
+
+Läuft die App im Container, nennt der Hinweis von sich aus die Docker-Variante.
+Sobald das Konto steht, verschwindet er überall – Interessenten bekommen also
+nie einen Terminalbefehl zu sehen.
+
 ---
 
 ## Betrieb mit Docker
@@ -415,7 +435,7 @@ Bewusst nicht gebaut, weil nicht besprochen:
 python manage.py test termine
 ```
 
-156 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
+169 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
 Fehler unbemerkt bleiben würden:
 
 | Bereich | Was geprüft wird |
@@ -428,6 +448,7 @@ Fehler unbemerkt bleiben würden:
 | Kommandos | alle Argumente, inklusive der Abbruchfälle |
 | Ausfälle | ein streikender Mailserver darf keine Buchung zerstören, muss aber im Log auftauchen |
 | Konfiguration | die Prüfungen aus `checks.py` |
+| Einrichtung | der Hinweis erscheint ohne Superuser, verschwindet mit ihm, und überlebt eine noch nicht migrierte Datenbank |
 | Öffentliche Seite | manipulierte URL-Parameter dürfen keinen Fehler auslösen |
 
 Abdeckung selbst messen:
@@ -462,7 +483,9 @@ termine/
     verfuegbarkeit.py  Abfragen für die öffentliche Seite
     ics.py             Kalendereinträge und Abo-Feed
     mail.py            E-Mail-Versand
-  tests/           156 Tests, 97 % Zeilenabdeckung (siehe unten)
+    einrichtung.py     Erkennt die noch nicht eingerichtete Installation
+  templatetags/    Holt den Einrichtungshinweis in fremde Vorlagen
+  tests/           169 Tests, 97 % Zeilenabdeckung (siehe unten)
 static/            CSS und htmx
 docs/bilder/       Screenshots für diese README
 ```

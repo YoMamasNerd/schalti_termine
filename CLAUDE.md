@@ -96,7 +96,9 @@ python manage.py test termine     # muss grün bleiben
 coverage run manage.py test termine && coverage report
 ```
 
-- Stand: 156 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
+- `main` trägt den stabilen Stand. Entwickelt wird auf einem eigenen Branch,
+  der erst nach grüner Testsuite dorthin zurückfließt.
+- Stand: 169 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
   der Schwerpunkt liegt dort, wo ein Fehler unbemerkt bliebe (Jobs, Kommandos,
   Ausfallpfade des Mailversands).
 - Commit-Nachrichten auf Deutsch, im Stil der bestehenden Historie: erst was

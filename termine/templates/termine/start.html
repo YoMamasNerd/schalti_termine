@@ -8,6 +8,16 @@
      einem Bestätigungslink – erst danach ist der Termin verbindlich.</p>
 
   {% comment %}
+    Ist noch nichts angelegt, sieht diese Seite für einen Besucher aus wie eine
+    Fahrschule ohne freie Termine. Die Abfrage lohnt sich nur in genau diesem
+    Fall – deshalb steht sie hinter der Bedingung und nicht im Kontext jeder
+    Seitenansicht.
+  {% endcomment %}
+  {% if not alle_fahrlehrer or not alle_terminarten %}
+    {% include "termine/_einrichtung.html" %}
+  {% endif %}
+
+  {% comment %}
     Die Filterleiste erscheint nur, wenn es tatsächlich etwas auszuwählen gibt.
     Bei einer Fahrschule mit einem Fahrlehrer und einer Terminart entfällt sie
     komplett – der Kunde geht direkt in den Kalender.

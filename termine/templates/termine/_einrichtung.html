@@ -1,0 +1,27 @@
+{% comment %}
+  Hinweis auf den fehlenden ersten Schritt. Erscheint nur, solange es keinen
+  Superuser gibt – danach verschwindet er von selbst, auch von der
+  öffentlichen Seite.
+{% endcomment %}
+{% load einrichtung %}
+{% einrichtungshinweis as einrichtung %}
+{% if einrichtung %}
+  <div class="hinweis hinweis--warnung einrichtung">
+    <p><strong>Diese Installation ist noch nicht eingerichtet.</strong></p>
+    <p>
+      Es gibt noch kein Verwaltungskonto. Ohne eines lassen sich weder Terminarten
+      noch Fahrlehrer anlegen – und ohne die beiden gibt es nichts zu buchen.
+    </p>
+    <p>Das erste Konto wird auf dem Server angelegt:</p>
+    <pre class="befehl"><code>{{ einrichtung.befehl }}</code></pre>
+    <p>
+      {% if im_admin %}
+        Danach melden Sie sich hier an
+      {% else %}
+        Danach unter <a href="{% url 'admin:index' %}">Stammdaten</a> anmelden
+      {% endif %}
+      und mindestens eine Terminart und einen Fahrlehrer anlegen. Zum
+      Ausprobieren genügt <code>python manage.py beispieldaten</code>.
+    </p>
+  </div>
+{% endif %}
