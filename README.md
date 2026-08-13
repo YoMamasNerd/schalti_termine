@@ -297,6 +297,18 @@ docker compose exec web python manage.py createsuperuser
 Migrationen und die Job-Einrichtung laufen beim Start des Web-Containers
 automatisch mit.
 
+Davor prüft der Container die Konfiguration und **bricht bei einem Fehler ab**,
+statt loszulaufen. Das betrifft vor allem zwei Werte, die eine Installation
+still unbrauchbar machen können:
+
+- `SITE_BASE_URL` zeigt noch auf `localhost` – dann gingen alle Bestätigungs-
+  und Storno-Links ins Leere, denn sie entstehen in Hintergrundjobs ohne
+  Request, aus dem sich der Hostname ableiten ließe.
+- Es ist kein Mailversand eingerichtet – dann bekäme niemand einen
+  Bestätigungslink, und keine einzige Buchung käme zustande.
+
+Selbst prüfen lässt sich das jederzeit mit `python manage.py check --deploy`.
+
 Vor die App gehört ein Reverse Proxy mit TLS (nginx, Caddy, Traefik). Der
 Webserver lauscht absichtlich nur auf `127.0.0.1`.
 
@@ -338,6 +350,7 @@ python manage.py jobs_einrichten                     # wiederkehrende Jobs regis
 python manage.py qcluster                            # Worker für die Jobs
 python manage.py beispieldaten                       # Demodaten
 python manage.py test termine                        # Testsuite
+python manage.py check --deploy                      # Konfiguration vor dem Ausrollen prüfen
 ```
 
 Wer keinen Worker betreiben möchte, kann stattdessen `cron` benutzen:
@@ -400,6 +413,8 @@ Bewusst nicht gebaut, weil nicht besprochen:
 ```
 config/            Django-Projekt (Settings, URLs, WSGI)
 termine/
+  apps.py          App-Konfiguration, lädt die Systemprüfungen
+  checks.py        Prüft vor dem Ausrollen, ob Adresse und Mailversand stimmen
   models.py        Fahrlehrer, Terminart, RhythmusRegel, Sperrzeit, Termin, Buchung
   views.py         Öffentliche Buchungsseite
   staff_views.py   Interner Bereich
@@ -413,7 +428,7 @@ termine/
     verfuegbarkeit.py  Abfragen für die öffentliche Seite
     ics.py             Kalendereinträge und Abo-Feed
     mail.py            E-Mail-Versand
-  tests/           75 Tests für Generator, Buchung und internen Bereich
+  tests/           87 Tests für Generator, Buchung, internen Bereich und Prüfungen
 static/            CSS und htmx
 docs/bilder/       Screenshots für diese README
 ```
