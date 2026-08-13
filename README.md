@@ -153,6 +153,11 @@ Termine.
 
 ![Tagesplanung als Wochenansicht](docs/bilder/tagesplanung.png)
 
+> Die Aufnahme entstand in einem Browser mit englischer Oberfläche – daher
+> `08/13/2026` und `02:00 PM` in den Auswahlfeldern. Ein deutscher Browser
+> schreibt dort `13.08.2026` und `14:00`; siehe
+> [Datum und Uhrzeit](#datum-und-uhrzeit).
+
 ### Rhythmus-Regeln
 
 Eine Regel beschreibt eine wiederkehrende Verfügbarkeit. Die Vorschau rechts
@@ -255,6 +260,27 @@ nicht `403` – die App verrät damit nicht einmal, dass es den Termin gibt.
 
 htmx liegt als eine Datei unter `static/js/` – es gibt bewusst keinen
 Paketmanager fürs Frontend.
+
+### Datum und Uhrzeit
+
+Überall Tag.Monat.Jahr mit führender Null und die 24-Stunden-Uhr. Die Vorlagen
+benutzen dafür Djangos benannte Formate (`SHORT_DATE_FORMAT`) statt
+handgeschriebener Buchstabenfolgen – die richten sich nach `LANGUAGE_CODE`,
+und der steht auf `de`.
+
+Eine Sache liegt allerdings **nicht** bei der App: Die Auswahlfelder für Datum
+und Uhrzeit (`<input type="date">`, `<input type="time">`) zeichnet der Browser
+selbst, und zwar in *seiner* Sprache. Ein Chrome mit englischer Oberfläche
+zeigt darin `08/13/2026` und `02:00 PM`, ein deutscher `13.08.2026` und
+`14:00` – bei derselben Seite. Eine Webseite kann das nicht umstellen; es gibt
+kein Attribut dafür. Was die App liefern muss, ist das `value` in ISO-Form
+(`2026-08-13`), so schreibt es der HTML-Standard vor – steht dort etwas
+anderes, bleibt das Feld schlicht leer. Genau das prüft ein Test.
+
+Wer die Felder unabhängig vom Browser deutsch haben will, müsste die nativen
+Auswahlfelder durch einen selbstgebauten Kalender ersetzen. Das kostet die
+guten Datumsauswahlen der Handy-Tastaturen und bringt JavaScript ins Projekt –
+beides passt nicht zu den Entscheidungen, auf denen diese App steht.
 
 ### Kopfzeile und Navigation
 
@@ -457,7 +483,7 @@ sein. Wer unterwegs nachsehen will, wer morgen kommt, dreht das Gerät quer.
 python manage.py test termine
 ```
 
-174 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
+178 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
 Fehler unbemerkt bleiben würden:
 
 | Bereich | Was geprüft wird |
@@ -470,6 +496,7 @@ Fehler unbemerkt bleiben würden:
 | Kommandos | alle Argumente, inklusive der Abbruchfälle |
 | Ausfälle | ein streikender Mailserver darf keine Buchung zerstören, muss aber im Log auftauchen |
 | Konfiguration | die Prüfungen aus `checks.py` |
+| Darstellung | deutsche Schreibweise von Datum und Uhrzeit, geprüft am einstelligen Tag und am Nachmittag |
 | Einrichtung | der Hinweis erscheint ohne Superuser, verschwindet mit ihm, und überlebt eine noch nicht migrierte Datenbank |
 | Öffentliche Seite | manipulierte URL-Parameter dürfen keinen Fehler auslösen |
 
@@ -507,7 +534,7 @@ termine/
     mail.py            E-Mail-Versand
     einrichtung.py     Erkennt die noch nicht eingerichtete Installation
   templatetags/    Einrichtungshinweis und aktiver Navigationspunkt
-  tests/           174 Tests, 97 % Zeilenabdeckung (siehe unten)
+  tests/           178 Tests, 97 % Zeilenabdeckung (siehe unten)
 static/            CSS und htmx
 docs/bilder/       Screenshots für diese README
 ```

@@ -30,6 +30,17 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
 | Kalender | `icalendar` für `.ics`-Anhang und Abo-Feed |
 | Sprache | Deutsch – Oberfläche, Code-Kommentare, Commit-Nachrichten. Keine Übersetzungsdateien. |
 
+### Datum und Uhrzeit
+
+- Immer `SHORT_DATE_FORMAT` statt handgeschriebener Formatangaben; `LANGUAGE_CODE`
+  steht auf `de`, damit stimmt Tag.Monat.Jahr mit führender Null. Nie `j.m.Y` –
+  das mischt Tag ohne und Monat mit führender Null.
+- 24-Stunden-Uhr (`H:i`), nirgends AM/PM.
+- `<input type="date">`/`<input type="time">` zeichnet der **Browser** in seiner
+  Sprache. Das ist nicht umstellbar und **kein Fehler der App**. Die App liefert
+  das `value` in ISO – alles andere lässt das Feld leer. Kein selbstgebauter
+  Kalender als Ersatz (kostet die Handy-Tastaturauswahl, bringt JavaScript).
+
 ### Oberfläche
 
 - Kopfzeile klebt beim Scrollen, milchig über dem Inhalt; Navigationspunkte als
@@ -109,7 +120,7 @@ coverage run manage.py test termine && coverage report
 
 - `main` trägt den stabilen Stand. Entwickelt wird auf einem eigenen Branch,
   der erst nach grüner Testsuite dorthin zurückfließt.
-- Stand: 174 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
+- Stand: 178 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
   der Schwerpunkt liegt dort, wo ein Fehler unbemerkt bliebe (Jobs, Kommandos,
   Ausfallpfade des Mailversands).
 - Commit-Nachrichten auf Deutsch, im Stil der bestehenden Historie: erst was

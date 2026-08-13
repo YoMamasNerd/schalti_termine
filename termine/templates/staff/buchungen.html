@@ -26,7 +26,7 @@
           {% for buchung in buchungen %}
             <tr>
               <td>
-                {{ buchung.termin.beginn_lokal|date:"D, j.m.Y" }}<br>
+                {{ buchung.termin.beginn_lokal|date:"D" }}, {{ buchung.termin.beginn_lokal|date:"SHORT_DATE_FORMAT" }}<br>
                 <strong>{{ buchung.termin.beginn_lokal|date:"H:i" }}–{{ buchung.termin.ende_lokal|date:"H:i" }}</strong><br>
                 <span class="leer">{{ buchung.termin.terminart.name }}</span>
               </td>

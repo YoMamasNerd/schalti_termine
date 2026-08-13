@@ -114,7 +114,7 @@
           <h3 style="margin-top:1rem">In dieser Woche</h3>
           <ul>
             {% for sperre in sperrzeiten %}
-              <li>{{ sperre.beginn|date:"j.m." }}–{{ sperre.ende|date:"j.m.Y" }}
+              <li>{{ sperre.beginn|date:"d.m." }}–{{ sperre.ende|date:"SHORT_DATE_FORMAT" }}
                   {% if sperre.grund %}({{ sperre.grund }}){% endif %}</li>
             {% endfor %}
           </ul>

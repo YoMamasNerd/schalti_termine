@@ -37,8 +37,8 @@
               </td>
               <td>{{ regel.terminart.name }}<br><span class="leer">{{ regel.terminart.dauer_minuten }} Min.</span></td>
               <td>
-                ab {{ regel.gueltig_ab|date:"j.m.Y" }}
-                {% if regel.gueltig_bis %}<br>bis {{ regel.gueltig_bis|date:"j.m.Y" }}{% endif %}
+                ab {{ regel.gueltig_ab|date:"SHORT_DATE_FORMAT" }}
+                {% if regel.gueltig_bis %}<br>bis {{ regel.gueltig_bis|date:"SHORT_DATE_FORMAT" }}{% endif %}
               </td>
               <td>{% if regel.feiertage_auslassen %}auslassen{% else %}mitplanen{% endif %}</td>
               <td>
