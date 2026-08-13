@@ -32,6 +32,7 @@ anhand des Bundeslands übersprungen.
 - [Kalender-Abo](#kalender-abo-einrichten)
 - [Datenschutz](#datenschutz)
 - [Grenzen und offene Punkte](#grenzen-und-offene-punkte)
+- [Tests](#tests)
 - [Aufbau des Codes](#aufbau-des-codes)
 
 ---
@@ -408,6 +409,39 @@ Bewusst nicht gebaut, weil nicht besprochen:
 
 ---
 
+## Tests
+
+```bash
+python manage.py test termine
+```
+
+156 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
+Fehler unbemerkt bleiben würden:
+
+| Bereich | Was geprüft wird |
+| --- | --- |
+| Slot-Generator | Rhythmus, Feiertage je Bundesland, Sperrzeiten, Idempotenz, und dass gebuchte Termine nie verschwinden |
+| Buchungsablauf | Double-Opt-in, Ablauf der Reservierung, Storno, Erinnerung, DSGVO-Anonymisierung |
+| Doppelbuchung | zwei Interessenten auf denselben Termin, inklusive des Falls, dass der Datenbank-Index zuerst greift |
+| Zugriffsschutz | Fahrlehrer sieht nur eigene Daten, fremde Termine liefern 404, Benutzer ohne Profil bekommen 403 |
+| Hintergrundjobs | dass die Jobs tun, was sie sollen – und dass der Scheduler sie über die eingetragenen Pfade überhaupt findet |
+| Kommandos | alle Argumente, inklusive der Abbruchfälle |
+| Ausfälle | ein streikender Mailserver darf keine Buchung zerstören, muss aber im Log auftauchen |
+| Konfiguration | die Prüfungen aus `checks.py` |
+| Öffentliche Seite | manipulierte URL-Parameter dürfen keinen Fehler auslösen |
+
+Abdeckung selbst messen:
+
+```bash
+pip install coverage
+coverage run manage.py test termine && coverage report
+```
+
+Nicht abgedeckt sind im Wesentlichen defensive Zweige, die nur bei einer
+Postgres-Konfiguration oder bei nicht erreichbaren Zuständen greifen.
+
+---
+
 ## Aufbau des Codes
 
 ```
@@ -428,7 +462,7 @@ termine/
     verfuegbarkeit.py  Abfragen für die öffentliche Seite
     ics.py             Kalendereinträge und Abo-Feed
     mail.py            E-Mail-Versand
-  tests/           87 Tests für Generator, Buchung, internen Bereich und Prüfungen
+  tests/           156 Tests, 97 % Zeilenabdeckung (siehe unten)
 static/            CSS und htmx
 docs/bilder/       Screenshots für diese README
 ```

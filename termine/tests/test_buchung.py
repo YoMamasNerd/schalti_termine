@@ -430,3 +430,56 @@ class OeffentlicheSeiten(BuchungsBasis):
         antwort = self.client.get(reverse("termine:start"))
 
         self.assertNotContains(antwort, f'href="/buchen/{self.termin.pk}/"')
+
+
+class RobusteParameter(BuchungsBasis):
+    """Die Startseite ist ohne Login erreichbar – Müll in der URL darf sie nicht umwerfen."""
+
+    def test_unsinnige_parameter_fuehren_nicht_zum_fehler(self):
+        faelle = [
+            {"monat": "quatsch"},
+            {"monat": "2026-99"},
+            {"monat": "0-0"},
+            {"monat": "99999-13"},
+            {"monat": ""},
+            {"tag": "kein-datum"},
+            {"tag": "2026-02-31"},
+            {"fahrlehrer": "gibt-es-nicht"},
+            {"art": "gibt-es-nicht"},
+            {"monat": "2026-13", "tag": "9999-99-99", "fahrlehrer": "x", "art": "y"},
+        ]
+        for parameter in faelle:
+            with self.subTest(parameter=parameter):
+                antwort = self.client.get(reverse("termine:start"), parameter)
+                self.assertEqual(antwort.status_code, 200)
+
+    def test_unbekannter_fahrlehrer_in_der_url_ist_404(self):
+        antwort = self.client.get(reverse("termine:fahrlehrer", args=["gibt-es-nicht"]))
+        self.assertEqual(antwort.status_code, 404)
+
+    def test_inaktiver_fahrlehrer_ist_nicht_erreichbar(self):
+        self.fahrlehrer.aktiv = False
+        self.fahrlehrer.save()
+
+        antwort = self.client.get(reverse("termine:fahrlehrer", args=[self.fahrlehrer.slug]))
+
+        self.assertEqual(antwort.status_code, 404)
+
+    def test_eigene_seite_eines_fahrlehrers_zeigt_dessen_termine(self):
+        antwort = self.client.get(reverse("termine:fahrlehrer", args=[self.fahrlehrer.slug]))
+
+        self.assertEqual(antwort.status_code, 200)
+        self.assertContains(antwort, self.termin.beginn_lokal.strftime("%H:%M"))
+
+    def test_unbekannter_termin_ist_404(self):
+        antwort = self.client.get(reverse("termine:buchen", args=[999999]))
+        self.assertEqual(antwort.status_code, 404)
+
+    def test_kein_rueckwaertsblaettern_vor_den_aktuellen_monat(self):
+        antwort = self.client.get(reverse("termine:start"))
+        self.assertIsNone(antwort.context["vorheriger_monat"])
+
+    def test_kein_vorwaertsblaettern_hinter_den_horizont(self):
+        weit = (timezone.localdate() + dt.timedelta(days=365)).strftime("%Y-%m")
+        antwort = self.client.get(reverse("termine:start"), {"monat": weit})
+        self.assertIsNone(antwort.context["naechster_monat"])

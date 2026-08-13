@@ -22,3 +22,7 @@ media/
 .vscode/
 .DS_Store
 *.swp
+
+# Coverage
+.coverage
+htmlcov/

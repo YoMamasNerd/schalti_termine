@@ -1,0 +1,13 @@
+[run]
+source = termine,config
+omit =
+    */migrations/*
+    */tests/*
+    */management/commands/beispieldaten.py
+    config/wsgi.py
+    config/asgi.py
+
+[report]
+show_missing = True
+skip_covered = False
+precision = 0

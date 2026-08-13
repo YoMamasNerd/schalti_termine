@@ -3,6 +3,7 @@
 import datetime as dt
 
 from django.contrib.auth import get_user_model
+from django.contrib.messages import get_messages
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -309,3 +310,196 @@ class RegelVerwaltung(BackendBasis):
         self.assertFalse(Termin.objects.filter(pk=frei.pk).exists())
         self.assertTrue(Termin.objects.filter(pk=gebucht.pk).exists())
         self.assertEqual(RhythmusRegel.objects.count(), 0)
+
+
+class Uebersichtsseite(BackendBasis):
+    """Die Landeseite nach dem Anmelden – bisher nur als Redirect geprüft."""
+
+    def test_staff_sieht_kennzahlen_und_naechste_termine(self):
+        gebucht = self.termin_fuer(self.anna)
+        gebucht.status = Termin.Status.GEBUCHT
+        gebucht.save()
+        Buchung.objects.create(
+            termin=gebucht, name="Lena Hoffmann", email="lena@example.org",
+            status=Buchung.Status.BESTAETIGT,
+        )
+        self.termin_fuer(self.anna, stunde=11)  # freier Termin
+
+        self.client.login(username="chef", password="geheim123")
+        antwort = self.client.get(reverse("termine:dashboard"))
+
+        self.assertEqual(antwort.status_code, 200)
+        self.assertContains(antwort, "Lena Hoffmann")
+        self.assertContains(antwort, "Anna Berger")
+        self.assertContains(antwort, "Tom Keller")
+
+        zeilen = {f.name: f for f in antwort.context["fahrlehrer_liste"]}
+        self.assertEqual(zeilen["Anna Berger"].frei, 1)
+        self.assertEqual(zeilen["Anna Berger"].gebucht, 1)
+
+    def test_offene_buchungen_werden_hervorgehoben(self):
+        termin = self.termin_fuer(self.anna)
+        Buchung.objects.create(
+            termin=termin, name="Tim Krause", email="tim@example.org",
+            status=Buchung.Status.OFFEN,
+            reserviert_bis=timezone.now() + dt.timedelta(minutes=20),
+        )
+
+        self.client.login(username="chef", password="geheim123")
+        antwort = self.client.get(reverse("termine:dashboard"))
+
+        self.assertEqual(antwort.context["offene_buchungen"], 1)
+        self.assertContains(antwort, "E-Mail-Bestätigung")
+
+    def test_fahrlehrer_sieht_nur_die_eigene_zeile(self):
+        self.client.login(username="anna", password="geheim123")
+        antwort = self.client.get(reverse("termine:dashboard"))
+
+        namen = [f.name for f in antwort.context["fahrlehrer_liste"]]
+        self.assertEqual(namen, ["Anna Berger"])
+
+
+class Randfaelle(BackendBasis):
+    def setUp(self):
+        super().setUp()
+        self.client.login(username="chef", password="geheim123")
+
+    def test_tagesplanung_verkraftet_unsinnige_woche(self):
+        """Bei kaputtem Parameter wird auf die laufende Woche zurückgefallen."""
+        antwort = self.client.get(reverse("termine:tagesplanung"), {"woche": "kein-datum"})
+
+        heute = timezone.localdate()
+        self.assertEqual(antwort.status_code, 200)
+        self.assertEqual(
+            antwort.context["montag"], heute - dt.timedelta(days=heute.weekday())
+        )
+
+    def test_tagesplanung_ohne_fahrlehrer_leitet_zum_anlegen(self):
+        Fahrlehrer.objects.update(aktiv=False)
+
+        antwort = self.client.get(reverse("termine:tagesplanung"))
+
+        self.assertEqual(antwort.status_code, 302)
+        self.assertIn("fahrlehrer/add", antwort["Location"])
+
+    def test_generieren_ohne_fahrlehrer_meldet_das(self):
+        Fahrlehrer.objects.update(aktiv=False)
+
+        # Bewusst ohne follow: Die Tagesplanung leitet ohne Fahrlehrer weiter in
+        # den Admin, und dort endet ein Staff-Benutzer ohne Modellrechte bei 403.
+        antwort = self.client.post(reverse("termine:generieren"))
+
+        self.assertEqual(antwort.status_code, 302)
+        self.assertEqual(antwort["Location"], reverse("termine:tagesplanung"))
+        meldungen = [str(m) for m in get_messages(antwort.wsgi_request)]
+        self.assertIn("Kein Fahrlehrer ausgewählt.", meldungen)
+
+    def test_belegtes_zeitfenster_wird_gemeldet(self):
+        tag = self.montag + dt.timedelta(days=2)
+        daten = {
+            "fahrlehrer": self.anna.pk, "terminart": self.art.pk,
+            "tag": tag.isoformat(), "von": "14:00", "bis": "15:00",
+        }
+        self.client.post(reverse("termine:termine_anlegen"), daten)
+
+        antwort = self.client.post(reverse("termine:termine_anlegen"), daten, follow=True)
+
+        self.assertContains(antwort, "bereits belegt")
+
+    def test_zu_kurzes_zeitfenster_wird_gemeldet(self):
+        antwort = self.client.post(
+            reverse("termine:termine_anlegen"),
+            {
+                "fahrlehrer": self.anna.pk, "terminart": self.art.pk,
+                "tag": (self.montag + dt.timedelta(days=2)).isoformat(),
+                "von": "14:00", "bis": "14:20",
+            },
+            follow=True,
+        )
+
+        self.assertContains(antwort, "kein einziger Termin")
+
+    def test_sperrzeit_warnt_vor_bereits_gebuchten_terminen(self):
+        tag = self.montag + dt.timedelta(days=2)
+        beginn = timezone.make_aware(dt.datetime.combine(tag, dt.time(14, 0)))
+        termin = Termin.objects.create(
+            fahrlehrer=self.anna, terminart=self.art,
+            beginn=beginn, ende=beginn + dt.timedelta(minutes=30),
+            status=Termin.Status.GEBUCHT,
+        )
+        Buchung.objects.create(
+            termin=termin, name="Max Muster", email="max@example.org",
+            status=Buchung.Status.BESTAETIGT,
+        )
+
+        antwort = self.client.post(
+            reverse("termine:sperrzeit_anlegen"),
+            {"fahrlehrer": self.anna.pk, "von_tag": tag.isoformat(),
+             "bis_tag": tag.isoformat(), "grund": "Urlaub"},
+            follow=True,
+        )
+
+        self.assertContains(antwort, "bereits gebuchte Termine")
+
+    def test_fehlerhafte_sperrzeit_wird_gemeldet(self):
+        antwort = self.client.post(
+            reverse("termine:sperrzeit_anlegen"),
+            {"fahrlehrer": self.anna.pk,
+             "von_tag": (self.montag + dt.timedelta(days=5)).isoformat(),
+             "bis_tag": self.montag.isoformat()},
+            follow=True,
+        )
+
+        self.assertEqual(Sperrzeit.objects.count(), 0)
+        self.assertContains(antwort, "nach dem Beginn")
+
+    def test_buchungsliste_kennt_alle_filter(self):
+        for status in ("aktiv", "vergangen", "offen", "bestaetigt", "storniert", "quatsch"):
+            with self.subTest(status=status):
+                antwort = self.client.get(reverse("termine:buchungen"), {"status": status})
+                self.assertEqual(antwort.status_code, 200)
+
+    def test_absage_einer_beendeten_buchung_ist_folgenlos(self):
+        buchung = Buchung.objects.create(
+            termin=self.termin_fuer(self.anna), name="Max Muster",
+            email="max@example.org", status=Buchung.Status.STORNIERT,
+        )
+
+        antwort = self.client.post(
+            reverse("termine:buchung_absagen", args=[buchung.pk]), follow=True
+        )
+
+        self.assertContains(antwort, "bereits beendet")
+
+    def test_regelformular_zeigt_eine_vorschau(self):
+        regel = RhythmusRegel.objects.create(
+            fahrlehrer=self.anna, terminart=self.art,
+            wochentage=[0, 1, 2, 3, 4], beginn=dt.time(9, 0), ende=dt.time(11, 0),
+            gueltig_ab=timezone.localdate(),
+        )
+
+        antwort = self.client.get(reverse("termine:regel_bearbeiten", args=[regel.pk]))
+
+        self.assertEqual(antwort.status_code, 200)
+        self.assertGreater(len(antwort.context["vorschau_tage"]), 0)
+
+    def test_loeschen_kehrt_zur_herkunftsseite_zurueck(self):
+        termin = self.termin_fuer(self.anna)
+        herkunft = f"/intern/planung/?woche={self.montag:%Y-%m-%d}"
+
+        antwort = self.client.post(
+            reverse("termine:termin_loeschen", args=[termin.pk]),
+            HTTP_REFERER=f"http://testserver{herkunft}",
+        )
+
+        self.assertEqual(antwort["Location"], f"http://testserver{herkunft}")
+
+    def test_fremde_herkunftsseite_wird_ignoriert(self):
+        termin = self.termin_fuer(self.anna)
+
+        antwort = self.client.post(
+            reverse("termine:termin_loeschen", args=[termin.pk]),
+            HTTP_REFERER="https://boese.example/weiterleitung",
+        )
+
+        self.assertEqual(antwort["Location"], reverse("termine:tagesplanung"))
