@@ -66,17 +66,106 @@ p { margin: 0 0 1em; }
 
 /* --- Kopf und Fuß --- */
 
+/* Die Kopfzeile bleibt beim Scrollen stehen. Auf dem Handy ist das der
+   Unterschied zwischen „einmal ganz nach oben wischen" und „direkt zum
+   nächsten Bereich"; die Planung ist lang genug, dass das zählt. */
 .kopf {
-  background: var(--flaeche);
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--flaeche) 85%, transparent);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
   border-bottom: 1px solid var(--linie);
-  padding: 0.9rem 0;
   margin-bottom: 1.5rem;
 }
-.kopf .huelle { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-.kopf .marke {
-  font-weight: 700; font-size: 1.05rem; color: var(--text); text-decoration: none;
+/* Browser ohne backdrop-filter bekommen eine deckende Fläche statt
+   milchig durchscheinendem Text. */
+@supports not (backdrop-filter: blur(1px)) {
+  .kopf { background: var(--flaeche); }
 }
-.kopf nav { margin-left: auto; display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.92rem; }
+
+/* Der Kopf spannt breiter als der Inhalt darunter. Marke, fünf Punkte und
+   die Abmeldung brauchen zusammen mehr als die 1040 px, auf die der Text
+   bewusst begrenzt ist – ohne diese Ausnahme kürzt der Browser den Namen der
+   Fahrschule weg, obwohl der Bildschirm breit genug wäre. */
+.kopf-inhalt {
+  display: flex; align-items: center; gap: 0.75rem;
+  max-width: 1240px; min-height: 3.5rem;
+}
+
+.marke {
+  display: inline-flex; align-items: center; gap: 0.6rem; min-width: 0;
+  font-weight: 700; font-size: 1.02rem; color: var(--text); text-decoration: none;
+  letter-spacing: -0.01em;
+}
+.marke-zeichen {
+  display: grid; place-items: center; flex: none;
+  width: 2rem; height: 2rem; border-radius: 9px;
+  background: var(--gruen-hell); color: var(--gruen);
+  border: 1px solid color-mix(in srgb, var(--gruen) 22%, transparent);
+}
+.marke-zeichen svg { width: 1.05rem; height: 1.05rem; }
+/* Lange Fahrschulnamen dürfen den Schalter nicht aus der Zeile drängen. */
+.marke-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- Navigation --- */
+
+.menue { margin-left: auto; }
+
+.menue-inhalt {
+  display: flex; align-items: center; gap: 0.15rem;
+  font-size: 0.92rem;
+}
+/* Ab dieser Breite ist das Menü keine Klappe mehr, sondern eine Leiste: Der
+   Inhalt gehört immer sichtbar, unabhängig davon, ob <details> gerade offen
+   ist. Neuere Browser verstecken ihn über ::details-content, ältere über
+   display:none am Kind – die Zeile oben nimmt das eine zurück, diese das
+   andere. */
+@media (min-width: 761px) {
+  .menue::details-content { content-visibility: visible; }
+}
+.menue-inhalt a {
+  padding: 0.45rem 0.75rem; border-radius: 999px;
+  color: var(--text-leise); text-decoration: none; font-weight: 550;
+  white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.menue-inhalt a:hover { background: var(--grund); color: var(--text); }
+.menue-inhalt a.aktiv { background: var(--gruen-hell); color: var(--gruen-dunkel); }
+.menue-inhalt a:focus-visible { outline: 2px solid var(--gruen); outline-offset: 2px; }
+.menue-abmelden { margin-left: 0.4rem; }
+
+/* Der Schalter erscheint nur auf schmalen Geräten (siehe unten). */
+.menue-schalter {
+  display: none; list-style: none; cursor: pointer;
+  width: 2.75rem; height: 2.75rem; border-radius: 10px;
+  align-items: center; justify-content: center;
+  color: var(--text); border: 1px solid var(--linie); background: var(--flaeche);
+}
+.menue-schalter::-webkit-details-marker { display: none; }
+.menue-schalter svg { width: 1.35rem; height: 1.35rem; }
+.menue-schalter:hover { background: var(--grund); }
+.menue-kreuz { display: none; }
+.menue[open] .menue-strich { display: none; }
+.menue[open] .menue-kreuz { display: block; }
+
+@media (max-width: 760px) {
+  .menue-schalter { display: flex; }
+  .menue-inhalt {
+    position: absolute; right: 1rem; left: 1rem; top: calc(100% + 0.5rem);
+    flex-direction: column; align-items: stretch; gap: 0.1rem;
+    padding: 0.5rem; border-radius: var(--radius);
+    background: var(--flaeche); border: 1px solid var(--linie);
+    box-shadow: var(--schatten);
+  }
+  /* Fingerbreite Ziele statt Textzeilen. */
+  .menue-inhalt a { padding: 0.7rem 0.8rem; border-radius: var(--radius-klein); }
+  .menue-abmelden { margin: 0.35rem 0 0; border-top: 1px solid var(--linie); padding-top: 0.5rem; }
+  .menue-abmelden .knopf { width: 100%; justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menue-inhalt a { transition: none; }
+}
 
 .fuss {
   margin-top: 3rem; padding: 1.5rem 0; border-top: 1px solid var(--linie);

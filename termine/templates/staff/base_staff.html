@@ -1,13 +1,47 @@
 {% extends "base.html" %}
+{% load navigation %}
 
 {% block navigation %}
-  <a href="{% url 'termine:dashboard' %}">Übersicht</a>
-  <a href="{% url 'termine:tagesplanung' %}">Tagesplanung</a>
-  <a href="{% url 'termine:regeln' %}">Rhythmus-Regeln</a>
-  <a href="{% url 'termine:buchungen' %}">Buchungen</a>
-  {% if user.is_staff %}<a href="/django-admin/">Stammdaten</a>{% endif %}
-  <form method="post" action="{% url 'termine:logout' %}" style="display:inline">
-    {% csrf_token %}
-    <button type="submit" class="knopf knopf--leise knopf--klein">Abmelden</button>
-  </form>
+  {% comment %}
+    Ein <details> statt eines Skripts: Auf schmalen Geräten klappt die
+    Navigation über den Schalter auf, ab 760 px zeigt das Stylesheet sie
+    dauerhaft an und blendet den Schalter aus. Damit funktioniert das Menü
+    auch ohne JavaScript – genau wie der Rest der App.
+  {% endcomment %}
+  <details class="menue">
+    <summary class="menue-schalter" aria-label="Menü">
+      <svg class="menue-strich" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M4 7h16M4 12h16M4 17h16"></path>
+      </svg>
+      <svg class="menue-kreuz" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18"></path>
+      </svg>
+    </summary>
+
+    <nav class="menue-inhalt" aria-label="Interner Bereich">
+      {% aktiv 'dashboard' as hier %}
+      <a class="{{ hier }}" {% if hier %}aria-current="page"{% endif %}
+         href="{% url 'termine:dashboard' %}">Übersicht</a>
+
+      {% aktiv 'tagesplanung' 'termine_anlegen' 'sperrzeit_anlegen' 'generieren' as hier %}
+      <a class="{{ hier }}" {% if hier %}aria-current="page"{% endif %}
+         href="{% url 'termine:tagesplanung' %}">Tagesplanung</a>
+
+      {% aktiv 'regeln' 'regel_neu' 'regel_bearbeiten' as hier %}
+      <a class="{{ hier }}" {% if hier %}aria-current="page"{% endif %}
+         href="{% url 'termine:regeln' %}">Rhythmus-Regeln</a>
+
+      {% aktiv 'buchungen' as hier %}
+      <a class="{{ hier }}" {% if hier %}aria-current="page"{% endif %}
+         href="{% url 'termine:buchungen' %}">Buchungen</a>
+
+      {% if user.is_staff %}<a href="/django-admin/">Stammdaten</a>{% endif %}
+      <form class="menue-abmelden" method="post" action="{% url 'termine:logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="knopf knopf--leise knopf--klein">Abmelden</button>
+      </form>
+    </nav>
+  </details>
 {% endblock %}
