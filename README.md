@@ -14,6 +14,9 @@ anhand des Bundeslands übersprungen.
 **Für Interessenten (öffentlich, ohne Login)**
 
 - Monatskalender mit allen freien Terminen, filterbar nach Terminart und Fahrlehrer
+- Die Filterleiste erscheint nur, wo es etwas zu wählen gibt: Bei einer
+  Fahrschule mit einem Fahrlehrer und einer Terminart landet der Kunde direkt
+  im Kalender
 - Buchung mit Name, E-Mail, Telefon, Führerscheinklasse und Nachricht
 - Double-Opt-in: der Termin wird erst nach Klick auf den Link in der E-Mail verbindlich
 - Bestätigungsmail mit Kalendereintrag (.ics) im Anhang

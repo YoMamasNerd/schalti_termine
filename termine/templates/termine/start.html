@@ -7,38 +7,49 @@
   <p>Wählen Sie einen freien Termin. Sie erhalten anschließend eine E-Mail mit
      einem Bestätigungslink – erst danach ist der Termin verbindlich.</p>
 
-  <form class="karte" method="get" action="{% url 'termine:start' %}" style="margin-bottom:1rem">
-    <div class="raster-zwei">
-      <div class="feld" style="margin-bottom:0">
-        <label for="art">Worum geht es?</label>
-        <select name="art" id="art">
-          <option value="">Alle Terminarten</option>
-          {% for art in alle_terminarten %}
-            <option value="{{ art.slug }}" {% if terminart and terminart.pk == art.pk %}selected{% endif %}>
-              {{ art.name }} ({{ art.dauer_minuten }} Min.)
-            </option>
-          {% endfor %}
-        </select>
+  {% comment %}
+    Die Filterleiste erscheint nur, wenn es tatsächlich etwas auszuwählen gibt.
+    Bei einer Fahrschule mit einem Fahrlehrer und einer Terminart entfällt sie
+    komplett – der Kunde geht direkt in den Kalender.
+  {% endcomment %}
+  {% if terminart_auswahl or fahrlehrer_auswahl %}
+    <form class="karte" method="get" action="{% url 'termine:start' %}" style="margin-bottom:1rem">
+      <div {% if terminart_auswahl and fahrlehrer_auswahl %}class="raster-zwei"{% endif %}>
+        {% if terminart_auswahl %}
+          <div class="feld" style="margin-bottom:0">
+            <label for="art">Worum geht es?</label>
+            <select name="art" id="art">
+              <option value="">Alle Terminarten</option>
+              {% for art in alle_terminarten %}
+                <option value="{{ art.slug }}" {% if terminart and terminart.pk == art.pk %}selected{% endif %}>
+                  {{ art.name }} ({{ art.dauer_minuten }} Min.)
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        {% endif %}
+        {% if fahrlehrer_auswahl %}
+          <div class="feld" style="margin-bottom:0">
+            <label for="fahrlehrer">Bei wem?</label>
+            <select name="fahrlehrer" id="fahrlehrer">
+              <option value="">Egal – alle anzeigen</option>
+              {% for person in alle_fahrlehrer %}
+                <option value="{{ person.slug }}" {% if fahrlehrer and fahrlehrer.pk == person.pk %}selected{% endif %}>
+                  {{ person.name }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        {% endif %}
       </div>
-      <div class="feld" style="margin-bottom:0">
-        <label for="fahrlehrer">Bei wem?</label>
-        <select name="fahrlehrer" id="fahrlehrer">
-          <option value="">Egal – alle anzeigen</option>
-          {% for person in alle_fahrlehrer %}
-            <option value="{{ person.slug }}" {% if fahrlehrer and fahrlehrer.pk == person.pk %}selected{% endif %}>
-              {{ person.name }}
-            </option>
-          {% endfor %}
-        </select>
+      <div class="knopfreihe" style="margin-top:0.9rem">
+        <button class="knopf" type="submit">Termine anzeigen</button>
+        {% if terminart_auswahl and terminart or fahrlehrer_auswahl and fahrlehrer %}
+          <a class="knopf knopf--leise" href="{% url 'termine:start' %}">Filter zurücksetzen</a>
+        {% endif %}
       </div>
-    </div>
-    <div class="knopfreihe" style="margin-top:0.9rem">
-      <button class="knopf" type="submit">Termine anzeigen</button>
-      {% if terminart or fahrlehrer %}
-        <a class="knopf knopf--leise" href="{% url 'termine:start' %}">Filter zurücksetzen</a>
-      {% endif %}
-    </div>
-  </form>
+    </form>
+  {% endif %}
 
   {% if fahrlehrer and fahrlehrer.beschreibung %}
     <div class="hinweis">{{ fahrlehrer.beschreibung|linebreaksbr }}</div>

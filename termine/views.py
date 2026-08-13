@@ -72,6 +72,17 @@ def _monatsgrenzen(jahr: int, monat: int) -> tuple[dt.date, dt.date]:
 
 def _basis_kontext(request, slug: str | None = None) -> dict:
     fahrlehrer, terminart = _auswahl(request, slug)
+    alle_fahrlehrer = list(Fahrlehrer.objects.filter(aktiv=True))
+    alle_terminarten = list(Terminart.objects.filter(aktiv=True))
+
+    # Gibt es nur einen Fahrlehrer, hat der Kunde nichts zu entscheiden. Er wird
+    # dann still verwendet – so erscheinen seine Feiertage im Kalender und sein
+    # Name verschwindet aus der Terminliste, ohne dass die URL einen
+    # überflüssigen Parameter mitschleppt.
+    fahrlehrer_implizit = fahrlehrer is None and len(alle_fahrlehrer) == 1
+    if fahrlehrer_implizit:
+        fahrlehrer = alle_fahrlehrer[0]
+
     jahr, monat = _monat_aus_get(request)
     try:
         gitter_von, gitter_bis = _monatsgrenzen(jahr, monat)
@@ -102,8 +113,11 @@ def _basis_kontext(request, slug: str | None = None) -> dict:
     return {
         "fahrlehrer": fahrlehrer,
         "terminart": terminart,
-        "alle_fahrlehrer": Fahrlehrer.objects.filter(aktiv=True),
-        "alle_terminarten": Terminart.objects.filter(aktiv=True),
+        "alle_fahrlehrer": alle_fahrlehrer,
+        "alle_terminarten": alle_terminarten,
+        # Nur anbieten, wo es tatsächlich etwas zu wählen gibt.
+        "fahrlehrer_auswahl": len(alle_fahrlehrer) > 1,
+        "terminart_auswahl": len(alle_terminarten) > 1,
         "jahr": jahr,
         "monat": monat,
         "monatsname": date_format(erster_im_monat, "F Y"),
@@ -121,7 +135,7 @@ def _basis_kontext(request, slug: str | None = None) -> dict:
             else None
         ),
         "horizont": horizont,
-        "querystring": _querystring(fahrlehrer, terminart),
+        "querystring": _querystring(None if fahrlehrer_implizit else fahrlehrer, terminart),
     }
 
 
