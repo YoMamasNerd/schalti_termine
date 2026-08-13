@@ -256,6 +256,19 @@ nicht `403` – die App verrät damit nicht einmal, dass es den Termin gibt.
 htmx liegt als eine Datei unter `static/js/` – es gibt bewusst keinen
 Paketmanager fürs Frontend.
 
+### Kopfzeile und Navigation
+
+Die Kopfzeile bleibt beim Scrollen stehen und legt sich milchig über den
+Inhalt. Die Punkte des internen Bereichs sind Pillen; der Bereich, in dem man
+gerade steht, ist eingefärbt und für Screenreader zusätzlich mit
+`aria-current="page"` ausgezeichnet. Zu einem Punkt gehören auch seine
+Unterseiten – das Regelformular färbt „Rhythmus-Regeln" ein, nicht nichts.
+
+Unter 760 px klappt die Navigation hinter einen Schalter. Dahinter steckt ein
+`<details>`-Element und kein Skript: Damit funktioniert das Menü auch ohne
+JavaScript, passend zum Rest der App. Auf breiten Bildschirmen nimmt das
+Stylesheet die Klappmechanik wieder zurück und zeigt eine Leiste.
+
 ---
 
 ## Schnellstart (Entwicklung)
@@ -427,6 +440,15 @@ Bewusst nicht gebaut, weil nicht besprochen:
 - Bei einem einzelnen Fahrlehrer bleiben die Auswahlfelder in den internen
   Formularen sichtbar (auf der öffentlichen Seite entfallen sie).
 
+**Die Kundenseite ist für das Handy gebaut, der interne Bereich für den
+Schreibtisch.** Kalender, Terminliste und Buchungsformular ordnen sich schon
+ab 390 px sauber untereinander – dort kommen die Interessenten an, meist vom
+Telefon. Der interne Bereich funktioniert auf dem Handy, ist aber nicht dafür
+gemacht: Die Wochenansicht der Tagesplanung stapelt sieben Tage untereinander,
+und die Tabellen von Übersicht und Buchungsliste sind breiter als der
+Bildschirm – sie werden am rechten Rand abgeschnitten, statt scrollbar zu
+sein. Wer unterwegs nachsehen will, wer morgen kommt, dreht das Gerät quer.
+
 ---
 
 ## Tests
@@ -435,7 +457,7 @@ Bewusst nicht gebaut, weil nicht besprochen:
 python manage.py test termine
 ```
 
-169 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
+174 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
 Fehler unbemerkt bleiben würden:
 
 | Bereich | Was geprüft wird |
@@ -484,8 +506,8 @@ termine/
     ics.py             Kalendereinträge und Abo-Feed
     mail.py            E-Mail-Versand
     einrichtung.py     Erkennt die noch nicht eingerichtete Installation
-  templatetags/    Holt den Einrichtungshinweis in fremde Vorlagen
-  tests/           169 Tests, 97 % Zeilenabdeckung (siehe unten)
+  templatetags/    Einrichtungshinweis und aktiver Navigationspunkt
+  tests/           174 Tests, 97 % Zeilenabdeckung (siehe unten)
 static/            CSS und htmx
 docs/bilder/       Screenshots für diese README
 ```

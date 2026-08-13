@@ -30,6 +30,17 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
 | Kalender | `icalendar` für `.ics`-Anhang und Abo-Feed |
 | Sprache | Deutsch – Oberfläche, Code-Kommentare, Commit-Nachrichten. Keine Übersetzungsdateien. |
 
+### Oberfläche
+
+- Kopfzeile klebt beim Scrollen, milchig über dem Inhalt; Navigationspunkte als
+  Pillen mit eingefärbtem aktivem Bereich (`aria-current="page"`).
+- Unter 760 px klappt die Navigation hinter einen Schalter – als `<details>`,
+  **ohne JavaScript**. Kein Skript für Aufklappmenüs nachrüsten.
+- Der Kopf darf breiter spannen (1240 px) als der Inhalt (1040 px); sonst passt
+  der Name der Fahrschule nicht neben die fünf Punkte.
+- Die öffentliche Seite ist auf das Handy optimiert, der interne Bereich auf den
+  Schreibtisch. Das ist eine Entscheidung, kein Versehen.
+
 ### Zugriff und Login
 
 - **Kein Kundenkonto.** Interessenten buchen ohne Registrierung.
@@ -98,7 +109,7 @@ coverage run manage.py test termine && coverage report
 
 - `main` trägt den stabilen Stand. Entwickelt wird auf einem eigenen Branch,
   der erst nach grüner Testsuite dorthin zurückfließt.
-- Stand: 169 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
+- Stand: 174 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
   der Schwerpunkt liegt dort, wo ein Fehler unbemerkt bliebe (Jobs, Kommandos,
   Ausfallpfade des Mailversands).
 - Commit-Nachrichten auf Deutsch, im Stil der bestehenden Historie: erst was
