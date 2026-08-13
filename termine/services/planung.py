@@ -1,0 +1,307 @@
+"""Erzeugt aus Rhythmus-Regeln konkrete Termine und pflegt sie fort.
+
+Leitplanken, die der Generator immer einhält:
+
+* Er fasst **nur die Zukunft** an. Alles vor „jetzt“ bleibt unverändert.
+* Er löscht **niemals** reservierte oder gebuchte Termine.
+* Er löscht **niemals** von Hand angelegte Termine.
+* Er ist **idempotent**: zweimal laufen lassen ändert nichts.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import logging
+from dataclasses import dataclass, field
+
+from django.conf import settings
+from django.db import transaction
+from django.utils import timezone
+
+from ..models import Fahrlehrer, RhythmusRegel, Sperrzeit, Termin, Terminart
+from .feiertage import feiertage_im_zeitraum
+
+logger = logging.getLogger(__name__)
+
+
+def lokal(tag: dt.date, uhrzeit: dt.time) -> dt.datetime:
+    """Kombiniert Datum und lokale Uhrzeit zu einem zeitzonenbewussten Zeitpunkt."""
+    return timezone.make_aware(dt.datetime.combine(tag, uhrzeit))
+
+
+@dataclass
+class Bericht:
+    """Was ein Generatorlauf getan hat – für Log, Admin-Meldung und Tests."""
+
+    fahrlehrer: str = ""
+    von: dt.date | None = None
+    bis: dt.date | None = None
+    erstellt: int = 0
+    entfernt: int = 0
+    unveraendert: int = 0
+    feiertage_uebersprungen: int = 0
+    sperrzeiten_uebersprungen: int = 0
+    konflikte_uebersprungen: int = 0
+    feiertage: dict[dt.date, str] = field(default_factory=dict)
+
+    def __add__(self, other: "Bericht") -> "Bericht":
+        summe = Bericht(von=self.von, bis=self.bis)
+        summe.erstellt = self.erstellt + other.erstellt
+        summe.entfernt = self.entfernt + other.entfernt
+        summe.unveraendert = self.unveraendert + other.unveraendert
+        summe.feiertage_uebersprungen = (
+            self.feiertage_uebersprungen + other.feiertage_uebersprungen
+        )
+        summe.sperrzeiten_uebersprungen = (
+            self.sperrzeiten_uebersprungen + other.sperrzeiten_uebersprungen
+        )
+        summe.konflikte_uebersprungen = (
+            self.konflikte_uebersprungen + other.konflikte_uebersprungen
+        )
+        summe.feiertage = {**self.feiertage, **other.feiertage}
+        return summe
+
+    def als_text(self) -> str:
+        teile = [
+            f"{self.erstellt} erstellt",
+            f"{self.entfernt} entfernt",
+            f"{self.unveraendert} unverändert",
+        ]
+        if self.feiertage_uebersprungen:
+            teile.append(f"{self.feiertage_uebersprungen} wegen Feiertag ausgelassen")
+        if self.sperrzeiten_uebersprungen:
+            teile.append(f"{self.sperrzeiten_uebersprungen} wegen Sperrzeit ausgelassen")
+        if self.konflikte_uebersprungen:
+            teile.append(f"{self.konflikte_uebersprungen} wegen Überschneidung ausgelassen")
+        return ", ".join(teile)
+
+
+def slots_einer_regel(regel: RhythmusRegel, tag: dt.date) -> list[tuple[dt.datetime, dt.datetime]]:
+    """Zerlegt das Zeitfenster einer Regel an einem Tag in einzelne Termine.
+
+    Es wird nur ein Termin erzeugt, wenn er komplett in das Fenster passt – ein
+    angebrochener Rest am Ende fällt weg.
+    """
+    art = regel.terminart
+    dauer = dt.timedelta(minutes=art.dauer_minuten)
+    schritt = dt.timedelta(minutes=art.schrittweite_minuten)
+
+    fenster_beginn = lokal(tag, regel.beginn)
+    fenster_ende = lokal(tag, regel.ende)
+
+    slots: list[tuple[dt.datetime, dt.datetime]] = []
+    cursor = fenster_beginn
+    while cursor + dauer <= fenster_ende:
+        slots.append((cursor, cursor + dauer))
+        cursor += schritt
+    return slots
+
+
+def _ueberschneidet(a_beginn, a_ende, b_beginn, b_ende) -> bool:
+    return a_beginn < b_ende and b_beginn < a_ende
+
+
+def gewuenschte_termine(
+    fahrlehrer: Fahrlehrer, von: dt.date, bis: dt.date, bericht: Bericht
+) -> dict[dt.datetime, tuple[dt.datetime, Terminart, RhythmusRegel]]:
+    """Der Soll-Zustand: welche Termine die Regeln in diesem Zeitraum ergeben."""
+    regeln = list(
+        RhythmusRegel.objects.filter(fahrlehrer=fahrlehrer, aktiv=True).select_related("terminart")
+    )
+    if not regeln:
+        return {}
+
+    feiertage = feiertage_im_zeitraum(fahrlehrer.bundesland, von, bis)
+    bericht.feiertage = feiertage
+
+    roh: list[tuple[dt.datetime, dt.datetime, Terminart, RhythmusRegel]] = []
+    tag = von
+    while tag <= bis:
+        ist_feiertag = tag in feiertage
+        for regel in regeln:
+            if not regel.gilt_am(tag):
+                continue
+            if ist_feiertag and regel.feiertage_auslassen:
+                bericht.feiertage_uebersprungen += len(slots_einer_regel(regel, tag))
+                continue
+            for beginn, ende in slots_einer_regel(regel, tag):
+                roh.append((beginn, ende, regel.terminart, regel))
+        tag += dt.timedelta(days=1)
+
+    # Sperrzeiten des Fahrlehrers im Zeitraum vorab laden.
+    fenster_start = lokal(von, dt.time.min)
+    fenster_ende = lokal(bis, dt.time.max)
+    sperren = list(
+        Sperrzeit.objects.filter(
+            fahrlehrer=fahrlehrer, beginn__lt=fenster_ende, ende__gt=fenster_start
+        ).values_list("beginn", "ende")
+    )
+
+    # Überschneidungen zwischen mehreren Regeln auflösen: Wer früher beginnt,
+    # gewinnt. So kann eine zweite Regel dasselbe Fenster nicht doppelt belegen.
+    roh.sort(key=lambda eintrag: (eintrag[0], eintrag[1]))
+    soll: dict[dt.datetime, tuple[dt.datetime, Terminart, RhythmusRegel]] = {}
+    letztes_ende: dt.datetime | None = None
+    for beginn, ende, art, regel in roh:
+        if letztes_ende is not None and beginn < letztes_ende:
+            bericht.konflikte_uebersprungen += 1
+            continue
+        if any(_ueberschneidet(beginn, ende, s_beginn, s_ende) for s_beginn, s_ende in sperren):
+            bericht.sperrzeiten_uebersprungen += 1
+            continue
+        soll[beginn] = (ende, art, regel)
+        letztes_ende = ende
+    return soll
+
+
+@transaction.atomic
+def generiere_termine(
+    fahrlehrer: Fahrlehrer,
+    *,
+    wochen: int | None = None,
+    ab: dt.date | None = None,
+    aufraeumen: bool = True,
+) -> Bericht:
+    """Rollt die Rhythmus-Regeln eines Fahrlehrers in konkrete Termine aus."""
+    wochen = wochen or fahrlehrer.horizont_wochen or settings.DEFAULT_HORIZON_WEEKS
+    jetzt = timezone.now()
+    von = ab or timezone.localdate(jetzt)
+    bis = von + dt.timedelta(days=wochen * 7 - 1)
+
+    bericht = Bericht(fahrlehrer=fahrlehrer.name, von=von, bis=bis)
+
+    # Der Generator arbeitet ausschließlich in der Zukunft.
+    fenster_start = max(lokal(von, dt.time.min), jetzt)
+    fenster_ende = lokal(bis, dt.time.max)
+
+    soll = gewuenschte_termine(fahrlehrer, von, bis, bericht)
+    soll = {beginn: wert for beginn, wert in soll.items() if beginn >= fenster_start}
+
+    bestand = list(
+        Termin.objects.select_for_update()
+        .filter(fahrlehrer=fahrlehrer, beginn__gte=fenster_start, beginn__lte=fenster_ende)
+        .order_by("beginn")
+    )
+    bestand_nach_beginn = {termin.beginn: termin for termin in bestand}
+
+    # 1. Aufräumen: freie Regel-Termine, die es laut Regeln nicht mehr geben soll.
+    if aufraeumen:
+        zu_loeschen = [
+            termin.pk
+            for termin in bestand
+            if termin.herkunft == Termin.Herkunft.REGEL
+            and termin.status == Termin.Status.FREI
+            and termin.beginn not in soll
+        ]
+        if zu_loeschen:
+            geloescht, _ = Termin.objects.filter(pk__in=zu_loeschen).delete()
+            bericht.entfernt = len(zu_loeschen)
+            bestand = [t for t in bestand if t.pk not in set(zu_loeschen)]
+            bestand_nach_beginn = {t.beginn: t for t in bestand}
+
+    # 2. Anlegen, was fehlt – ohne bestehende Termine zu überlappen.
+    belegt = [(t.beginn, t.ende) for t in bestand]
+    neue: list[Termin] = []
+    for beginn in sorted(soll):
+        ende, art, regel = soll[beginn]
+        if beginn in bestand_nach_beginn:
+            bericht.unveraendert += 1
+            continue
+        if any(_ueberschneidet(beginn, ende, b_beginn, b_ende) for b_beginn, b_ende in belegt):
+            bericht.konflikte_uebersprungen += 1
+            continue
+        neue.append(
+            Termin(
+                fahrlehrer=fahrlehrer,
+                terminart=art,
+                beginn=beginn,
+                ende=ende,
+                status=Termin.Status.FREI,
+                herkunft=Termin.Herkunft.REGEL,
+                regel=regel,
+            )
+        )
+        belegt.append((beginn, ende))
+
+    if neue:
+        # ignore_conflicts schützt gegen parallele Läufe (Unique-Constraint auf
+        # fahrlehrer + beginn), ohne den ganzen Lauf abzubrechen.
+        Termin.objects.bulk_create(neue, ignore_conflicts=True)
+        bericht.erstellt = len(neue)
+
+    logger.info("Terminplanung %s (%s bis %s): %s", fahrlehrer, von, bis, bericht.als_text())
+    return bericht
+
+
+def generiere_alle(*, wochen: int | None = None, ab: dt.date | None = None) -> Bericht:
+    """Läuft über alle aktiven Fahrlehrer."""
+    gesamt = Bericht(fahrlehrer="alle")
+    for fahrlehrer in Fahrlehrer.objects.filter(aktiv=True):
+        gesamt = gesamt + generiere_termine(fahrlehrer, wochen=wochen, ab=ab)
+    return gesamt
+
+
+def vorschau(
+    fahrlehrer: Fahrlehrer, *, wochen: int | None = None, ab: dt.date | None = None
+) -> tuple[dict[dt.datetime, tuple], Bericht]:
+    """Wie `generiere_termine`, aber ohne zu schreiben – für die Regel-Vorschau."""
+    wochen = wochen or fahrlehrer.horizont_wochen
+    von = ab or timezone.localdate()
+    bis = von + dt.timedelta(days=wochen * 7 - 1)
+    bericht = Bericht(fahrlehrer=fahrlehrer.name, von=von, bis=bis)
+    return gewuenschte_termine(fahrlehrer, von, bis, bericht), bericht
+
+
+@transaction.atomic
+def termine_manuell_anlegen(
+    fahrlehrer: Fahrlehrer,
+    terminart: Terminart,
+    tag: dt.date,
+    von: dt.time,
+    bis: dt.time,
+    *,
+    notiz: str = "",
+) -> tuple[list[Termin], int]:
+    """Legt für einen einzelnen Tag von Hand eine Terminreihe an.
+
+    Das ist die Funktion hinter der Tagesplanung: „Am 17.09. von 14:00 bis 17:00
+    Beratungen anbieten“. Gibt die neuen Termine und die Zahl der wegen
+    Überschneidung ausgelassenen zurück.
+    """
+    dauer = dt.timedelta(minutes=terminart.dauer_minuten)
+    schritt = dt.timedelta(minutes=terminart.schrittweite_minuten)
+
+    fenster_beginn = lokal(tag, von)
+    fenster_ende = lokal(tag, bis)
+
+    belegt = list(
+        Termin.objects.select_for_update()
+        .filter(fahrlehrer=fahrlehrer, beginn__lt=fenster_ende, ende__gt=fenster_beginn)
+        .values_list("beginn", "ende")
+    )
+
+    neue: list[Termin] = []
+    uebersprungen = 0
+    cursor = fenster_beginn
+    while cursor + dauer <= fenster_ende:
+        beginn, ende = cursor, cursor + dauer
+        if any(_ueberschneidet(beginn, ende, b, e) for b, e in belegt):
+            uebersprungen += 1
+        else:
+            neue.append(
+                Termin(
+                    fahrlehrer=fahrlehrer,
+                    terminart=terminart,
+                    beginn=beginn,
+                    ende=ende,
+                    status=Termin.Status.FREI,
+                    herkunft=Termin.Herkunft.MANUELL,
+                    notiz=notiz,
+                )
+            )
+            belegt.append((beginn, ende))
+        cursor += schritt
+
+    if neue:
+        Termin.objects.bulk_create(neue, ignore_conflicts=True)
+    return neue, uebersprungen

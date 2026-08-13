@@ -1,0 +1,8 @@
+Ein Termin von {{ fahrlehrer.name }} wurde storniert:
+
+  Wann:      {{ beginn|date:"l, j. F Y" }}, {{ beginn|date:"H:i" }} bis {{ ende|date:"H:i" }} Uhr
+  Was:       {{ terminart.name }}
+  Wer:       {{ buchung.name }} ({{ buchung.email }}{% if buchung.telefon %}, {{ buchung.telefon }}{% endif %})
+  Abgesagt:  von {{ buchung.storniert_von }}
+
+Der Termin steht wieder zur Buchung bereit.

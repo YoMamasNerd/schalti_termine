@@ -1,0 +1,19 @@
+Hallo {{ buchung.name }},
+
+Ihr Beratungstermin wurde storniert:
+
+  Wann:      {{ beginn|date:"l, j. F Y" }}, {{ beginn|date:"H:i" }} bis {{ ende|date:"H:i" }} Uhr
+  Was:       {{ terminart.name }}
+  Bei wem:   {{ fahrlehrer.name }}
+{% if buchung.storniert_von == "fahrschule" %}
+Die Absage kam von uns – das tut uns leid. Bitte suchen Sie sich gerne einen
+neuen Termin aus:
+{% else %}
+Sie haben den Termin selbst abgesagt. Sie können jederzeit einen neuen buchen:
+{% endif %}
+{{ site_url }}
+
+Der angehängte Kalendereintrag entfernt den Termin wieder aus Ihrem Kalender.
+
+Viele Grüße
+{{ site_name }}

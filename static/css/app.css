@@ -1,0 +1,301 @@
+/* Schalti Termine – Basis-Stylesheet.
+   Bewusst ohne Build-Schritt: eine Datei, reines CSS, überall lesbar. */
+
+:root {
+  --gruen: #2f6f4e;
+  --gruen-hell: #e8f2ec;
+  --gruen-dunkel: #235640;
+  --rot: #b3261e;
+  --rot-hell: #fdecea;
+  --gelb: #8a6100;
+  --gelb-hell: #fdf4e0;
+
+  --text: #1c1f1d;
+  --text-leise: #5d6763;
+  --linie: #dbe2de;
+  --flaeche: #ffffff;
+  --grund: #f5f7f6;
+
+  --radius: 10px;
+  --radius-klein: 6px;
+  --schatten: 0 1px 2px rgba(20, 30, 25, 0.06), 0 4px 12px rgba(20, 30, 25, 0.05);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --gruen: #6fbc93;
+    --gruen-hell: #1e2f27;
+    --gruen-dunkel: #8ed3ac;
+    --rot: #f2b8b5;
+    --rot-hell: #3a2220;
+    --gelb: #e5c37c;
+    --gelb-hell: #33291480;
+
+    --text: #e6ebe8;
+    --text-leise: #a3aeaa;
+    --linie: #333c38;
+    --flaeche: #1b201e;
+    --grund: #131715;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--grund);
+  -webkit-text-size-adjust: 100%;
+}
+
+a { color: var(--gruen); }
+a:hover { color: var(--gruen-dunkel); }
+
+h1, h2, h3 { line-height: 1.25; margin: 0 0 0.5em; font-weight: 650; }
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.2rem; }
+h3 { font-size: 1rem; }
+p { margin: 0 0 1em; }
+
+.huelle { max-width: 1040px; margin: 0 auto; padding: 0 1rem; }
+.huelle-schmal { max-width: 620px; margin: 0 auto; padding: 0 1rem; }
+
+/* --- Kopf und Fuß --- */
+
+.kopf {
+  background: var(--flaeche);
+  border-bottom: 1px solid var(--linie);
+  padding: 0.9rem 0;
+  margin-bottom: 1.5rem;
+}
+.kopf .huelle { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.kopf .marke {
+  font-weight: 700; font-size: 1.05rem; color: var(--text); text-decoration: none;
+}
+.kopf nav { margin-left: auto; display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.92rem; }
+
+.fuss {
+  margin-top: 3rem; padding: 1.5rem 0; border-top: 1px solid var(--linie);
+  color: var(--text-leise); font-size: 0.85rem;
+}
+.fuss a { color: var(--text-leise); }
+
+/* --- Karten --- */
+
+.karte {
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--schatten);
+}
+.karte + .karte { margin-top: 1rem; }
+.karte h2 { margin-top: 0; }
+
+.raster-zwei {
+  display: grid; gap: 1.25rem;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: start;
+}
+@media (max-width: 760px) { .raster-zwei { grid-template-columns: 1fr; } }
+
+/* --- Kalender --- */
+
+.kalender-kopf {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.kalender-kopf h2 { margin: 0; font-size: 1.05rem; }
+
+.monat { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.monat th {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-leise); font-weight: 600; padding-bottom: 0.4rem;
+}
+.monat td { padding: 2px; }
+
+.tag {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 100%; aspect-ratio: 1 / 1; min-height: 40px;
+  border: 1px solid transparent; border-radius: var(--radius-klein);
+  background: none; color: var(--text-leise);
+  font: inherit; font-size: 0.9rem; text-decoration: none; cursor: default;
+}
+.tag .zahl { line-height: 1.1; }
+.tag .punkt {
+  width: 4px; height: 4px; border-radius: 50%; margin-top: 3px; background: transparent;
+}
+
+.tag--frei {
+  background: var(--gruen-hell); color: var(--gruen-dunkel);
+  border-color: color-mix(in srgb, var(--gruen) 25%, transparent);
+  font-weight: 600; cursor: pointer;
+}
+.tag--frei:hover { border-color: var(--gruen); }
+.tag--frei .punkt { background: var(--gruen); }
+.tag--gewaehlt { background: var(--gruen); color: #fff; border-color: var(--gruen); }
+.tag--gewaehlt .punkt { background: #fff; }
+.tag--fremd { opacity: 0.35; }
+.tag--heute { outline: 2px solid var(--gruen); outline-offset: -2px; }
+.tag--feiertag { color: var(--rot); }
+
+.legende {
+  display: flex; gap: 1rem; flex-wrap: wrap;
+  margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-leise);
+}
+.legende span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.legende i {
+  width: 11px; height: 11px; border-radius: 3px; display: inline-block;
+  background: var(--gruen-hell); border: 1px solid var(--gruen);
+}
+.legende i.frei-voll { background: var(--gruen); }
+.legende i.feiertag { background: var(--rot-hell); border-color: var(--rot); }
+
+/* --- Terminliste --- */
+
+.slots { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fill, minmax(122px, 1fr)); }
+.slot {
+  display: block; text-align: center; text-decoration: none;
+  padding: 0.6rem 0.4rem;
+  border: 1px solid var(--linie); border-radius: var(--radius-klein);
+  background: var(--flaeche); color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.slot:hover { border-color: var(--gruen); background: var(--gruen-hell); color: var(--gruen-dunkel); }
+.slot .uhrzeit { font-weight: 650; display: block; }
+.slot .meta { display: block; font-size: 0.76rem; color: var(--text-leise); }
+.slot:hover .meta { color: var(--gruen-dunkel); }
+
+/* --- Formulare --- */
+
+.feld { margin-bottom: 1rem; }
+.feld label { display: block; font-weight: 600; font-size: 0.92rem; margin-bottom: 0.3rem; }
+.feld .hilfe { font-size: 0.82rem; color: var(--text-leise); margin-top: 0.25rem; }
+.feld .fehler { font-size: 0.85rem; color: var(--rot); margin-top: 0.25rem; }
+
+input[type="text"], input[type="email"], input[type="tel"], input[type="date"],
+input[type="time"], input[type="number"], input[type="password"], select, textarea {
+  width: 100%; padding: 0.55rem 0.65rem;
+  border: 1px solid var(--linie); border-radius: var(--radius-klein);
+  background: var(--flaeche); color: var(--text);
+  font: inherit;
+}
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--gruen); outline-offset: 1px; border-color: var(--gruen);
+}
+textarea { resize: vertical; }
+
+.feld--kontrollkaestchen { display: flex; gap: 0.6rem; align-items: flex-start; }
+.feld--kontrollkaestchen input { margin-top: 0.3rem; flex: none; }
+.feld--kontrollkaestchen label { font-weight: 400; font-size: 0.9rem; }
+
+.honigtopf { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+ul.wochentage { list-style: none; margin: 0; padding: 0; display: flex; gap: 0.75rem; flex-wrap: wrap; }
+ul.wochentage li { display: flex; align-items: center; gap: 0.3rem; }
+ul.wochentage label { font-weight: 400; margin: 0; }
+ul.wochentage input { width: auto; }
+
+/* --- Knöpfe --- */
+
+.knopf {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  padding: 0.55rem 1.1rem; border-radius: var(--radius-klein);
+  border: 1px solid var(--gruen); background: var(--gruen); color: #fff;
+  font: inherit; font-weight: 600; text-decoration: none; cursor: pointer;
+}
+.knopf:hover { background: var(--gruen-dunkel); border-color: var(--gruen-dunkel); color: #fff; }
+.knopf--leise { background: var(--flaeche); color: var(--text); border-color: var(--linie); }
+.knopf--leise:hover { background: var(--grund); color: var(--text); border-color: var(--text-leise); }
+.knopf--gefahr { background: var(--flaeche); color: var(--rot); border-color: var(--rot); }
+.knopf--gefahr:hover { background: var(--rot); color: #fff; }
+.knopf--klein { padding: 0.3rem 0.6rem; font-size: 0.82rem; }
+.knopf[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+.knopfreihe { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
+
+/* --- Hinweise --- */
+
+.hinweis {
+  padding: 0.8rem 1rem; border-radius: var(--radius-klein);
+  border: 1px solid var(--linie); background: var(--flaeche);
+  margin-bottom: 1rem; font-size: 0.92rem;
+}
+.hinweis--erfolg { background: var(--gruen-hell); border-color: var(--gruen); color: var(--gruen-dunkel); }
+.hinweis--fehler { background: var(--rot-hell); border-color: var(--rot); color: var(--rot); }
+.hinweis--warnung { background: var(--gelb-hell); border-color: var(--gelb); color: var(--gelb); }
+
+.marke-status {
+  display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600; border: 1px solid;
+}
+.status-frei { color: var(--gruen); border-color: var(--gruen); background: var(--gruen-hell); }
+.status-gebucht { color: var(--rot); border-color: var(--rot); background: var(--rot-hell); }
+.status-reserviert { color: var(--gelb); border-color: var(--gelb); background: var(--gelb-hell); }
+
+/* --- Tabellen --- */
+
+.tabelle-huelle { overflow-x: auto; }
+table.liste { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+table.liste th, table.liste td {
+  text-align: left; padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--linie);
+  vertical-align: top;
+}
+table.liste th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-leise); }
+table.liste tr:last-child td { border-bottom: none; }
+
+/* --- Tagesplanung (Wochenraster) --- */
+
+.woche {
+  display: grid; gap: 0.6rem;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+@media (max-width: 900px) { .woche { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .woche { grid-template-columns: 1fr; } }
+
+.wochentag {
+  border: 1px solid var(--linie); border-radius: var(--radius-klein);
+  background: var(--flaeche); padding: 0.5rem; min-height: 110px;
+}
+.wochentag--heute { border-color: var(--gruen); border-width: 2px; }
+.wochentag--vergangen { opacity: 0.55; }
+.wochentag--feiertag { background: var(--rot-hell); }
+.wochentag h3 { font-size: 0.82rem; margin-bottom: 0.4rem; }
+.wochentag h3 small { display: block; font-weight: 400; color: var(--text-leise); }
+.wochentag .feiertag-name { font-size: 0.72rem; color: var(--rot); margin-bottom: 0.3rem; }
+
+.plan-slot {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.3rem;
+  font-size: 0.78rem; padding: 0.2rem 0.35rem; border-radius: 4px;
+  border-left: 3px solid var(--linie); margin-bottom: 3px; background: var(--grund);
+  font-variant-numeric: tabular-nums;
+}
+.plan-slot--frei { border-left-color: var(--gruen); }
+.plan-slot--gebucht { border-left-color: var(--rot); }
+.plan-slot--reserviert { border-left-color: var(--gelb); }
+.plan-slot .weg {
+  border: none; background: none; color: var(--text-leise); cursor: pointer;
+  font-size: 0.9rem; line-height: 1; padding: 0 2px;
+}
+.plan-slot .weg:hover { color: var(--rot); }
+.plan-slot .name { font-size: 0.72rem; color: var(--text-leise); }
+
+.leer { color: var(--text-leise); font-size: 0.85rem; font-style: italic; }
+
+.kennzahlen { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.kennzahl .wert { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+.kennzahl .beschriftung { font-size: 0.8rem; color: var(--text-leise); }
+
+.zusammenfassung {
+  background: var(--gruen-hell); border: 1px solid color-mix(in srgb, var(--gruen) 30%, transparent);
+  border-radius: var(--radius-klein); padding: 0.9rem 1rem; margin-bottom: 1.25rem;
+}
+.zusammenfassung dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.8rem; font-size: 0.92rem; }
+.zusammenfassung dt { color: var(--text-leise); }
+.zusammenfassung dd { margin: 0; font-weight: 600; }
+
+.htmx-request { opacity: 0.55; transition: opacity 120ms; }

@@ -1,0 +1,20 @@
+Neue bestätigte Buchung für {{ fahrlehrer.name }}:
+
+  Wann:      {{ beginn|date:"l, j. F Y" }}, {{ beginn|date:"H:i" }} bis {{ ende|date:"H:i" }} Uhr
+  Was:       {{ terminart.name }}
+
+Interessent:
+
+  Name:      {{ buchung.name }}
+  E-Mail:    {{ buchung.email }}
+{% if buchung.telefon %}  Telefon:   {{ buchung.telefon }}
+{% endif %}{% if buchung.fuehrerscheinklasse %}  Klasse:    {{ buchung.get_fuehrerscheinklasse_display }}
+{% endif %}{% if buchung.nachricht %}
+Nachricht:
+
+{{ buchung.nachricht }}
+{% endif %}
+Buchung im Backend öffnen:
+{{ site_url }}/intern/buchungen/
+
+Der Kalendereintrag hängt an.

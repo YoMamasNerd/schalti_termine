@@ -1,0 +1,22 @@
+Hallo {{ buchung.name }},
+
+vielen Dank für Ihre Terminanfrage. Bitte bestätigen Sie sie über diesen Link,
+damit der Termin verbindlich für Sie reserviert wird:
+
+{{ buchung.bestaetigungs_url }}
+
+Ihr angefragter Termin:
+
+  Wann:      {{ beginn|date:"l, j. F Y" }}, {{ beginn|date:"H:i" }} bis {{ ende|date:"H:i" }} Uhr
+  Was:       {{ terminart.name }}
+  Bei wem:   {{ fahrlehrer.name }}
+{% if terminart.ort %}  Wo:        {{ terminart.ort }}
+{% endif %}
+Wichtig: Wir halten den Termin nur {{ minuten }} Minuten für Sie frei. Wenn der
+Link bis dahin nicht angeklickt wurde, geben wir ihn wieder für andere frei.
+
+Sie haben keinen Termin angefragt? Dann ignorieren Sie diese E-Mail einfach.
+Ohne Bestätigung passiert nichts.
+
+Viele Grüße
+{{ site_name }}

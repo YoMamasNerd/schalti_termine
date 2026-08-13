@@ -1,0 +1,66 @@
+{% extends "staff/base_staff.html" %}
+
+{% block titel %}Buchungen – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+  <h1>Buchungen</h1>
+
+  <div class="knopfreihe" style="margin-bottom:1rem">
+    <a class="knopf {% if status != 'aktiv' %}knopf--leise{% endif %} knopf--klein" href="?status=aktiv">Anstehend</a>
+    <a class="knopf {% if status != 'vergangen' %}knopf--leise{% endif %} knopf--klein" href="?status=vergangen">Vergangen</a>
+    {% for wert, beschriftung in status_optionen %}
+      <a class="knopf {% if status != wert %}knopf--leise{% endif %} knopf--klein" href="?status={{ wert }}">{{ beschriftung }}</a>
+    {% endfor %}
+  </div>
+
+  <div class="karte">
+    <div class="tabelle-huelle">
+      <table class="liste">
+        <thead>
+          <tr>
+            <th>Termin</th><th>Wer</th><th>Kontakt</th><th>Klasse</th>
+            <th>Nachricht</th><th>Fahrlehrer</th><th>Status</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for buchung in buchungen %}
+            <tr>
+              <td>
+                {{ buchung.termin.beginn_lokal|date:"D, j.m.Y" }}<br>
+                <strong>{{ buchung.termin.beginn_lokal|date:"H:i" }}–{{ buchung.termin.ende_lokal|date:"H:i" }}</strong><br>
+                <span class="leer">{{ buchung.termin.terminart.name }}</span>
+              </td>
+              <td>{{ buchung.name }}</td>
+              <td>
+                {% if buchung.email %}<a href="mailto:{{ buchung.email }}">{{ buchung.email }}</a>{% endif %}
+                {% if buchung.telefon %}<br>{{ buchung.telefon }}{% endif %}
+              </td>
+              <td>{{ buchung.get_fuehrerscheinklasse_display|default:"—" }}</td>
+              <td>{{ buchung.nachricht|truncatechars:80|default:"—" }}</td>
+              <td>{{ buchung.termin.fahrlehrer.name }}</td>
+              <td>
+                <span class="marke-status
+                  {% if buchung.status == 'bestaetigt' %}status-frei
+                  {% elif buchung.status == 'offen' %}status-reserviert
+                  {% else %}status-gebucht{% endif %}">
+                  {{ buchung.get_status_display }}
+                </span>
+              </td>
+              <td>
+                {% if buchung.ist_aktiv %}
+                  <form method="post" action="{% url 'termine:buchung_absagen' buchung.pk %}"
+                        onsubmit="return confirm('Buchung wirklich absagen? Der Kunde bekommt eine E-Mail.');">
+                    {% csrf_token %}
+                    <button class="knopf knopf--gefahr knopf--klein" type="submit">Absagen</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="8" class="leer">Keine Buchungen in dieser Ansicht.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

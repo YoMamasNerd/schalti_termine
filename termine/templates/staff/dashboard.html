@@ -1,0 +1,93 @@
+{% extends "staff/base_staff.html" %}
+
+{% block titel %}Übersicht – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+  <h1>Übersicht</h1>
+
+  {% if offene_buchungen %}
+    <div class="hinweis hinweis--warnung">
+      {{ offene_buchungen }} Buchung{{ offene_buchungen|pluralize:"en" }} warte{{ offene_buchungen|pluralize:"t,n" }}
+      noch auf die E-Mail-Bestätigung durch den Interessenten.
+    </div>
+  {% endif %}
+
+  <div class="karte">
+    <h2>Freie und gebuchte Termine</h2>
+    <div class="tabelle-huelle">
+      <table class="liste">
+        <thead>
+          <tr>
+            <th>Fahrlehrer</th>
+            <th>Bundesland</th>
+            <th>Frei</th>
+            <th>Gebucht</th>
+            <th>Horizont</th>
+            <th>Kalender-Abo</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for person in fahrlehrer_liste %}
+            <tr>
+              <td><strong>{{ person.name }}</strong></td>
+              <td>{{ person.get_bundesland_display }}</td>
+              <td>{{ person.frei }}</td>
+              <td>{{ person.gebucht }}</td>
+              <td>{{ person.horizont_wochen }} Wochen</td>
+              <td><a href="{{ person.feed_url }}">Abo-Link</a></td>
+              <td>
+                <form method="post" action="{% url 'termine:generieren' %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="fahrlehrer" value="{{ person.slug }}">
+                  <button class="knopf knopf--leise knopf--klein" type="submit">
+                    Termine erzeugen
+                  </button>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7" class="leer">Noch kein Fahrlehrer angelegt.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="karte">
+    <h2>Nächste Termine</h2>
+    {% if naechste_buchungen %}
+      <div class="tabelle-huelle">
+        <table class="liste">
+          <thead>
+            <tr><th>Wann</th><th>Wer</th><th>Kontakt</th><th>Terminart</th><th>Fahrlehrer</th></tr>
+          </thead>
+          <tbody>
+            {% for buchung in naechste_buchungen %}
+              <tr>
+                <td>{{ buchung.termin.beginn_lokal|date:"D, j. M Y, H:i" }}</td>
+                <td>
+                  {{ buchung.name }}
+                  {% if buchung.fuehrerscheinklasse %}
+                    <br><span class="leer">{{ buchung.get_fuehrerscheinklasse_display }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <a href="mailto:{{ buchung.email }}">{{ buchung.email }}</a>
+                  {% if buchung.telefon %}<br>{{ buchung.telefon }}{% endif %}
+                </td>
+                <td>{{ buchung.termin.terminart.name }}</td>
+                <td>{{ buchung.termin.fahrlehrer.name }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="leer">Zurzeit sind keine Termine gebucht.</p>
+    {% endif %}
+    <p style="margin-top:1rem">
+      <a class="knopf knopf--leise" href="{% url 'termine:buchungen' %}">Alle Buchungen</a>
+    </p>
+  </div>
+{% endblock %}

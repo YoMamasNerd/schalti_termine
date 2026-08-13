@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block titel %}Termin bestätigt – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+<div class="huelle-schmal" style="padding:0">
+  {% if fehler %}
+    <h1>Das hat nicht geklappt</h1>
+    <div class="hinweis hinweis--fehler">{{ fehler }}</div>
+    <p><a class="knopf" href="{% url 'termine:start' %}">Neuen Termin auswählen</a></p>
+  {% else %}
+    <h1>Vielen Dank – Ihr Termin ist gebucht</h1>
+    <div class="hinweis hinweis--erfolg">
+      Wir haben Ihnen eine Bestätigung an {{ buchung.email }} geschickt.
+      Der Kalendereintrag hängt der E-Mail an.
+    </div>
+
+    <div class="zusammenfassung">
+      <dl>
+        <dt>Wann</dt>
+        <dd>{{ termin.beginn_lokal|date:"l, j. F Y" }}, {{ termin.beginn_lokal|date:"H:i" }}–{{ termin.ende_lokal|date:"H:i" }} Uhr</dd>
+        <dt>Was</dt>
+        <dd>{{ termin.terminart.name }}</dd>
+        <dt>Bei wem</dt>
+        <dd>{{ termin.fahrlehrer.name }}</dd>
+        {% if termin.terminart.ort %}<dt>Wo</dt><dd>{{ termin.terminart.ort }}</dd>{% endif %}
+      </dl>
+    </div>
+
+    <p>
+      <a class="knopf knopf--leise" href="{% url 'termine:buchung' buchung.token %}">
+        Termin ansehen oder absagen
+      </a>
+    </p>
+  {% endif %}
+</div>
+{% endblock %}

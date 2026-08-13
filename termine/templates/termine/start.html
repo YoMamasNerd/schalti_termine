@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block titel %}Beratungstermin buchen – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+  <h1>Beratungstermin buchen</h1>
+  <p>Wählen Sie einen freien Termin. Sie erhalten anschließend eine E-Mail mit
+     einem Bestätigungslink – erst danach ist der Termin verbindlich.</p>
+
+  <form class="karte" method="get" action="{% url 'termine:start' %}" style="margin-bottom:1rem">
+    <div class="raster-zwei">
+      <div class="feld" style="margin-bottom:0">
+        <label for="art">Worum geht es?</label>
+        <select name="art" id="art">
+          <option value="">Alle Terminarten</option>
+          {% for art in alle_terminarten %}
+            <option value="{{ art.slug }}" {% if terminart and terminart.pk == art.pk %}selected{% endif %}>
+              {{ art.name }} ({{ art.dauer_minuten }} Min.)
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="feld" style="margin-bottom:0">
+        <label for="fahrlehrer">Bei wem?</label>
+        <select name="fahrlehrer" id="fahrlehrer">
+          <option value="">Egal – alle anzeigen</option>
+          {% for person in alle_fahrlehrer %}
+            <option value="{{ person.slug }}" {% if fahrlehrer and fahrlehrer.pk == person.pk %}selected{% endif %}>
+              {{ person.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="knopfreihe" style="margin-top:0.9rem">
+      <button class="knopf" type="submit">Termine anzeigen</button>
+      {% if terminart or fahrlehrer %}
+        <a class="knopf knopf--leise" href="{% url 'termine:start' %}">Filter zurücksetzen</a>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if fahrlehrer and fahrlehrer.beschreibung %}
+    <div class="hinweis">{{ fahrlehrer.beschreibung|linebreaksbr }}</div>
+  {% endif %}
+
+  <div class="raster-zwei" id="buchungsbereich">
+    <div class="karte">
+      {% include "termine/_kalender.html" %}
+    </div>
+    <div class="karte">
+      {% include "termine/_tagesliste.html" %}
+    </div>
+  </div>
+{% endblock %}

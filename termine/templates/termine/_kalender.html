@@ -1,0 +1,76 @@
+{% comment %}
+  Monatsgitter. Jeder Tag ist ein echter Link – ohne JavaScript lädt die Seite
+  komplett neu, mit htmx wird nur der Buchungsbereich ausgetauscht.
+{% endcomment %}
+<div class="kalender-kopf">
+  {% if vorheriger_monat %}
+    <a class="knopf knopf--leise knopf--klein"
+       href="?monat={{ vorheriger_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
+       hx-get="?monat={{ vorheriger_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
+       hx-select="#buchungsbereich" hx-target="#buchungsbereich" hx-swap="outerHTML"
+       hx-push-url="true"
+       aria-label="Vorheriger Monat">&larr;</a>
+  {% else %}
+    <span class="knopf knopf--leise knopf--klein" aria-hidden="true" style="visibility:hidden">&larr;</span>
+  {% endif %}
+
+  <h2>{{ monatsname }}</h2>
+
+  {% if naechster_monat %}
+    <a class="knopf knopf--leise knopf--klein"
+       href="?monat={{ naechster_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
+       hx-get="?monat={{ naechster_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
+       hx-select="#buchungsbereich" hx-target="#buchungsbereich" hx-swap="outerHTML"
+       hx-push-url="true"
+       aria-label="Nächster Monat">&rarr;</a>
+  {% else %}
+    <span class="knopf knopf--leise knopf--klein" aria-hidden="true" style="visibility:hidden">&rarr;</span>
+  {% endif %}
+</div>
+
+<table class="monat">
+  <thead>
+    <tr>
+      <th scope="col"><abbr title="Montag">Mo</abbr></th>
+      <th scope="col"><abbr title="Dienstag">Di</abbr></th>
+      <th scope="col"><abbr title="Mittwoch">Mi</abbr></th>
+      <th scope="col"><abbr title="Donnerstag">Do</abbr></th>
+      <th scope="col"><abbr title="Freitag">Fr</abbr></th>
+      <th scope="col"><abbr title="Samstag">Sa</abbr></th>
+      <th scope="col"><abbr title="Sonntag">So</abbr></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for woche in gitter %}
+      <tr>
+        {% for zelle in woche %}
+          <td>
+            {% if zelle.verfuegbar %}
+              <a class="tag tag--frei{% if zelle.ausgewaehlt %} tag--gewaehlt{% endif %}{% if not zelle.im_monat %} tag--fremd{% endif %}{% if zelle.ist_heute %} tag--heute{% endif %}"
+                 href="?tag={{ zelle.datum|date:'Y-m-d' }}&monat={{ jahr }}-{{ monat|stringformat:'02d' }}{% if querystring %}&{{ querystring }}{% endif %}"
+                 hx-get="?tag={{ zelle.datum|date:'Y-m-d' }}&monat={{ jahr }}-{{ monat|stringformat:'02d' }}{% if querystring %}&{{ querystring }}{% endif %}"
+                 hx-select="#buchungsbereich" hx-target="#buchungsbereich" hx-swap="outerHTML"
+                 hx-push-url="true"
+                 title="{{ zelle.datum|date:'l, j. F Y' }} – {{ zelle.anzahl }} freie Termine">
+                <span class="zahl">{{ zelle.tag }}</span>
+                <span class="punkt"></span>
+              </a>
+            {% else %}
+              <span class="tag{% if not zelle.im_monat %} tag--fremd{% endif %}{% if zelle.ist_heute %} tag--heute{% endif %}{% if zelle.feiertag %} tag--feiertag{% endif %}"
+                    {% if zelle.feiertag %}title="{{ zelle.feiertag }}"{% endif %}>
+                <span class="zahl">{{ zelle.tag }}</span>
+                <span class="punkt"></span>
+              </span>
+            {% endif %}
+          </td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="legende">
+  <span><i class="frei-voll"></i> ausgewählt</span>
+  <span><i></i> freie Termine</span>
+  {% if fahrlehrer %}<span><i class="feiertag"></i> Feiertag ({{ fahrlehrer.get_bundesland_display }})</span>{% endif %}
+</div>

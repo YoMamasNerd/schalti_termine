@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block navigation %}
+  <a href="{% url 'termine:dashboard' %}">Übersicht</a>
+  <a href="{% url 'termine:tagesplanung' %}">Tagesplanung</a>
+  <a href="{% url 'termine:regeln' %}">Rhythmus-Regeln</a>
+  <a href="{% url 'termine:buchungen' %}">Buchungen</a>
+  {% if user.is_staff %}<a href="/django-admin/">Stammdaten</a>{% endif %}
+  <form method="post" action="{% url 'termine:logout' %}" style="display:inline">
+    {% csrf_token %}
+    <button type="submit" class="knopf knopf--leise knopf--klein">Abmelden</button>
+  </form>
+{% endblock %}

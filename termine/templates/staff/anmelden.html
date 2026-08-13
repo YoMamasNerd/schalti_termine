@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block titel %}Anmelden – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+<div class="huelle-schmal" style="padding:0">
+  <h1>Interner Bereich</h1>
+
+  {% if form.errors %}
+    <div class="hinweis hinweis--fehler">
+      Benutzername oder Passwort stimmen nicht.
+    </div>
+  {% endif %}
+
+  <form class="karte" method="post">
+    {% csrf_token %}
+    {% for feld in form %}
+      {% include "termine/_feld.html" with feld=feld %}
+    {% endfor %}
+    <button class="knopf" type="submit">Anmelden</button>
+    <input type="hidden" name="next" value="{{ next }}">
+  </form>
+</div>
+{% endblock %}

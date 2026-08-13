@@ -1,0 +1,24 @@
+# Umgebung und Geheimnisse
+.env
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Django
+data/
+*.sqlite3
+staticfiles/
+media/
+
+# Editor und Betriebssystem
+.idea/
+.vscode/
+.DS_Store
+*.swp

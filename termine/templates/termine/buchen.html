@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block titel %}Termin am {{ termin.beginn_lokal|date:"j. F" }} buchen – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+<div class="huelle-schmal" style="padding:0">
+  <p><a href="{% url 'termine:start' %}?tag={{ termin.beginn_lokal|date:'Y-m-d' }}&amp;fahrlehrer={{ termin.fahrlehrer.slug }}">&larr; Anderen Termin wählen</a></p>
+
+  <h1>Termin bestätigen</h1>
+
+  <div class="zusammenfassung">
+    <dl>
+      <dt>Wann</dt>
+      <dd>{{ termin.beginn_lokal|date:"l, j. F Y" }}, {{ termin.beginn_lokal|date:"H:i" }}–{{ termin.ende_lokal|date:"H:i" }} Uhr</dd>
+      <dt>Was</dt>
+      <dd>{{ termin.terminart.name }}</dd>
+      <dt>Bei wem</dt>
+      <dd>{{ termin.fahrlehrer.name }}</dd>
+      {% if termin.terminart.ort %}
+        <dt>Wo</dt>
+        <dd>{{ termin.terminart.ort }}</dd>
+      {% endif %}
+    </dl>
+  </div>
+
+  {% if termin.terminart.beschreibung %}
+    <p>{{ termin.terminart.beschreibung|linebreaksbr }}</p>
+  {% endif %}
+
+  <form class="karte" method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="hinweis hinweis--fehler">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="honigtopf" aria-hidden="true">
+      {{ form.website.label_tag }}{{ form.website }}
+    </div>
+
+    {% for feld in form %}
+      {% if feld.name != 'website' %}
+        {% include "termine/_feld.html" with feld=feld %}
+      {% endif %}
+    {% endfor %}
+
+    <div class="knopfreihe">
+      <button class="knopf" type="submit">Termin verbindlich anfragen</button>
+      <a class="knopf knopf--leise" href="{% url 'termine:start' %}">Abbrechen</a>
+    </div>
+    <p class="hilfe" style="margin-top:0.8rem">
+      Nach dem Absenden schicken wir Ihnen eine E-Mail. Der Termin ist erst
+      gebucht, wenn Sie den Link darin angeklickt haben. Bis dahin halten wir
+      ihn {{ RESERVATION_MINUTES }} Minuten für Sie frei.
+    </p>
+  </form>
+</div>
+{% endblock %}

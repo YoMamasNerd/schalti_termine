@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block titel %}Termin nicht mehr frei – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+<div class="huelle-schmal" style="padding:0">
+  <h1>Dieser Termin ist leider weg</h1>
+  <div class="hinweis hinweis--warnung">
+    {{ meldung|default:"Der Termin wurde inzwischen von jemand anderem gebucht." }}
+  </div>
+  <p>
+    Der Termin am {{ termin.beginn_lokal|date:"l, j. F Y" }} um
+    {{ termin.beginn_lokal|date:"H:i" }} Uhr steht nicht mehr zur Verfügung.
+    Bitte wählen Sie einen anderen.
+  </p>
+  <p>
+    <a class="knopf" href="{% url 'termine:start' %}?fahrlehrer={{ termin.fahrlehrer.slug }}">
+      Freie Termine anzeigen
+    </a>
+  </p>
+</div>
+{% endblock %}

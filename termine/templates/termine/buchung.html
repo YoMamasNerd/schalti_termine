@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block titel %}Ihr Termin – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+<div class="huelle-schmal" style="padding:0">
+  {% if buchung.status == "offen" %}
+    <h1>Fast geschafft</h1>
+    <div class="hinweis hinweis--warnung">
+      <strong>Bitte bestätigen Sie Ihre E-Mail-Adresse.</strong><br>
+      Wir haben eine Nachricht an <strong>{{ buchung.email }}</strong> geschickt.
+      Klicken Sie den Link darin an – erst dann ist der Termin verbindlich gebucht.
+      {% if buchung.reserviert_bis %}
+        Wir halten den Termin bis {{ buchung.reserviert_bis|date:"H:i" }} Uhr für Sie frei.
+      {% endif %}
+    </div>
+    <p class="leer">Keine E-Mail bekommen? Schauen Sie bitte auch im Spam-Ordner nach.</p>
+
+  {% elif buchung.status == "bestaetigt" %}
+    <h1>Ihr Termin steht</h1>
+    <div class="hinweis hinweis--erfolg">
+      Der Termin ist verbindlich gebucht. Eine Bestätigung mit Kalendereintrag
+      liegt in Ihrem Postfach.
+    </div>
+
+  {% elif buchung.status == "storniert" %}
+    <h1>Termin storniert</h1>
+    <div class="hinweis">Dieser Termin wurde storniert.</div>
+    <p><a class="knopf" href="{% url 'termine:start' %}">Neuen Termin buchen</a></p>
+
+  {% else %}
+    <h1>Reservierung abgelaufen</h1>
+    <div class="hinweis hinweis--fehler">
+      Die Bestätigung ist nicht rechtzeitig eingegangen, der Termin wurde
+      wieder freigegeben.
+    </div>
+    <p><a class="knopf" href="{% url 'termine:start' %}">Neuen Termin buchen</a></p>
+  {% endif %}
+
+  <div class="zusammenfassung">
+    <dl>
+      <dt>Wann</dt>
+      <dd>{{ termin.beginn_lokal|date:"l, j. F Y" }}, {{ termin.beginn_lokal|date:"H:i" }}–{{ termin.ende_lokal|date:"H:i" }} Uhr</dd>
+      <dt>Was</dt>
+      <dd>{{ termin.terminart.name }}</dd>
+      <dt>Bei wem</dt>
+      <dd>{{ termin.fahrlehrer.name }}</dd>
+      {% if termin.terminart.ort %}<dt>Wo</dt><dd>{{ termin.terminart.ort }}</dd>{% endif %}
+      <dt>Für</dt>
+      <dd>{{ buchung.name }}</dd>
+      {% if buchung.fuehrerscheinklasse %}
+        <dt>Klasse</dt><dd>{{ buchung.get_fuehrerscheinklasse_display }}</dd>
+      {% endif %}
+    </dl>
+  </div>
+
+  {% if stornierbar %}
+    <div class="karte">
+      <h2>Termin absagen</h2>
+      <p>Sollten Sie den Termin nicht wahrnehmen können, sagen Sie ihn bitte ab.
+         Dann kann ihn jemand anderes bekommen.</p>
+      <form method="post" action="{% url 'termine:buchung_stornieren' buchung.token %}">
+        {% csrf_token %}
+        <button class="knopf knopf--gefahr" type="submit">Termin absagen</button>
+      </form>
+    </div>
+  {% endif %}
+
+  <p class="leer" style="margin-top:1.5rem">
+    Bei Rückfragen erreichen Sie {{ termin.fahrlehrer.name }} unter
+    <a href="mailto:{{ termin.fahrlehrer.email }}">{{ termin.fahrlehrer.email }}</a>{% if termin.fahrlehrer.telefon %}
+    oder {{ termin.fahrlehrer.telefon }}{% endif %}.
+  </p>
+</div>
+{% endblock %}

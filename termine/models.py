@@ -1,0 +1,528 @@
+"""Datenmodell für Beratungstermine einer Fahrschule."""
+
+from __future__ import annotations
+
+import datetime as dt
+import secrets
+import uuid
+
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.text import slugify
+
+from .services.feiertage import BUNDESLAENDER
+
+WOCHENTAGE: tuple[tuple[int, str], ...] = (
+    (0, "Montag"),
+    (1, "Dienstag"),
+    (2, "Mittwoch"),
+    (3, "Donnerstag"),
+    (4, "Freitag"),
+    (5, "Samstag"),
+    (6, "Sonntag"),
+)
+
+WOCHENTAG_KURZ = {0: "Mo", 1: "Di", 2: "Mi", 3: "Do", 4: "Fr", 5: "Sa", 6: "So"}
+
+FUEHRERSCHEINKLASSEN: tuple[tuple[str, str], ...] = (
+    ("AM", "AM – Roller / Kleinkraftrad"),
+    ("A1", "A1 – Leichtkraftrad"),
+    ("A2", "A2 – Motorrad (mittel)"),
+    ("A", "A – Motorrad (unbeschränkt)"),
+    ("B", "B – PKW"),
+    ("B197", "B197 – PKW (Automatik-Regelung)"),
+    ("B96", "B96 – PKW mit Anhänger"),
+    ("BE", "BE – PKW mit Anhänger"),
+    ("C1", "C1 – LKW bis 7,5 t"),
+    ("C", "C – LKW"),
+    ("CE", "CE – LKW mit Anhänger"),
+    ("D1", "D1 – Kleinbus"),
+    ("D", "D – Bus"),
+    ("L", "L – Land-/Forstwirtschaft"),
+    ("T", "T – Zugmaschine"),
+    ("MOFA", "Mofa-Prüfbescheinigung"),
+    ("SONST", "Andere / weiß ich noch nicht"),
+)
+
+
+def neuer_token() -> str:
+    """Kryptografisch sicherer Token für Links in E-Mails."""
+    return secrets.token_urlsafe(32)
+
+
+class Fahrlehrer(models.Model):
+    """Eine Person, die Beratungstermine anbietet."""
+
+    benutzer = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fahrlehrer",
+        verbose_name="Login-Benutzer",
+        help_text="Optional. Verknüpft den Fahrlehrer mit einem Login für die Tagesplanung.",
+    )
+    name = models.CharField("Name", max_length=120)
+    slug = models.SlugField("URL-Kürzel", max_length=140, unique=True, blank=True)
+    email = models.EmailField(
+        "E-Mail",
+        help_text="Hierhin gehen die Benachrichtigungen über neue Buchungen.",
+    )
+    telefon = models.CharField("Telefon", max_length=40, blank=True)
+    beschreibung = models.TextField(
+        "Beschreibung",
+        blank=True,
+        help_text="Wird auf der öffentlichen Buchungsseite angezeigt.",
+    )
+    bundesland = models.CharField(
+        "Bundesland",
+        max_length=2,
+        choices=BUNDESLAENDER,
+        default="BW",
+        help_text="Bestimmt, welche gesetzlichen Feiertage bei der automatischen "
+        "Terminplanung übersprungen werden.",
+    )
+    vorlauf_stunden = models.PositiveIntegerField(
+        "Mindest-Vorlauf (Stunden)",
+        default=24,
+        help_text="Termine, die früher als dieser Vorlauf beginnen, sind nicht mehr buchbar.",
+    )
+    horizont_wochen = models.PositiveIntegerField(
+        "Planungshorizont (Wochen)",
+        default=4,
+        validators=[MinValueValidator(1), MaxValueValidator(52)],
+        help_text="Wie viele Wochen im Voraus aus den Rhythmus-Regeln Termine "
+        "erzeugt und zur Buchung angeboten werden.",
+    )
+    feed_token = models.CharField(
+        "Feed-Token",
+        max_length=64,
+        default=neuer_token,
+        unique=True,
+        help_text="Geheimer Teil der Kalender-Abo-URL. Beim Zurücksetzen wird das "
+        "alte Abo ungültig.",
+    )
+    aktiv = models.BooleanField("Aktiv", default=True)
+    reihenfolge = models.IntegerField("Reihenfolge", default=0)
+
+    class Meta:
+        verbose_name = "Fahrlehrer"
+        verbose_name_plural = "Fahrlehrer"
+        ordering = ("reihenfolge", "name")
+
+    def __str__(self) -> str:
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            basis = slugify(self.name) or "fahrlehrer"
+            slug = basis
+            n = 2
+            while Fahrlehrer.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{basis}-{n}"
+                n += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
+
+    def get_absolute_url(self) -> str:
+        return reverse("termine:fahrlehrer", args=[self.slug])
+
+    @property
+    def feed_url(self) -> str:
+        pfad = reverse("termine:ics_feed", args=[self.feed_token])
+        return f"{settings.SITE_BASE_URL}{pfad}"
+
+    def fruehester_start(self, jetzt: dt.datetime | None = None) -> dt.datetime:
+        """Ab wann ein Termin frühestens buchbar ist (Mindest-Vorlauf)."""
+        jetzt = jetzt or timezone.now()
+        return jetzt + dt.timedelta(hours=self.vorlauf_stunden)
+
+
+class Terminart(models.Model):
+    """Was gebucht werden kann, z. B. „Erstberatung Führerschein Klasse B“."""
+
+    name = models.CharField("Bezeichnung", max_length=120)
+    slug = models.SlugField("URL-Kürzel", max_length=140, unique=True, blank=True)
+    dauer_minuten = models.PositiveIntegerField(
+        "Dauer (Minuten)",
+        default=30,
+        validators=[MinValueValidator(5), MaxValueValidator(600)],
+    )
+    puffer_minuten = models.PositiveIntegerField(
+        "Puffer danach (Minuten)",
+        default=0,
+        help_text="Freie Zeit nach dem Termin, bevor der nächste Slot beginnt.",
+    )
+    beschreibung = models.TextField("Beschreibung", blank=True)
+    ort = models.CharField(
+        "Ort",
+        max_length=200,
+        blank=True,
+        help_text="Erscheint in der Bestätigungsmail und im Kalendereintrag.",
+    )
+    farbe = models.CharField(
+        "Farbe",
+        max_length=7,
+        default="#2f6f4e",
+        help_text="Hex-Farbe für die Darstellung im Backend, z. B. #2f6f4e",
+    )
+    fuehrerscheinklasse_abfragen = models.BooleanField(
+        "Führerscheinklasse abfragen",
+        default=True,
+        help_text="Blendet im Buchungsformular die Auswahl der Führerscheinklasse ein.",
+    )
+    aktiv = models.BooleanField("Aktiv", default=True)
+    reihenfolge = models.IntegerField("Reihenfolge", default=0)
+
+    class Meta:
+        verbose_name = "Terminart"
+        verbose_name_plural = "Terminarten"
+        ordering = ("reihenfolge", "name")
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.dauer_minuten} Min.)"
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            basis = slugify(self.name) or "terminart"
+            slug = basis
+            n = 2
+            while Terminart.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{basis}-{n}"
+                n += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
+
+    @property
+    def schrittweite_minuten(self) -> int:
+        return self.dauer_minuten + self.puffer_minuten
+
+
+class RhythmusRegel(models.Model):
+    """Wiederkehrende Verfügbarkeit, aus der Termine im Voraus erzeugt werden.
+
+    Beispiel: „montags und mittwochs 14:00–18:00, jede Woche“ oder
+    „freitags 09:00–12:00, jede 2. Woche“.
+    """
+
+    fahrlehrer = models.ForeignKey(
+        Fahrlehrer, on_delete=models.CASCADE, related_name="regeln", verbose_name="Fahrlehrer"
+    )
+    terminart = models.ForeignKey(
+        Terminart, on_delete=models.PROTECT, related_name="regeln", verbose_name="Terminart"
+    )
+    bezeichnung = models.CharField(
+        "Bezeichnung", max_length=120, blank=True, help_text="Nur zur Orientierung im Backend."
+    )
+    wochentage = models.JSONField(
+        "Wochentage",
+        default=list,
+        help_text="Liste von Wochentagen (0 = Montag … 6 = Sonntag).",
+    )
+    beginn = models.TimeField("Von", default=dt.time(9, 0))
+    ende = models.TimeField("Bis", default=dt.time(12, 0))
+    intervall_wochen = models.PositiveIntegerField(
+        "Rhythmus",
+        default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(8)],
+        help_text="1 = jede Woche, 2 = jede zweite Woche, usw.",
+    )
+    referenzwoche = models.DateField(
+        "Referenzdatum",
+        default=dt.date(2024, 1, 1),
+        help_text="Nur bei mehrwöchigem Rhythmus relevant: Die Woche dieses Datums "
+        "ist eine Woche, in der die Regel greift.",
+    )
+    gueltig_ab = models.DateField("Gültig ab", default=dt.date.today)
+    gueltig_bis = models.DateField(
+        "Gültig bis", null=True, blank=True, help_text="Leer lassen für unbegrenzt."
+    )
+    feiertage_auslassen = models.BooleanField(
+        "Feiertage auslassen",
+        default=True,
+        help_text="Überspringt gesetzliche Feiertage im Bundesland des Fahrlehrers.",
+    )
+    aktiv = models.BooleanField("Aktiv", default=True)
+
+    class Meta:
+        verbose_name = "Rhythmus-Regel"
+        verbose_name_plural = "Rhythmus-Regeln"
+        ordering = ("fahrlehrer", "beginn")
+
+    def __str__(self) -> str:
+        if self.bezeichnung:
+            return self.bezeichnung
+        return f"{self.wochentage_kurz} {self.beginn:%H:%M}–{self.ende:%H:%M}"
+
+    def clean(self):
+        fehler = {}
+        if self.beginn >= self.ende:
+            fehler["ende"] = "Das Ende muss nach dem Beginn liegen."
+        if not isinstance(self.wochentage, list) or not self.wochentage:
+            fehler["wochentage"] = "Mindestens ein Wochentag muss ausgewählt sein."
+        else:
+            ungueltig = [t for t in self.wochentage if t not in range(7)]
+            if ungueltig:
+                fehler["wochentage"] = f"Ungültige Wochentage: {ungueltig}"
+        if self.gueltig_bis and self.gueltig_bis < self.gueltig_ab:
+            fehler["gueltig_bis"] = "„Gültig bis“ muss nach „Gültig ab“ liegen."
+        if fehler:
+            raise ValidationError(fehler)
+
+    @property
+    def wochentage_kurz(self) -> str:
+        return ", ".join(WOCHENTAG_KURZ[t] for t in sorted(self.wochentage) if t in WOCHENTAG_KURZ)
+
+    def gilt_am(self, tag: dt.date) -> bool:
+        """Greift diese Regel an diesem Kalendertag?
+
+        Feiertage werden hier bewusst nicht geprüft – das macht der Generator,
+        weil dafür das Bundesland des Fahrlehrers nötig ist.
+        """
+        if not self.aktiv:
+            return False
+        if tag < self.gueltig_ab:
+            return False
+        if self.gueltig_bis and tag > self.gueltig_bis:
+            return False
+        if tag.weekday() not in (self.wochentage or []):
+            return False
+        if self.intervall_wochen > 1:
+            # Kalenderwochen-Abstand zwischen Referenzwoche und Zieltag.
+            referenz_montag = self.referenzwoche - dt.timedelta(days=self.referenzwoche.weekday())
+            ziel_montag = tag - dt.timedelta(days=tag.weekday())
+            wochen_differenz = (ziel_montag - referenz_montag).days // 7
+            if wochen_differenz % self.intervall_wochen != 0:
+                return False
+        return True
+
+
+class Sperrzeit(models.Model):
+    """Urlaub, Fahrstunde, Krankheit – blockiert einen Zeitraum komplett."""
+
+    fahrlehrer = models.ForeignKey(
+        Fahrlehrer, on_delete=models.CASCADE, related_name="sperrzeiten", verbose_name="Fahrlehrer"
+    )
+    beginn = models.DateTimeField("Beginn")
+    ende = models.DateTimeField("Ende")
+    grund = models.CharField("Grund", max_length=200, blank=True)
+
+    class Meta:
+        verbose_name = "Sperrzeit"
+        verbose_name_plural = "Sperrzeiten"
+        ordering = ("-beginn",)
+        indexes = [models.Index(fields=["fahrlehrer", "beginn", "ende"])]
+
+    def __str__(self) -> str:
+        return f"{self.fahrlehrer}: {timezone.localtime(self.beginn):%d.%m.%Y %H:%M} – {timezone.localtime(self.ende):%d.%m.%Y %H:%M}"
+
+    def clean(self):
+        if self.beginn and self.ende and self.beginn >= self.ende:
+            raise ValidationError({"ende": "Das Ende muss nach dem Beginn liegen."})
+
+
+class TerminQuerySet(models.QuerySet):
+    def buchbar(self, jetzt: dt.datetime | None = None):
+        """Freie Termine, die den Mindest-Vorlauf einhalten und nicht gesperrt sind."""
+        from django.db.models import Exists, OuterRef, Q
+
+        jetzt = jetzt or timezone.now()
+        vorlauf_filter = Q(pk__in=[])
+        for fahrlehrer in Fahrlehrer.objects.filter(aktiv=True):
+            vorlauf_filter |= Q(
+                fahrlehrer=fahrlehrer, beginn__gte=fahrlehrer.fruehester_start(jetzt)
+            )
+        gesperrt = Sperrzeit.objects.filter(
+            fahrlehrer=OuterRef("fahrlehrer"),
+            beginn__lt=OuterRef("ende"),
+            ende__gt=OuterRef("beginn"),
+        )
+        return (
+            self.filter(status=Termin.Status.FREI)
+            .filter(vorlauf_filter)
+            .filter(terminart__aktiv=True)
+            .annotate(ist_gesperrt=Exists(gesperrt))
+            .filter(ist_gesperrt=False)
+        )
+
+
+class Termin(models.Model):
+    """Ein konkreter, buchbarer Zeitslot."""
+
+    class Status(models.TextChoices):
+        FREI = "frei", "Frei"
+        RESERVIERT = "reserviert", "Reserviert (wartet auf Bestätigung)"
+        GEBUCHT = "gebucht", "Gebucht"
+
+    class Herkunft(models.TextChoices):
+        MANUELL = "manuell", "Manuell angelegt"
+        REGEL = "regel", "Aus Rhythmus-Regel"
+
+    fahrlehrer = models.ForeignKey(
+        Fahrlehrer, on_delete=models.CASCADE, related_name="termine", verbose_name="Fahrlehrer"
+    )
+    terminart = models.ForeignKey(
+        Terminart, on_delete=models.PROTECT, related_name="termine", verbose_name="Terminart"
+    )
+    beginn = models.DateTimeField("Beginn", db_index=True)
+    ende = models.DateTimeField("Ende")
+    status = models.CharField(
+        "Status", max_length=12, choices=Status.choices, default=Status.FREI, db_index=True
+    )
+    herkunft = models.CharField(
+        "Herkunft", max_length=10, choices=Herkunft.choices, default=Herkunft.MANUELL
+    )
+    regel = models.ForeignKey(
+        RhythmusRegel,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="termine",
+        verbose_name="Erzeugt durch Regel",
+    )
+    notiz = models.CharField("Interne Notiz", max_length=200, blank=True)
+    erstellt_am = models.DateTimeField(auto_now_add=True)
+    geaendert_am = models.DateTimeField(auto_now=True)
+
+    objects = TerminQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = "Termin"
+        verbose_name_plural = "Termine"
+        ordering = ("beginn",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["fahrlehrer", "beginn"], name="termin_eindeutig_pro_fahrlehrer"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(ende__gt=models.F("beginn")), name="termin_ende_nach_beginn"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["fahrlehrer", "beginn", "status"]),
+            models.Index(fields=["status", "beginn"]),
+        ]
+
+    def __str__(self) -> str:
+        lokal = timezone.localtime(self.beginn)
+        return f"{self.fahrlehrer} – {lokal:%d.%m.%Y %H:%M}"
+
+    @property
+    def beginn_lokal(self) -> dt.datetime:
+        return timezone.localtime(self.beginn)
+
+    @property
+    def ende_lokal(self) -> dt.datetime:
+        return timezone.localtime(self.ende)
+
+    @property
+    def tag(self) -> dt.date:
+        return self.beginn_lokal.date()
+
+    @property
+    def aktive_buchung(self):
+        return self.buchungen.filter(
+            status__in=[Buchung.Status.OFFEN, Buchung.Status.BESTAETIGT]
+        ).first()
+
+    def ist_gesperrt(self) -> bool:
+        return Sperrzeit.objects.filter(
+            fahrlehrer=self.fahrlehrer, beginn__lt=self.ende, ende__gt=self.beginn
+        ).exists()
+
+    def ueberschneidet_sich(self) -> bool:
+        """Gibt es für denselben Fahrlehrer bereits einen überlappenden Termin?"""
+        return (
+            Termin.objects.filter(
+                fahrlehrer=self.fahrlehrer, beginn__lt=self.ende, ende__gt=self.beginn
+            )
+            .exclude(pk=self.pk)
+            .exists()
+        )
+
+
+class Buchung(models.Model):
+    """Die Anmeldung eines Interessenten auf einen Termin."""
+
+    class Status(models.TextChoices):
+        OFFEN = "offen", "Offen (E-Mail-Bestätigung ausstehend)"
+        BESTAETIGT = "bestaetigt", "Bestätigt"
+        STORNIERT = "storniert", "Storniert"
+        VERFALLEN = "verfallen", "Verfallen (nicht bestätigt)"
+
+    AKTIVE_STATUS = (Status.OFFEN, Status.BESTAETIGT)
+
+    termin = models.ForeignKey(
+        Termin, on_delete=models.PROTECT, related_name="buchungen", verbose_name="Termin"
+    )
+    referenz = models.UUIDField("Referenz", default=uuid.uuid4, unique=True, editable=False)
+    token = models.CharField(
+        "Zugriffs-Token", max_length=64, default=neuer_token, unique=True, editable=False
+    )
+
+    name = models.CharField("Name", max_length=120)
+    email = models.EmailField("E-Mail")
+    telefon = models.CharField("Telefon", max_length=40, blank=True)
+    fuehrerscheinklasse = models.CharField(
+        "Führerscheinklasse", max_length=8, choices=FUEHRERSCHEINKLASSEN, blank=True
+    )
+    nachricht = models.TextField("Nachricht", blank=True)
+
+    status = models.CharField(
+        "Status", max_length=12, choices=Status.choices, default=Status.OFFEN, db_index=True
+    )
+    reserviert_bis = models.DateTimeField("Reserviert bis", null=True, blank=True)
+
+    erstellt_am = models.DateTimeField(auto_now_add=True)
+    bestaetigt_am = models.DateTimeField(null=True, blank=True)
+    storniert_am = models.DateTimeField(null=True, blank=True)
+    storniert_von = models.CharField(
+        "Storniert von", max_length=20, blank=True, help_text="kunde oder fahrschule"
+    )
+    erinnerung_am = models.DateTimeField(null=True, blank=True)
+    einwilligung_am = models.DateTimeField(
+        "Datenschutz-Einwilligung", null=True, blank=True
+    )
+    anonymisiert_am = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Buchung"
+        verbose_name_plural = "Buchungen"
+        ordering = ("-erstellt_am",)
+        constraints = [
+            # Ein Termin darf nur genau eine offene oder bestätigte Buchung haben.
+            # Stornierte und verfallene Buchungen bleiben als Historie erhalten.
+            models.UniqueConstraint(
+                fields=["termin"],
+                condition=models.Q(status__in=["offen", "bestaetigt"]),
+                name="nur_eine_aktive_buchung_pro_termin",
+            )
+        ]
+        indexes = [models.Index(fields=["status", "reserviert_bis"])]
+
+    def __str__(self) -> str:
+        return f"{self.name} – {self.termin}"
+
+    @property
+    def ist_aktiv(self) -> bool:
+        return self.status in self.AKTIVE_STATUS
+
+    @property
+    def ist_abgelaufen(self) -> bool:
+        return (
+            self.status == self.Status.OFFEN
+            and self.reserviert_bis is not None
+            and self.reserviert_bis < timezone.now()
+        )
+
+    @property
+    def bestaetigungs_url(self) -> str:
+        return f"{settings.SITE_BASE_URL}{reverse('termine:bestaetigen', args=[self.token])}"
+
+    @property
+    def verwaltungs_url(self) -> str:
+        return f"{settings.SITE_BASE_URL}{reverse('termine:buchung', args=[self.token])}"

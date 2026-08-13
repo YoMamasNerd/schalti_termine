@@ -1,0 +1,125 @@
+{% extends "staff/base_staff.html" %}
+
+{% block titel %}Tagesplanung – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+  <h1>Tagesplanung</h1>
+
+  <form class="karte" method="get" style="margin-bottom:1rem">
+    <div class="knopfreihe">
+      {% if alle_fahrlehrer.count > 1 %}
+        <label for="fahrlehrer" style="font-weight:600">Fahrlehrer</label>
+        <select name="fahrlehrer" id="fahrlehrer" style="width:auto" onchange="this.form.submit()">
+          {% for person in alle_fahrlehrer %}
+            <option value="{{ person.slug }}" {% if person.pk == fahrlehrer.pk %}selected{% endif %}>
+              {{ person.name }}
+            </option>
+          {% endfor %}
+        </select>
+      {% endif %}
+      <a class="knopf knopf--leise knopf--klein" href="?woche={{ vorherige_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}">&larr; Woche</a>
+      <a class="knopf knopf--leise knopf--klein" href="?woche={{ diese_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}">Heute</a>
+      <a class="knopf knopf--leise knopf--klein" href="?woche={{ naechste_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}">Woche &rarr;</a>
+      <strong style="margin-left:0.5rem">{{ montag|date:"j. F" }} – {{ sonntag|date:"j. F Y" }}</strong>
+      <noscript><button class="knopf knopf--klein" type="submit">Wechseln</button></noscript>
+    </div>
+  </form>
+
+  <div class="woche">
+    {% for tag in tage %}
+      <div class="wochentag{% if tag.ist_heute %} wochentag--heute{% endif %}{% if tag.ist_vergangen %} wochentag--vergangen{% endif %}{% if tag.feiertag %} wochentag--feiertag{% endif %}">
+        <h3>
+          {{ tag.kurz }}
+          <small>{{ tag.label }}</small>
+        </h3>
+        {% if tag.feiertag %}<div class="feiertag-name">{{ tag.feiertag }}</div>{% endif %}
+
+        {% for termin in tag.termine %}
+          <div class="plan-slot plan-slot--{{ termin.status }}">
+            <span>
+              {{ termin.beginn_lokal|date:"H:i" }}
+              {% with buchung=termin.aktive_buchung %}
+                {% if buchung %}<span class="name">{{ buchung.name }}</span>{% endif %}
+              {% endwith %}
+            </span>
+            {% if termin.status == "frei" %}
+              <form method="post" action="{% url 'termine:termin_loeschen' termin.pk %}" style="display:inline">
+                {% csrf_token %}
+                <button class="weg" type="submit" title="Termin löschen" aria-label="Termin löschen">&times;</button>
+              </form>
+            {% endif %}
+          </div>
+        {% empty %}
+          <p class="leer">nichts geplant</p>
+        {% endfor %}
+
+        {% if tag.termine %}
+          <p class="leer" style="margin:0.4rem 0 0">{{ tag.frei }} frei, {{ tag.gebucht }} belegt</p>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="raster-zwei" style="margin-top:1.5rem">
+    <div class="karte">
+      <h2>Termine für einen Tag anlegen</h2>
+      <p class="leer">
+        Das ist die schnelle Einzelplanung: Tag, Zeitfenster und Terminart wählen –
+        die App zerlegt das Fenster automatisch in einzelne Termine.
+      </p>
+      <form method="post" action="{% url 'termine:termine_anlegen' %}">
+        {% csrf_token %}
+        <input type="hidden" name="fahrlehrer_slug" value="{{ fahrlehrer.slug }}">
+        {% for feld in planungs_form %}
+          {% include "termine/_feld.html" with feld=feld %}
+        {% endfor %}
+        <button class="knopf" type="submit">Termine anlegen</button>
+      </form>
+    </div>
+
+    <div>
+      <div class="karte">
+        <h2>Automatisch nach Rhythmus planen</h2>
+        <p class="leer">
+          Erzeugt aus den Rhythmus-Regeln von {{ fahrlehrer.name }} die Termine für die
+          nächsten {{ fahrlehrer.horizont_wochen }} Wochen. Feiertage in
+          {{ fahrlehrer.get_bundesland_display }} werden dabei übersprungen.
+          Gebuchte Termine bleiben immer unangetastet.
+        </p>
+        <div class="knopfreihe">
+          <form method="post" action="{% url 'termine:generieren' %}">
+            {% csrf_token %}
+            <input type="hidden" name="fahrlehrer" value="{{ fahrlehrer.slug }}">
+            <button class="knopf" type="submit">Jetzt vorausplanen</button>
+          </form>
+          <a class="knopf knopf--leise" href="{% url 'termine:regeln' %}">Regeln bearbeiten</a>
+        </div>
+      </div>
+
+      <div class="karte">
+        <h2>Urlaub / Abwesenheit</h2>
+        <p class="leer">
+          Sperrt einen Zeitraum komplett. Freie Termine darin werden gelöscht,
+          und die automatische Planung lässt den Zeitraum aus.
+        </p>
+        <form method="post" action="{% url 'termine:sperrzeit_anlegen' %}">
+          {% csrf_token %}
+          {% for feld in sperr_form %}
+            {% include "termine/_feld.html" with feld=feld %}
+          {% endfor %}
+          <button class="knopf knopf--leise" type="submit">Sperrzeit eintragen</button>
+        </form>
+
+        {% if sperrzeiten %}
+          <h3 style="margin-top:1rem">In dieser Woche</h3>
+          <ul>
+            {% for sperre in sperrzeiten %}
+              <li>{{ sperre.beginn|date:"j.m." }}–{{ sperre.ende|date:"j.m.Y" }}
+                  {% if sperre.grund %}({{ sperre.grund }}){% endif %}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "staff/base_staff.html" %}
+
+{% block titel %}Rhythmus-Regeln – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+  <h1>Rhythmus-Regeln</h1>
+  <p>
+    Eine Regel beschreibt eine wiederkehrende Verfügbarkeit – zum Beispiel
+    „dienstags und donnerstags 14:00–18:00“. Der Generator rollt sie für den
+    eingestellten Horizont in einzelne Termine aus und lässt dabei Feiertage
+    und Sperrzeiten aus.
+  </p>
+
+  <p class="knopfreihe">
+    <a class="knopf" href="{% url 'termine:regel_neu' %}">Neue Regel</a>
+    <a class="knopf knopf--leise" href="{% url 'termine:tagesplanung' %}">Zur Tagesplanung</a>
+  </p>
+
+  <div class="karte">
+    <div class="tabelle-huelle">
+      <table class="liste">
+        <thead>
+          <tr>
+            <th>Fahrlehrer</th><th>Wochentage</th><th>Zeit</th><th>Rhythmus</th>
+            <th>Terminart</th><th>Gültig</th><th>Feiertage</th><th>Status</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for regel in regeln %}
+            <tr>
+              <td>{{ regel.fahrlehrer.name }}</td>
+              <td>{{ regel.wochentage_kurz }}</td>
+              <td>{{ regel.beginn|time:"H:i" }}–{{ regel.ende|time:"H:i" }}</td>
+              <td>
+                {% if regel.intervall_wochen == 1 %}wöchentlich
+                {% else %}alle {{ regel.intervall_wochen }} Wochen{% endif %}
+              </td>
+              <td>{{ regel.terminart.name }}<br><span class="leer">{{ regel.terminart.dauer_minuten }} Min.</span></td>
+              <td>
+                ab {{ regel.gueltig_ab|date:"j.m.Y" }}
+                {% if regel.gueltig_bis %}<br>bis {{ regel.gueltig_bis|date:"j.m.Y" }}{% endif %}
+              </td>
+              <td>{% if regel.feiertage_auslassen %}auslassen{% else %}mitplanen{% endif %}</td>
+              <td>
+                <span class="marke-status {% if regel.aktiv %}status-frei{% else %}status-gebucht{% endif %}">
+                  {% if regel.aktiv %}aktiv{% else %}inaktiv{% endif %}
+                </span>
+              </td>
+              <td>
+                <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:regel_bearbeiten' regel.pk %}">Bearbeiten</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="9" class="leer">Noch keine Regel angelegt.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

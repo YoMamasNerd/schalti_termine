@@ -1,0 +1,92 @@
+{% extends "staff/base_staff.html" %}
+
+{% block titel %}{% if regel %}Regel bearbeiten{% else %}Neue Regel{% endif %} – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+  <h1>{% if regel %}Regel bearbeiten{% else %}Neue Rhythmus-Regel{% endif %}</h1>
+  <p><a href="{% url 'termine:regeln' %}">&larr; Zurück zur Übersicht</a></p>
+
+  <div class="raster-zwei">
+    <form class="karte" method="post" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="hinweis hinweis--fehler">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      {% for feld in form %}
+        {% if feld.name == "wochentage" %}
+          <div class="feld">
+            <label>{{ feld.label }}</label>
+            {{ feld }}
+            {% for fehler in feld.errors %}<div class="fehler">{{ fehler }}</div>{% endfor %}
+          </div>
+        {% else %}
+          {% include "termine/_feld.html" with feld=feld %}
+        {% endif %}
+      {% endfor %}
+
+      <div class="knopfreihe">
+        <button class="knopf" type="submit" name="speichern_und_generieren" value="1">
+          Speichern und Termine erzeugen
+        </button>
+        <button class="knopf knopf--leise" type="submit">Nur speichern</button>
+      </div>
+    </form>
+
+    <div>
+      <div class="karte">
+        <h2>So funktioniert der Rhythmus</h2>
+        <dl style="font-size:0.9rem">
+          <dt><strong>Wochentage</strong></dt>
+          <dd style="margin:0 0 0.7rem">An welchen Tagen die Regel greift.</dd>
+          <dt><strong>Rhythmus</strong></dt>
+          <dd style="margin:0 0 0.7rem">
+            1 = jede Woche. Bei 2 greift die Regel nur in jeder zweiten Woche –
+            welche das ist, legt das Referenzdatum fest.
+          </dd>
+          <dt><strong>Feiertage auslassen</strong></dt>
+          <dd style="margin:0 0 0.7rem">
+            Überspringt die gesetzlichen Feiertage des Bundeslands, das beim
+            Fahrlehrer hinterlegt ist.
+          </dd>
+          <dt><strong>Zeitfenster</strong></dt>
+          <dd style="margin:0">
+            Wird in Termine der gewählten Terminart zerlegt. Ein angebrochener
+            Rest am Ende fällt weg.
+          </dd>
+        </dl>
+      </div>
+
+      {% if regel %}
+        <div class="karte">
+          <h2>Vorschau</h2>
+          {% if vorschau_tage %}
+            <p class="leer">Diese Regel würde im aktuellen Planungshorizont folgende Termine erzeugen:</p>
+            <div class="tabelle-huelle">
+              <table class="liste">
+                <thead><tr><th>Tag</th><th>Termine</th></tr></thead>
+                <tbody>
+                  {% for tag, anzahl in vorschau_tage %}
+                    <tr><td>{{ tag|date:"D, j. F Y" }}</td><td>{{ anzahl }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <p class="leer">
+              Diese Regel erzeugt im aktuellen Horizont keine Termine – prüfen Sie
+              Wochentage, Gültigkeitszeitraum und Rhythmus.
+            </p>
+          {% endif %}
+
+          <form method="post" action="{% url 'termine:regel_loeschen' regel.pk %}"
+                style="margin-top:1rem"
+                onsubmit="return confirm('Regel wirklich löschen? Freie Termine aus dieser Regel werden mitgelöscht, gebuchte bleiben bestehen.');">
+            {% csrf_token %}
+            <button class="knopf knopf--gefahr knopf--klein" type="submit">Regel löschen</button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

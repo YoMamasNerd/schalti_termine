@@ -1,0 +1,12 @@
+{% comment %}Rendert ein einzelnes Formularfeld samt Label, Hilfe und Fehlern.{% endcomment %}
+<div class="feld{% if feld.field.widget.input_type == 'checkbox' %} feld--kontrollkaestchen{% endif %}">
+  {% if feld.field.widget.input_type == 'checkbox' %}
+    {{ feld }}
+    <label for="{{ feld.id_for_label }}">{{ feld.label }}</label>
+  {% else %}
+    <label for="{{ feld.id_for_label }}">{{ feld.label }}</label>
+    {{ feld }}
+  {% endif %}
+  {% if feld.help_text %}<div class="hilfe">{{ feld.help_text }}</div>{% endif %}
+  {% for fehler in feld.errors %}<div class="fehler">{{ fehler }}</div>{% endfor %}
+</div>

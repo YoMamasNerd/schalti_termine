@@ -1,0 +1,39 @@
+{% if gewaehlter_tag %}
+  <h2>{{ gewaehlter_tag|date:"l, j. F Y" }}</h2>
+  {% if feiertag %}
+    <div class="hinweis hinweis--warnung">{{ feiertag }}</div>
+  {% endif %}
+
+  {% if tages_termine %}
+    <div class="slots">
+      {% for termin in tages_termine %}
+        <a class="slot" href="{% url 'termine:buchen' termin.pk %}">
+          <span class="uhrzeit">{{ termin.beginn_lokal|date:"H:i" }}</span>
+          <span class="meta">
+            {{ termin.terminart.dauer_minuten }} Min.
+            {% if not fahrlehrer %}<br>{{ termin.fahrlehrer.name }}{% endif %}
+          </span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="leer">An diesem Tag sind keine Termine mehr frei.</p>
+  {% endif %}
+{% else %}
+  <h2>Keine freien Termine</h2>
+  <p class="leer">
+    {% if terminart or fahrlehrer %}
+      Für diese Auswahl sind derzeit keine Termine verfügbar.
+      Versuchen Sie es mit einer anderen Terminart oder einem anderen Fahrlehrer.
+    {% else %}
+      Aktuell sind keine Termine freigegeben. Bitte schauen Sie später noch einmal vorbei.
+    {% endif %}
+  </p>
+{% endif %}
+
+{% if tage_gesamt %}
+  <p class="leer" style="margin-top:1rem">
+    Insgesamt {{ tage_gesamt }} freie Termin{{ tage_gesamt|pluralize:"e" }} in diesem Monat.
+    Buchbar bis {{ horizont|date:"j. F Y" }}.
+  </p>
+{% endif %}

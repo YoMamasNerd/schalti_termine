@@ -1,0 +1,41 @@
+{% load static %}<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titel %}{{ SITE_NAME }}{% endblock %}</title>
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="{% static 'js/htmx.min.js' %}" defer></script>
+  {% block kopf_extra %}{% endblock %}
+</head>
+<body>
+  <header class="kopf">
+    <div class="huelle">
+      <a class="marke" href="{% url 'termine:start' %}">{{ SITE_NAME }}</a>
+      <nav>
+        {% block navigation %}{% endblock %}
+      </nav>
+    </div>
+  </header>
+
+  <main class="huelle">
+    {% if messages %}
+      {% for nachricht in messages %}
+        <div class="hinweis hinweis--{% if nachricht.tags == 'error' %}fehler{% elif nachricht.tags == 'warning' %}warnung{% elif nachricht.tags == 'success' %}erfolg{% endif %}">
+          {{ nachricht }}
+        </div>
+      {% endfor %}
+    {% endif %}
+    {% block inhalt %}{% endblock %}
+  </main>
+
+  <footer class="fuss">
+    <div class="huelle">
+      {% if IMPRESSUM_URL %}<a href="{{ IMPRESSUM_URL }}">Impressum</a> · {% endif %}
+      {% if DATENSCHUTZ_URL %}<a href="{{ DATENSCHUTZ_URL }}">Datenschutz</a> · {% endif %}
+      <a href="{% url 'termine:dashboard' %}">Interner Bereich</a>
+    </div>
+  </footer>
+</body>
+</html>
