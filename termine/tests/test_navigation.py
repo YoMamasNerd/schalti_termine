@@ -75,3 +75,17 @@ class OhneRequest(SimpleTestCase):
         # Fehlerseiten werden ohne den üblichen Kontext gerendert. Der Tag darf
         # dort nichts markieren, aber erst recht nicht scheitern.
         self.assertEqual(aktiv({}, "dashboard"), "")
+
+
+class KoerperKlasse(TestCase):
+    """Öffentlich und intern sind optisch getrennt – das hängt an dieser Klasse."""
+
+    def test_oeffentliche_seite_ist_als_solche_ausgezeichnet(self):
+        antwort = self.client.get(reverse("termine:start"))
+        self.assertContains(antwort, '<body class="oeffentlich">')
+
+    def test_interner_bereich_verzichtet_auf_die_empfangsgesten(self):
+        chef = get_user_model().objects.create_superuser("chef2", password="geheim123")
+        self.client.force_login(chef)
+        antwort = self.client.get(reverse("termine:dashboard"))
+        self.assertContains(antwort, '<body class="intern">')

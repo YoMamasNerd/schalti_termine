@@ -9,7 +9,7 @@
   <script src="{% static 'js/htmx.min.js' %}" defer></script>
   {% block kopf_extra %}{% endblock %}
 </head>
-<body>
+<body class="{% block koerper %}oeffentlich{% endblock %}">
   <header class="kopf">
     <div class="huelle kopf-inhalt">
       <a class="marke" href="{% url 'termine:start' %}">

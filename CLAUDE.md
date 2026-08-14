@@ -43,6 +43,17 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
 
 ### Oberfläche
 
+- **Farben von fahrschule-schaltwerk.de**: Grund `#ebefe7`, Marke/Schrift
+  `#2b5883`, Akzent `#c72e2e`, Pastelltöne. Die Buchung wird von dort verlinkt.
+- Markenfarbe = Knöpfe, Links, aktiver Punkt, gewählter Tag. **Grün bleibt die
+  Bedeutungsfarbe** für frei/erfolgreich – im Kalender nicht durch die Marke
+  ersetzen.
+- Schrift auf gefüllten Flächen über `--auf-akzent`, nie festes `#fff`: In der
+  dunklen Fassung ist der Akzent hell.
+- Nachgeschärft gegenüber der Vorlage: `#5b7995` → `#4d6b87` (Kontrast),
+  `#3673b9` ungenutzt (4,2:1 zu wenig für Text).
+- Öffentliche Seite: Überschriften als gesperrte Versalien mit doppeltem rotem
+  Strich (`body.oeffentlich`). Interner Bereich (`body.intern`) ohne das.
 - Kopfzeile klebt beim Scrollen, milchig über dem Inhalt; Navigationspunkte als
   Pillen mit eingefärbtem aktivem Bereich (`aria-current="page"`).
 - Unter 760 px klappt die Navigation hinter einen Schalter – als `<details>`,
@@ -128,7 +139,7 @@ coverage run manage.py test termine && coverage report
 
 - `main` trägt den stabilen Stand. Entwickelt wird auf einem eigenen Branch,
   der erst nach grüner Testsuite dorthin zurückfließt.
-- Stand: 202 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
+- Stand: 204 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
   der Schwerpunkt liegt dort, wo ein Fehler unbemerkt bliebe (Jobs, Kommandos,
   Ausfallpfade des Mailversands).
 - Commit-Nachrichten auf Deutsch, im Stil der bestehenden Historie: erst was

@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% load navigation %}
 
+{# Der interne Bereich verzichtet auf die Empfangsgesten der Fahrschulseite. #}
+{% block koerper %}intern{% endblock %}
+
 {% block navigation %}
   {% comment %}
     Ein <details> statt eines Skripts: Auf schmalen Geräten klappt die

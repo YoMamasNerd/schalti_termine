@@ -261,6 +261,35 @@ nicht `403` – die App verrät damit nicht einmal, dass es den Termin gibt.
 htmx liegt als eine Datei unter `static/js/` – es gibt bewusst keinen
 Paketmanager fürs Frontend.
 
+### Farben
+
+Die Palette stammt von der Seite der Fahrschule, weil die Buchung von dort aus
+aufgerufen wird und der Sprung nicht wie ein Seitenwechsel wirken soll: das
+warme Papierweiß des Hintergrunds (`#ebefe7`), das Graublau für Schrift und
+Marke (`#2b5883`), der rote Akzent (`#c72e2e`) und die Pastelltöne der
+Abschnitte. Die öffentliche Seite greift zusätzlich die Schreibweise der
+Überschriften auf – gesperrte Versalien über einem doppelten roten Strich.
+Der interne Bereich bleibt sachlich; dort wird gearbeitet, nicht empfangen.
+
+Zwei Töne sind bewusst nachgeschärft, weil sie dort nur große Überschriften
+tragen, hier aber Fließtext und Bedienelemente:
+
+| Von der Fahrschulseite | Hier | Warum |
+| --- | --- | --- |
+| `#5b7995` | `#4d6b87` | 3,9:1 auf dem Hintergrund reicht für Fließtext nicht (jetzt 4,8:1) |
+| `#3673b9` | ungenutzt | 4,2:1 – für Text zu wenig; Zeigen und Fokus nutzen das dunklere `#1f4467` |
+
+**Grün bleibt Grün.** Die Markenfarbe färbt Knöpfe, Links, den aktiven
+Navigationspunkt und den gewählten Tag. Freie Termine, Erfolgsmeldungen und
+das Statuszeichen „Frei" behalten ihr Grün – im Kalender wird nichts so schnell
+verstanden wie ein grüner Tag. Es ist auf die Pastelltöne der Fahrschulseite
+abgestimmt, nicht mehr das alte Sattgrün.
+
+Alles hängt an Variablen in `static/css/app.css`; ein Wechsel der Palette sind
+zwölf Zeilen, hell und dunkel getrennt. Schrift auf gefüllten Flächen läuft
+über `--auf-akzent` statt über ein festes Weiß – in der dunklen Fassung ist der
+Akzent hell, dort wäre weiße Schrift unlesbar.
+
 ### Datum und Uhrzeit
 
 Überall Tag.Monat.Jahr mit führender Null und die 24-Stunden-Uhr. Die Vorlagen
@@ -515,7 +544,7 @@ sein. Wer unterwegs nachsehen will, wer morgen kommt, dreht das Gerät quer.
 python manage.py test termine
 ```
 
-202 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
+204 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
 Fehler unbemerkt bleiben würden:
 
 | Bereich | Was geprüft wird |
@@ -569,7 +598,7 @@ termine/
     einrichtung.py     Erkennt die noch nicht eingerichtete Installation
     zustand.py         Datenbank erreichbar? Laufen die Jobs?
   templatetags/    Einrichtungshinweis und aktiver Navigationspunkt
-  tests/           202 Tests, 97 % Zeilenabdeckung (siehe unten)
+  tests/           204 Tests, 97 % Zeilenabdeckung (siehe unten)
 static/            CSS und htmx
 docs/bilder/       Screenshots für diese README
 ```
