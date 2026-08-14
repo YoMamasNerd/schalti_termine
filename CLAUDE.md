@@ -87,7 +87,9 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
 
 ### Buchungsablauf
 
-- **Double-Opt-in**: verbindlich erst nach Klick auf den Mail-Link.
+- **Double-Opt-in**: Der Mail-Link führt auf eine Seite mit Knopf, gebucht
+  wird per **POST**. Ein GET darf nie buchen – Postfach-Scanner rufen Links
+  vorab ab und hätten sonst für den Kunden bestätigt.
 - Unbestätigte Reservierung verfällt nach **30 Minuten**.
 - Bestätigungsmail an Kunde und Fahrlehrer, je mit `.ics`-Anhang.
 - Selbst-Storno über denselben Link; Erinnerungsmail vor dem Termin.
@@ -160,7 +162,7 @@ coverage run manage.py test termine && coverage report
 
 - `main` trägt den stabilen Stand. Entwickelt wird auf einem eigenen Branch,
   der erst nach grüner Testsuite dorthin zurückfließt.
-- Stand: 241 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
+- Stand: 249 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
   der Schwerpunkt liegt dort, wo ein Fehler unbemerkt bliebe (Jobs, Kommandos,
   Ausfallpfade des Mailversands).
 - Commit-Nachrichten auf Deutsch, im Stil der bestehenden Historie: erst was

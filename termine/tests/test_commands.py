@@ -7,6 +7,7 @@ schon stehen geblieben ist.
 
 import datetime as dt
 from io import StringIO
+from unittest import mock
 
 from django.core import mail as django_mail
 from django.core.management import CommandError, call_command
@@ -192,3 +193,32 @@ class JobsEinrichten(KommandoBasis):
         self.rufe("jobs_einrichten")
 
         self.assertTrue(Schedule.objects.filter(name="Backup").exists())
+
+
+class PflegeSchritteSindUnabhaengig(TestCase):
+    """Ein klemmender Schritt darf die übrigen nicht mitreißen."""
+
+    def test_fehler_beim_versand_verhindert_die_anonymisierung_nicht(self):
+        with mock.patch(
+            "termine.management.commands.buchungen_pflegen.erinnerungen_versenden",
+            side_effect=RuntimeError("Mailserver weg"),
+        ), mock.patch(
+            "termine.management.commands.buchungen_pflegen.alte_buchungen_anonymisieren",
+            return_value=3,
+        ) as anonymisieren:
+            ausgabe, fehler = StringIO(), StringIO()
+            with self.assertLogs(
+                "termine.management.commands.buchungen_pflegen", level="ERROR"
+            ):
+                with self.assertRaises(SystemExit) as ende:
+                    call_command("buchungen_pflegen", stdout=ausgabe, stderr=fehler)
+
+        anonymisieren.assert_called_once()
+        self.assertEqual(ende.exception.code, 1)
+        self.assertIn("3 alte Buchungen anonymisiert", ausgabe.getvalue())
+        self.assertIn("fehlgeschlagen", fehler.getvalue())
+
+    def test_ohne_fehler_endet_die_pflege_still_und_erfolgreich(self):
+        ausgabe = StringIO()
+        call_command("buchungen_pflegen", stdout=ausgabe, stderr=StringIO())
+        self.assertIn("Pflege abgeschlossen", ausgabe.getvalue())

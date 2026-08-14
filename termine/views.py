@@ -236,7 +236,29 @@ def _buchung_holen(token: str) -> Buchung:
 
 
 def bestaetigen(request, token: str):
+    """Zweiter Schritt des Double-Opt-in – verbindlich erst nach dem Knopfdruck.
+
+    Der Aufruf des Links zeigt nur eine Seite mit einem Knopf; gebucht wird per
+    POST. Das ist kein Umstand um seiner selbst willen: Viele Postfächer lassen
+    eingehende Links vorab von einem Scanner abrufen (Outlook Safe Links und
+    Verwandte). Bestätigte der bloße Aufruf, hätte der Scanner die Buchung
+    verbindlich gemacht, ohne dass ein Mensch je geklickt hat – und genau das
+    soll das Double-Opt-in ja verhindern.
+    """
     buchung = _buchung_holen(token)
+
+    if request.method != "POST":
+        return render(
+            request,
+            "termine/bestaetigen.html",
+            {
+                "buchung": buchung,
+                "termin": buchung.termin,
+                "schon_bestaetigt": buchung.status == Buchung.Status.BESTAETIGT,
+                "abgelaufen": buchung.ist_abgelaufen,
+            },
+        )
+
     fehler = None
     try:
         buchung = buchungs_service.bestaetigen(buchung)

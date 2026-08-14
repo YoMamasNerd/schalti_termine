@@ -333,15 +333,40 @@ class Sperrzeit(models.Model):
 
 class TerminQuerySet(models.QuerySet):
     def buchbar(self, jetzt: dt.datetime | None = None):
-        """Freie Termine, die den Mindest-Vorlauf einhalten und nicht gesperrt sind."""
+        """Freie Termine, die den Mindest-Vorlauf einhalten und nicht gesperrt sind.
+
+        Der Mindest-Vorlauf hängt am einzelnen Fahrlehrer. Ihn in der Datenbank
+        auszurechnen (`beginn - jetzt >= vorlauf_stunden`) wäre die elegantere
+        Fassung, scheitert aber an SQLite: Dort ist „Ganzzahl mal Zeitspanne"
+        kein gültiger Operator, und SQLite ist für Einzelplatz-Installationen
+        ausdrücklich vorgesehen.
+
+        Deshalb wird die Grenze in Python gebildet. Haben alle Fahrlehrer
+        denselben Vorlauf – der Normalfall –, ist es eine einzige Bedingung;
+        erst bei unterschiedlichen Werten entsteht eine Kette.
+        """
         from django.db.models import Exists, OuterRef, Q
 
         jetzt = jetzt or timezone.now()
-        vorlauf_filter = Q(pk__in=[])
-        for fahrlehrer in Fahrlehrer.objects.filter(aktiv=True):
-            vorlauf_filter |= Q(
-                fahrlehrer=fahrlehrer, beginn__gte=fahrlehrer.fruehester_start(jetzt)
+        vorlaeufe = dict(
+            Fahrlehrer.objects.filter(aktiv=True).values_list("pk", "vorlauf_stunden")
+        )
+        if not vorlaeufe:
+            return self.none()
+
+        verschiedene = set(vorlaeufe.values())
+        if len(verschiedene) == 1:
+            stunden = verschiedene.pop()
+            vorlauf_filter = Q(
+                fahrlehrer__aktiv=True, beginn__gte=jetzt + dt.timedelta(hours=stunden)
             )
+        else:
+            vorlauf_filter = Q(pk__in=[])
+            for pk, stunden in vorlaeufe.items():
+                vorlauf_filter |= Q(
+                    fahrlehrer_id=pk, beginn__gte=jetzt + dt.timedelta(hours=stunden)
+                )
+
         gesperrt = Sperrzeit.objects.filter(
             fahrlehrer=OuterRef("fahrlehrer"),
             beginn__lt=OuterRef("ende"),

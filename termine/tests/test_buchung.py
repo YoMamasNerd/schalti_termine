@@ -349,15 +349,42 @@ class OeffentlicheSeiten(BuchungsBasis):
         self.assertEqual(antwort.status_code, 200)
         self.assertEqual(Buchung.objects.count(), 0)
 
-    def test_bestaetigungslink_bucht_verbindlich(self):
+    def test_aufruf_des_links_bestaetigt_noch_nichts(self):
+        # Postfach-Scanner rufen Links vorab ab. Täte der Aufruf schon die
+        # Buchung, wäre das Double-Opt-in wirkungslos.
         buchung = self.reservieren()
 
         antwort = self.client.get(reverse("termine:bestaetigen", args=[buchung.token]))
 
         buchung.refresh_from_db()
         self.assertEqual(antwort.status_code, 200)
+        self.assertEqual(buchung.status, Buchung.Status.OFFEN)
+        self.assertContains(antwort, "Termin verbindlich buchen")
+
+    def test_der_knopf_bucht_verbindlich(self):
+        buchung = self.reservieren()
+
+        antwort = self.client.post(reverse("termine:bestaetigen", args=[buchung.token]))
+
+        buchung.refresh_from_db()
+        self.assertEqual(antwort.status_code, 200)
         self.assertEqual(buchung.status, Buchung.Status.BESTAETIGT)
         self.assertContains(antwort, "gebucht")
+
+    def test_zweiter_aufruf_zeigt_den_bestaetigten_zustand(self):
+        buchung = self.bestaetigen(self.reservieren())
+        antwort = self.client.get(reverse("termine:bestaetigen", args=[buchung.token]))
+        self.assertContains(antwort, "steht bereits")
+        self.assertNotContains(antwort, "Termin verbindlich buchen")
+
+    def test_abgelaufene_reservierung_bietet_keinen_knopf_an(self):
+        buchung = self.reservieren()
+        buchung.reserviert_bis = timezone.now() - dt.timedelta(minutes=1)
+        buchung.save(update_fields=["reserviert_bis"])
+
+        antwort = self.client.get(reverse("termine:bestaetigen", args=[buchung.token]))
+        self.assertContains(antwort, "abgelaufen")
+        self.assertNotContains(antwort, "Termin verbindlich buchen")
 
     def test_unbekannter_token_fuehrt_ins_leere(self):
         antwort = self.client.get(reverse("termine:bestaetigen", args=["quatsch"]))

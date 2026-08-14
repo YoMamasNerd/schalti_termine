@@ -257,3 +257,46 @@ class HandplanungNurZukunft(Basis):
         )
         self.assertEqual(len(neue), 4)
         self.assertEqual(uebersprungen, 0)
+
+
+class Mindestvorlauf(Basis):
+    """Beide Wege durch `buchbar()` – gleicher Vorlauf und unterschiedlicher."""
+
+    def termin_in(self, stunden: int, fahrlehrer=None) -> Termin:
+        beginn = timezone.now() + dt.timedelta(hours=stunden)
+        return Termin.objects.create(
+            fahrlehrer=fahrlehrer or self.anna,
+            terminart=self.art,
+            beginn=beginn,
+            ende=beginn + dt.timedelta(minutes=30),
+        )
+
+    def test_gleicher_vorlauf_bei_allen(self):
+        self.anna.vorlauf_stunden = 24
+        self.anna.save(update_fields=["vorlauf_stunden"])
+
+        zu_frueh = self.termin_in(2)
+        passt = self.termin_in(48)
+
+        buchbar = list(Termin.objects.buchbar())
+        self.assertIn(passt, buchbar)
+        self.assertNotIn(zu_frueh, buchbar)
+
+    def test_unterschiedlicher_vorlauf_wird_je_fahrlehrer_gerechnet(self):
+        self.anna.vorlauf_stunden = 48
+        self.anna.save(update_fields=["vorlauf_stunden"])
+        tom = Fahrlehrer.objects.create(
+            name="Tom Keller", email="tom@example.org", bundesland="BY", vorlauf_stunden=2
+        )
+
+        annas_termin = self.termin_in(24)  # zu kurzfristig für Anna
+        toms_termin = self.termin_in(24, fahrlehrer=tom)  # für Tom weit genug weg
+
+        buchbar = list(Termin.objects.buchbar())
+        self.assertIn(toms_termin, buchbar)
+        self.assertNotIn(annas_termin, buchbar)
+
+    def test_ohne_aktive_fahrlehrer_ist_nichts_buchbar(self):
+        self.termin_in(48)
+        Fahrlehrer.objects.update(aktiv=False)
+        self.assertEqual(Termin.objects.buchbar().count(), 0)

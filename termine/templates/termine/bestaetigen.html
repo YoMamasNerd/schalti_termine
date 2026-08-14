@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block titel %}Termin bestätigen – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+<div class="huelle-schmal" style="padding:0">
+  {% if schon_bestaetigt %}
+    <h1>Dieser Termin steht bereits</h1>
+    <div class="hinweis hinweis--erfolg">
+      Sie haben diesen Termin schon bestätigt – Sie müssen nichts weiter tun.
+    </div>
+    <p>
+      <a class="knopf knopf--leise" href="{% url 'termine:buchung' buchung.token %}">
+        Termin ansehen oder absagen
+      </a>
+    </p>
+
+  {% elif abgelaufen %}
+    <h1>Die Reservierung ist abgelaufen</h1>
+    <div class="hinweis hinweis--warnung">
+      Wir halten einen Termin nur {{ RESERVATION_MINUTES }} Minuten frei. Dieser
+      hier ist inzwischen wieder für andere freigegeben.
+    </div>
+    <p><a class="knopf" href="{% url 'termine:start' %}">Neuen Termin auswählen</a></p>
+
+  {% else %}
+    <h1>Nur noch bestätigen</h1>
+    <p>
+      Bitte bestätigen Sie Ihren Termin mit einem Klick. Erst danach ist er
+      verbindlich für Sie reserviert.
+    </p>
+
+    <div class="zusammenfassung">
+      <dl>
+        <dt>Wann</dt>
+        <dd>{{ termin.beginn_lokal|date:"l, j. F Y" }}, {{ termin.beginn_lokal|date:"H:i" }}–{{ termin.ende_lokal|date:"H:i" }} Uhr</dd>
+        <dt>Was</dt>
+        <dd>{{ termin.terminart.name }}</dd>
+        <dt>Bei wem</dt>
+        <dd>{{ termin.fahrlehrer.name }}</dd>
+        {% if termin.terminart.ort %}<dt>Wo</dt><dd>{{ termin.terminart.ort }}</dd>{% endif %}
+      </dl>
+    </div>
+
+    {% comment %}
+      Bewusst ein Formular und kein Link: Ein Link würde von den Scannern
+      mancher Postfächer abgerufen, und die Buchung wäre verbindlich, ohne dass
+      jemand geklickt hat.
+    {% endcomment %}
+    <form method="post">
+      {% csrf_token %}
+      <button class="knopf" type="submit">Termin verbindlich buchen</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

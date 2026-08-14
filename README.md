@@ -44,7 +44,8 @@ anhand des Bundeslands übersprungen.
 - Monatskalender mit allen freien Terminen
 - Filter nach Terminart und Fahrlehrer – aber nur dort, wo es etwas zu wählen gibt
 - Buchung mit Name, E-Mail, Telefon, Führerscheinklasse und Nachricht
-- Double-Opt-in: verbindlich erst nach Klick auf den Link in der E-Mail
+- Double-Opt-in: verbindlich erst, wenn der Kunde auf der verlinkten Seite
+  bestätigt – ein bloßer Aufruf des Links genügt nicht
 - Bestätigungsmail mit Kalendereintrag (`.ics`) im Anhang
 - Selbstständiges Absagen über einen persönlichen Link
 - Erinnerungsmail vor dem Termin
@@ -560,7 +561,7 @@ sein. Wer unterwegs nachsehen will, wer morgen kommt, dreht das Gerät quer.
 python manage.py test termine
 ```
 
-241 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
+249 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
 Fehler unbemerkt bleiben würden:
 
 | Bereich | Was geprüft wird |
@@ -617,7 +618,7 @@ termine/
     einrichtung.py     Erkennt die noch nicht eingerichtete Installation
     zustand.py         Datenbank erreichbar? Laufen die Jobs?
   templatetags/    Einrichtungshinweis und aktiver Navigationspunkt
-  tests/           241 Tests, 97 % Zeilenabdeckung (siehe unten)
+  tests/           249 Tests, 97 % Zeilenabdeckung (siehe unten)
 static/            CSS und htmx
 docs/bilder/       Screenshots für diese README
 ```
