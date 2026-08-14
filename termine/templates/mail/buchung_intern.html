@@ -1,0 +1,62 @@
+{% extends "mail/_geruest.html" %}
+
+{% block titel %}Neue Buchung{% endblock %}
+{% block vorschau %}{{ buchung.name }} hat einen Termin bei {{ fahrlehrer.name }} gebucht.{% endblock %}
+{% block ueberschrift %}Neue Buchung{% endblock %}
+{% block ueberschrift_schmuck %}{% endblock %}
+
+{% block inhalt %}
+<p class="m-text" style="margin:0 0 20px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.55; color:#2b5883;">
+  Für {{ fahrlehrer.name }} ist eine bestätigte Buchung eingegangen.
+</p>
+
+{% include "mail/_karte_termin.html" with ohne_fahrlehrer=True %}
+
+<h2 class="m-text" style="margin:0 0 10px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; font-weight:650; line-height:1.25; color:#2b5883;">Interessent</h2>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       style="margin:0 0 20px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:15px; line-height:1.5;">
+  <tr>
+    <td class="m-leise" valign="top" style="padding:3px 12px 3px 0; color:#4d6b87; white-space:nowrap;">Name</td>
+    <td class="m-text" valign="top" style="padding:3px 0; color:#2b5883; font-weight:600;">{{ buchung.name }}</td>
+  </tr>
+  <tr>
+    <td class="m-leise" valign="top" style="padding:3px 12px 3px 0; color:#4d6b87; white-space:nowrap;">E-Mail</td>
+    <td class="m-text" valign="top" style="padding:3px 0; color:#2b5883; font-weight:600;">
+      <a class="m-link" href="mailto:{{ buchung.email }}" style="color:#2b5883;">{{ buchung.email }}</a>
+    </td>
+  </tr>
+  {% if buchung.telefon %}
+  <tr>
+    <td class="m-leise" valign="top" style="padding:3px 12px 3px 0; color:#4d6b87; white-space:nowrap;">Telefon</td>
+    <td class="m-text" valign="top" style="padding:3px 0; color:#2b5883; font-weight:600;">
+      <a class="m-link" href="tel:{{ buchung.telefon }}" style="color:#2b5883;">{{ buchung.telefon }}</a>
+    </td>
+  </tr>
+  {% endif %}
+  {% if buchung.fuehrerscheinklasse %}
+  <tr>
+    <td class="m-leise" valign="top" style="padding:3px 12px 3px 0; color:#4d6b87; white-space:nowrap;">Klasse</td>
+    <td class="m-text" valign="top" style="padding:3px 0; color:#2b5883; font-weight:600;">{{ buchung.get_fuehrerscheinklasse_display }}</td>
+  </tr>
+  {% endif %}
+</table>
+
+{% if buchung.nachricht %}
+<h2 class="m-text" style="margin:0 0 10px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; font-weight:650; line-height:1.25; color:#2b5883;">Nachricht</h2>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       class="m-neutral" style="background-color:#ebefe7; border:1px solid #cfdbe2; border-radius:6px; margin:0 0 20px;">
+  <tr>
+    <td class="m-text" style="padding:12px 16px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:15px; line-height:1.55; color:#2b5883;">
+      {{ buchung.nachricht|linebreaksbr }}
+    </td>
+  </tr>
+</table>
+{% endif %}
+
+{% include "mail/_knopf.html" with url=buchungen_url text="Im internen Bereich öffnen" leise=True %}
+
+<p class="m-leise" style="margin:0; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:13px; line-height:1.6; color:#4d6b87;">
+  Der Kalendereintrag hängt an.
+</p>
+{% endblock %}

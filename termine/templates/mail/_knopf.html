@@ -1,0 +1,24 @@
+{% comment %}
+  Knopf wie .knopf auf der Seite, gebaut als Tabellenzelle: Outlook wirft
+  Innenabstand an einem <a> weg, an einer Zelle nicht.
+
+  Darunter steht die Adresse noch einmal zum Abtippen. Postfächer, die HTML
+  beschneiden oder Knöpfe umbauen, machen sonst aus dem einen Weg zur
+  Bestätigung eine Sackgasse.
+
+  Parameter:
+    url    Ziel
+    text   Beschriftung
+    leise  stiller Knopf (heller Grund, Markenrand) statt gefüllt
+{% endcomment %}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px;">
+  <tr>
+    <td class="{% if not leise %}m-knopf{% else %}m-flaeche{% endif %}"
+        style="border-radius:6px; {% if leise %}background-color:#ffffff; border:1px solid #cfdbe2;{% else %}background-color:#2b5883; border:1px solid #2b5883;{% endif %}">
+      <a href="{{ url }}" {% if leise %}class="m-link" {% endif %}style="display:inline-block; padding:11px 22px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; font-weight:600; line-height:1.2; text-decoration:none; {% if leise %}color:#2b5883;{% else %}color:#ffffff;{% endif %}">{{ text }}</a>
+    </td>
+  </tr>
+</table>
+<p class="m-leise" style="margin:0 0 20px; font-size:12px; line-height:1.5; color:#4d6b87; word-break:break-all;">
+  Falls der Knopf nicht reagiert: {{ url }}
+</p>
