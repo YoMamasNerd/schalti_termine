@@ -6,6 +6,7 @@ import calendar
 import datetime as dt
 from collections import defaultdict
 
+from django.conf import settings
 from django.db.models import QuerySet
 from django.utils import timezone
 
@@ -45,13 +46,19 @@ def termine_nach_tag(termine: QuerySet[Termin]) -> dict[dt.date, list[Termin]]:
 
 
 def buchungshorizont() -> dt.date:
-    """Der letzte Tag, an dem irgendein Fahrlehrer noch Termine anbietet."""
+    """Der letzte Tag, an dem irgendein Fahrlehrer noch Termine anbietet.
+
+    Muss mit dem Generator übereinstimmen: Der plant von heute an `wochen * 7`
+    Tage, heute eingeschlossen – der letzte Tag ist also `wochen * 7 - 1` Tage
+    entfernt. Ohne das `- 1` versprach die Seite „buchbar bis" einen Tag, an
+    dem nie ein Termin steht.
+    """
     heute = timezone.localdate()
     wochen = max(
         (f.horizont_wochen for f in Fahrlehrer.objects.filter(aktiv=True)),
-        default=4,
+        default=settings.DEFAULT_HORIZON_WEEKS,
     )
-    return heute + dt.timedelta(days=wochen * 7)
+    return heute + dt.timedelta(days=wochen * 7 - 1)
 
 
 def monatsgitter(

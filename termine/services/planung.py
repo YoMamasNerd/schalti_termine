@@ -18,7 +18,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from ..models import Fahrlehrer, RhythmusRegel, Sperrzeit, Termin, Terminart
+from ..models import Buchung, Fahrlehrer, RhythmusRegel, Sperrzeit, Termin, Terminart
 from .feiertage import feiertage_im_zeitraum
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,7 @@ class Bericht:
     erstellt: int = 0
     entfernt: int = 0
     unveraendert: int = 0
+    wiederbelebt: int = 0
     feiertage_uebersprungen: int = 0
     sperrzeiten_uebersprungen: int = 0
     konflikte_uebersprungen: int = 0
@@ -49,6 +50,7 @@ class Bericht:
         summe.erstellt = self.erstellt + other.erstellt
         summe.entfernt = self.entfernt + other.entfernt
         summe.unveraendert = self.unveraendert + other.unveraendert
+        summe.wiederbelebt = self.wiederbelebt + other.wiederbelebt
         summe.feiertage_uebersprungen = (
             self.feiertage_uebersprungen + other.feiertage_uebersprungen
         )
@@ -67,6 +69,8 @@ class Bericht:
             f"{self.entfernt} entfernt",
             f"{self.unveraendert} unverändert",
         ]
+        if self.wiederbelebt:
+            teile.append(f"{self.wiederbelebt} wieder angeboten")
         if self.feiertage_uebersprungen:
             teile.append(f"{self.feiertage_uebersprungen} wegen Feiertag ausgelassen")
         if self.sperrzeiten_uebersprungen:
@@ -154,6 +158,38 @@ def gewuenschte_termine(
     return soll
 
 
+def termine_entfernen(termine) -> tuple[int, set[int]]:
+    """Nimmt Termine aus dem Angebot.
+
+    Gibt zurück, wie viele gelöscht wurden, und die Schlüssel derer, die als
+    ENTFALLEN stehen geblieben sind.
+
+    Termine ohne Buchungshistorie werden gelöscht. Termine mit Historie
+    bleiben als ENTFALLEN stehen – auch eine stornierte Buchung ist der Beleg
+    dafür, dass hier jemand gebucht hatte, und `Buchung.termin` steht bewusst
+    auf PROTECT, damit ein Aufräumlauf so einen Beleg nicht wegwirft.
+
+    Ohne diese Unterscheidung endete jeder Löschpfad in einem ProtectedError,
+    sobald ein Termin einmal gebucht und wieder storniert worden war – und
+    genau das ist der Normalfall einer Terminbuchung mit Selbst-Storno.
+    """
+    pks = list(termine.values_list("pk", flat=True))
+    if not pks:
+        return 0, set()
+
+    mit_historie = set(
+        Buchung.objects.filter(termin_id__in=pks).values_list("termin_id", flat=True)
+    )
+    ohne_historie = [pk for pk in pks if pk not in mit_historie]
+
+    if mit_historie:
+        Termin.objects.filter(pk__in=mit_historie).update(status=Termin.Status.ENTFALLEN)
+    geloescht = 0
+    if ohne_historie:
+        geloescht, _ = Termin.objects.filter(pk__in=ohne_historie).delete()
+    return geloescht, mit_historie
+
+
 @transaction.atomic
 def generiere_termine(
     fahrlehrer: Fahrlehrer,
@@ -194,9 +230,16 @@ def generiere_termine(
             and termin.beginn not in soll
         ]
         if zu_loeschen:
-            geloescht, _ = Termin.objects.filter(pk__in=zu_loeschen).delete()
-            bericht.entfernt = len(zu_loeschen)
-            bestand = [t for t in bestand if t.pk not in set(zu_loeschen)]
+            geloescht, entfallen = termine_entfernen(
+                Termin.objects.filter(pk__in=zu_loeschen)
+            )
+            bericht.entfernt = geloescht + len(entfallen)
+            # Die entfallenen bleiben im Bestand: Sie belegen ihre Uhrzeit
+            # weiterhin, und der nächste Lauf kann sie wiederbeleben.
+            bestand = [t for t in bestand if t.pk in entfallen or t.pk not in set(zu_loeschen)]
+            for termin in bestand:
+                if termin.pk in entfallen:
+                    termin.status = Termin.Status.ENTFALLEN
             bestand_nach_beginn = {t.beginn: t for t in bestand}
 
     # 2. Anlegen, was fehlt – ohne bestehende Termine zu überlappen.
@@ -204,8 +247,19 @@ def generiere_termine(
     neue: list[Termin] = []
     for beginn in sorted(soll):
         ende, art, regel = soll[beginn]
-        if beginn in bestand_nach_beginn:
-            bericht.unveraendert += 1
+        vorhanden = bestand_nach_beginn.get(beginn)
+        if vorhanden is not None:
+            if vorhanden.status == Termin.Status.ENTFALLEN:
+                # Die Regel deckt diesen Zeitpunkt wieder ab. Ein zweiter
+                # Termin zur selben Uhrzeit ginge ohnehin nicht – der
+                # Unique-Index verbietet ihn –, also wird dieser wieder
+                # angeboten.
+                Termin.objects.filter(pk=vorhanden.pk).update(
+                    status=Termin.Status.FREI, terminart=art, regel=regel, ende=ende
+                )
+                bericht.wiederbelebt += 1
+            else:
+                bericht.unveraendert += 1
             continue
         if any(_ueberschneidet(beginn, ende, b_beginn, b_ende) for b_beginn, b_ende in belegt):
             bericht.konflikte_uebersprungen += 1

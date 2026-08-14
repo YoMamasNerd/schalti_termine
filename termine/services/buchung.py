@@ -145,10 +145,11 @@ def stornieren(buchung: Buchung, *, von: str = "kunde", benachrichtigen: bool = 
 
     if benachrichtigen and war_bestaetigt:
         def _mails():
-            if von == "fahrschule":
-                mail.storno_kunde(buchung)
-            else:
-                mail.storno_kunde(buchung)
+            # Der Kunde wird immer benachrichtigt. Der Fahrlehrer nur dann,
+            # wenn die Absage vom Kunden kam – hat die Fahrschule selbst
+            # abgesagt, weiß sie es bereits.
+            mail.storno_kunde(buchung)
+            if von != "fahrschule":
                 mail.storno_fahrlehrer(buchung)
 
         transaction.on_commit(_mails)

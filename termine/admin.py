@@ -5,7 +5,7 @@ from django.utils.html import format_html
 from .forms import RhythmusRegelForm
 from .models import Buchung, Fahrlehrer, RhythmusRegel, Sperrzeit, Termin, Terminart
 from .services import buchung as buchungs_service
-from .services.planung import generiere_termine
+from .services.planung import generiere_termine, termine_entfernen
 
 # Wer hier ankommt und noch keinen Superuser hat, kann sich nicht anmelden und
 # erfährt sonst nirgends, warum. Die eigene Vorlage ergänzt die des Admins nur
@@ -168,7 +168,7 @@ class TerminAdmin(admin.ModelAdmin):
                 f"{belegt} Termine sind belegt und wurden nicht gelöscht.",
                 messages.WARNING,
             )
-        queryset.filter(status=Termin.Status.FREI).delete()
+        termine_entfernen(queryset.filter(status=Termin.Status.FREI))
 
 
 @admin.register(Buchung)

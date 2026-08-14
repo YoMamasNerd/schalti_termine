@@ -32,7 +32,13 @@ from .models import (
 )
 from .services import buchung as buchungs_service
 from .services.feiertage import feiertage_im_zeitraum
-from .services.planung import generiere_termine, lokal, termine_manuell_anlegen, vorschau
+from .services.planung import (
+    generiere_termine,
+    lokal,
+    termine_entfernen,
+    termine_manuell_anlegen,
+    vorschau,
+)
 
 
 def mitarbeiter(view):
@@ -146,6 +152,9 @@ def tagesplanung(request):
             beginn__gte=lokal(montag, dt.time.min),
             beginn__lte=lokal(sonntag, dt.time.max),
         )
+        # Entfallene Termine stehen nur noch als Beleg in der Datenbank; in der
+        # Wochenansicht wären sie eine Zeile, an der es nichts zu tun gibt.
+        .exclude(status=Termin.Status.ENTFALLEN)
         .select_related("terminart")
         .prefetch_related("buchungen")
         .order_by("beginn")
@@ -271,12 +280,15 @@ def sperrzeit_anlegen(request):
             grund=daten.get("grund", ""),
         )
         # Freie Termine im gesperrten Zeitraum verschwinden sofort aus dem Angebot.
-        entfernt, _ = Termin.objects.filter(
-            fahrlehrer=sperre.fahrlehrer,
-            status=Termin.Status.FREI,
-            beginn__lt=sperre.ende,
-            ende__gt=sperre.beginn,
-        ).delete()
+        geloescht, entfallen = termine_entfernen(
+            Termin.objects.filter(
+                fahrlehrer=sperre.fahrlehrer,
+                status=Termin.Status.FREI,
+                beginn__lt=sperre.ende,
+                ende__gt=sperre.beginn,
+            )
+        )
+        entfernt = geloescht + len(entfallen)
         betroffen = Buchung.objects.filter(
             termin__fahrlehrer=sperre.fahrlehrer,
             termin__beginn__lt=sperre.ende,
@@ -307,8 +319,8 @@ def termin_loeschen(request, pk: int):
         )
     else:
         tag = termin.tag
-        termin.delete()
-        messages.success(request, f"Termin am {date_format(tag, 'j. F')} gelöscht.")
+        termine_entfernen(Termin.objects.filter(pk=termin.pk))
+        messages.success(request, f"Termin am {date_format(tag, 'j. F')} entfernt.")
     return redirect(_sicheres_ziel(request, "termine:tagesplanung"))
 
 
@@ -437,7 +449,7 @@ def regel_loeschen(request, pk: int):
     )
     fahrlehrer = regel.fahrlehrer
     # Freie Termine aus dieser Regel mit entfernen, gebuchte bleiben bestehen.
-    Termin.objects.filter(regel=regel, status=Termin.Status.FREI).delete()
+    termine_entfernen(Termin.objects.filter(regel=regel, status=Termin.Status.FREI))
     regel.delete()
     messages.success(
         request,

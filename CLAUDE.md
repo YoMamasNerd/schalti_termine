@@ -104,6 +104,13 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
   Termine löschen, idempotent.
 - Feiertage auf **Bundesland-Ebene**; örtliche Feiertage über eine Sperrzeit.
 - Manuelle und generierte Termine leben friedlich nebeneinander.
+- **Termine nie direkt löschen**, immer über `planung.termine_entfernen()`:
+  `Buchung.termin` steht auf PROTECT, ein Termin mit Buchungshistorie wird
+  deshalb auf `ENTFALLEN` gesetzt statt gelöscht. Direktes `.delete()` endet
+  im ProtectedError, sobald jemand einmal storniert hat.
+- Deckt eine Regel einen entfallenen Zeitpunkt wieder ab, wird der Termin
+  wiederbelebt – ein zweiter zur selben Uhrzeit ginge wegen des Unique-Index
+  ohnehin nicht.
 
 ### Datenschutz
 
@@ -153,7 +160,7 @@ coverage run manage.py test termine && coverage report
 
 - `main` trägt den stabilen Stand. Entwickelt wird auf einem eigenen Branch,
   der erst nach grüner Testsuite dorthin zurückfließt.
-- Stand: 227 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
+- Stand: 238 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
   der Schwerpunkt liegt dort, wo ein Fehler unbemerkt bliebe (Jobs, Kommandos,
   Ausfallpfade des Mailversands).
 - Commit-Nachrichten auf Deutsch, im Stil der bestehenden Historie: erst was

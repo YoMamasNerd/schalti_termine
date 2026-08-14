@@ -237,7 +237,7 @@ class RhythmusRegel(models.Model):
         help_text="Nur bei mehrwöchigem Rhythmus relevant: Die Woche dieses Datums "
         "ist eine Woche, in der die Regel greift.",
     )
-    gueltig_ab = models.DateField("Gültig ab", default=dt.date.today)
+    gueltig_ab = models.DateField("Gültig ab", default=timezone.localdate)
     gueltig_bis = models.DateField(
         "Gültig bis", null=True, blank=True, help_text="Leer lassen für unbegrenzt."
     )
@@ -316,6 +316,12 @@ class Sperrzeit(models.Model):
         verbose_name_plural = "Sperrzeiten"
         ordering = ("-beginn",)
         indexes = [models.Index(fields=["fahrlehrer", "beginn", "ende"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(ende__gt=models.F("beginn")),
+                name="sperrzeit_ende_nach_beginn",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.fahrlehrer}: {timezone.localtime(self.beginn):%d.%m.%Y %H:%M} – {timezone.localtime(self.ende):%d.%m.%Y %H:%M}"
@@ -357,6 +363,11 @@ class Termin(models.Model):
         FREI = "frei", "Frei"
         RESERVIERT = "reserviert", "Reserviert (wartet auf Bestätigung)"
         GEBUCHT = "gebucht", "Gebucht"
+        # Zurückgezogen, aber nicht gelöscht: Der Termin trägt eine
+        # Buchungshistorie – etwa eine Stornierung –, und die ist der Beleg
+        # dafür, dass hier einmal jemand gebucht hat. Ein Aufräumlauf darf so
+        # einen Beleg nicht wegwerfen, also verschwindet nur das Angebot.
+        ENTFALLEN = "entfallen", "Entfallen (nicht mehr im Angebot)"
 
     class Herkunft(models.TextChoices):
         MANUELL = "manuell", "Manuell angelegt"
@@ -434,15 +445,6 @@ class Termin(models.Model):
             fahrlehrer=self.fahrlehrer, beginn__lt=self.ende, ende__gt=self.beginn
         ).exists()
 
-    def ueberschneidet_sich(self) -> bool:
-        """Gibt es für denselben Fahrlehrer bereits einen überlappenden Termin?"""
-        return (
-            Termin.objects.filter(
-                fahrlehrer=self.fahrlehrer, beginn__lt=self.ende, ende__gt=self.beginn
-            )
-            .exclude(pk=self.pk)
-            .exists()
-        )
 
 
 class Buchung(models.Model):

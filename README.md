@@ -560,7 +560,7 @@ sein. Wer unterwegs nachsehen will, wer morgen kommt, dreht das Gerät quer.
 python manage.py test termine
 ```
 
-227 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
+238 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
 Fehler unbemerkt bleiben würden:
 
 | Bereich | Was geprüft wird |
@@ -573,6 +573,7 @@ Fehler unbemerkt bleiben würden:
 | Kommandos | alle Argumente, inklusive der Abbruchfälle |
 | Ausfälle | ein streikender Mailserver darf keine Buchung zerstören, muss aber im Log auftauchen |
 | Konfiguration | die Prüfungen aus `checks.py`, inklusive unveränderter Geheimnisse aus der Beispieldatei |
+| Aufräumen | dass ein Termin mit Buchungshistorie entfernt werden kann, ohne den Beleg zu zerstören – auf allen vier Wegen |
 | Einbettung | wer die Auswahl einrahmen darf und wer nicht – und dass die übrigen Seiten gesperrt bleiben |
 | Sicherheit | echte XSS-Nutzlasten durch eine Buchung geschickt und auf jeder Seite nachgelesen; Kopfzeilen, Mailkopf, Kalenderfeld, Token-Länge, Weiterleitung nach der Anmeldung |
 | Zustand | Zustandsseite und Job-Fahrplan, jeweils auch im Ausfall – diese Prüfungen sind selbst die Alarmanlage |
@@ -616,7 +617,7 @@ termine/
     einrichtung.py     Erkennt die noch nicht eingerichtete Installation
     zustand.py         Datenbank erreichbar? Laufen die Jobs?
   templatetags/    Einrichtungshinweis und aktiver Navigationspunkt
-  tests/           227 Tests, 97 % Zeilenabdeckung (siehe unten)
+  tests/           238 Tests, 97 % Zeilenabdeckung (siehe unten)
 static/            CSS und htmx
 docs/bilder/       Screenshots für diese README
 ```
