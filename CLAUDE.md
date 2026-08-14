@@ -122,6 +122,9 @@ ausdrücklich danach:
   als `EMAIL_HOST`, unveränderte Geheimnisse aus `.env.example`. Alle mit
   `deploy=True` registriert, weil Djangos Testrunner `DEBUG=False` setzt.
 - `docker-compose` ruft `check --deploy` **vor** der Migration auf.
+- `docker-compose.yml` bleibt proxy-agnostisch (nur `127.0.0.1:8000`). TLS ist
+  eine **Ergänzung**: `docker-compose.tls.yml` + `deploy/Caddyfile`. Wer auf dem
+  Host schon nginx betreibt, benutzt sie nicht.
 - Beide Container prüfen sich selbst: `web` über `GET /healthz` (Datenbank),
   `worker` über `manage.py jobs_pruefen` (Fahrplan statt Prozess). Der Worker
   wartet auf einen gesunden `web`, weil dort die Migration läuft.

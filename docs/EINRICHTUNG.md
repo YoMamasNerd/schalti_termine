@@ -24,7 +24,9 @@ Docker kennt, springt zu [Die `.env` im Einzelnen](#die-env-im-einzelnen).
 
 - Docker mit dem Plugin `compose` (`docker compose version` muss antworten)
 - Einen Namen im DNS, der auf den Server zeigt, z. B. `termine.meine-fahrschule.de`
-- Einen Reverse Proxy mit TLS-Zertifikat davor – nginx, Caddy oder Traefik
+- Einen Reverse Proxy mit TLS davor. Entweder bringt der Stack ihn selbst mit
+  (`docker-compose.tls.yml` mit Caddy), oder auf dem Host läuft schon einer –
+  siehe [Reverse Proxy mit TLS](#reverse-proxy-mit-tls)
 - Zugangsdaten zu einem SMTP-Postfach für den Mailversand
 - Ungefähr 1 GB freien Arbeitsspeicher
 
@@ -135,6 +137,7 @@ Alle vier haben brauchbare Vorgaben und können erst einmal so bleiben.
 | --- | --- |
 | `TIME_ZONE` | `Europe/Berlin`. Bestimmt auch die Sommerzeitumstellung. |
 | `LOG_LEVEL` | `INFO` ist richtig. `WARNING` macht das Protokoll ruhiger, `DEBUG` sehr geschwätzig. |
+| `TLS_DOMAIN` | Nur für `docker-compose.tls.yml`: der Name, für den Caddy das Zertifikat holt. Muss mit `SITE_BASE_URL` übereinstimmen. |
 | `IMPRESSUM_URL` | Adresse eures Impressums. Erscheint im Seitenfuß. |
 | `DATENSCHUTZ_URL` | Adresse der Datenschutzerklärung. Erscheint im Seitenfuß. Die Einwilligung im Buchungsformular ist ein eigenes Pflichtfeld und verlinkt sie nicht – wer das möchte, verlinkt sie über den Seitenfuß. |
 
@@ -143,23 +146,54 @@ Alle vier haben brauchbare Vorgaben und können erst einmal so bleiben.
 ## Reverse Proxy mit TLS
 
 Die App bringt kein TLS mit und lauscht nur auf `127.0.0.1:8000`. Davor gehört
-ein Proxy, der das Zertifikat verwaltet.
+ein Proxy, der das Zertifikat verwaltet. Es gibt zwei Wege – nimm den ersten,
+wenn auf dem Server sonst nichts läuft.
 
-Wichtig ist in beiden Fällen der Kopf `X-Forwarded-Proto`. Ohne ihn weiß die App
+Wichtig ist in allen Fällen der Kopf `X-Forwarded-Proto`. Ohne ihn weiß die App
 nicht, dass die Anfrage verschlüsselt ankam – mit `SECURE_SSL_REDIRECT=true`
 entsteht dann eine endlose Umleitungsschleife.
 
-### Caddy
+### Weg A: Caddy im Stack (nichts am Host einzurichten)
 
-```caddy
-termine.meine-fahrschule.de {
-    reverse_proxy 127.0.0.1:8000
-}
+`docker-compose.tls.yml` ergänzt den Stack um Caddy. Das Zertifikat holt es
+selbst, die Weiterleitungs-Köpfe setzt es selbst.
+
+```bash
+# TLS_DOMAIN in der .env eintragen – der Name muss im DNS auf diesen Server
+# zeigen und mit SITE_BASE_URL übereinstimmen.
+docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
 ```
 
-Caddy setzt die Weiterleitungs-Köpfe selbst und holt das Zertifikat automatisch.
+Voraussetzung: Die Ports **80 und 443** sind von außen erreichbar. Port 80 wird
+gebraucht, auch wenn nachher alles über https läuft – darüber weist Caddy nach,
+dass ihm der Name gehört.
 
-### nginx
+Der Befehl ist bei jedem Start derselbe; beide Dateien müssen jedes Mal
+angegeben werden. Wer sich das sparen will, setzt einmalig:
+
+```bash
+export COMPOSE_FILE=docker-compose.yml:docker-compose.tls.yml
+```
+
+Zwei Dinge zum Wissen:
+
+- Die Zertifikate liegen in einem eigenen Volume. Wird das gelöscht, holt Caddy
+  neue – **Let's Encrypt begrenzt das auf fünf pro Woche und Name**, danach
+  steht die Seite ohne TLS da.
+- `127.0.0.1:8000` bleibt zusätzlich offen. Das ist Absicht: So funktionieren
+  `curl http://127.0.0.1:8000/healthz` und die Fehlersuche weiterhin, ohne dass
+  die Adresse nach außen erreichbar wäre.
+
+Von außen gesperrt ist `/healthz` – die Container prüfen sich über `127.0.0.1`,
+von außen braucht die Adresse niemand. Wer sie doch abfragen möchte, löscht den
+`handle`-Block in `deploy/Caddyfile`.
+
+### Weg B: vorhandener Proxy auf dem Host
+
+Läuft auf dem Server schon nginx oder Traefik, bleibt `docker-compose.tls.yml`
+ungenutzt und der vorhandene Proxy zeigt auf `127.0.0.1:8000`.
+
+#### nginx als Beispiel
 
 ```nginx
 server {

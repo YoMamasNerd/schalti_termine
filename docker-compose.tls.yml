@@ -1,0 +1,38 @@
+# Ergänzung für Installationen ohne eigenen Reverse Proxy auf dem Host.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
+#
+# Caddy holt das Zertifikat selbst von Let's Encrypt und setzt die
+# Weiterleitungs-Köpfe, die Django braucht – X-Forwarded-Proto ist der
+# entscheidende, ohne ihn läuft SECURE_SSL_REDIRECT in eine Schleife.
+#
+# Voraussetzungen: TLS_DOMAIN steht in der .env und zeigt im DNS auf diesen
+# Server, die Ports 80 und 443 sind von außen erreichbar.
+#
+# Wer bereits nginx oder Traefik auf dem Host betreibt, benutzt diese Datei
+# nicht, sondern lässt den vorhandenen Proxy auf 127.0.0.1:8000 zeigen.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      TLS_DOMAIN: ${TLS_DOMAIN:?TLS_DOMAIN fehlt in der .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Ohne diese beiden Volumes holt Caddy nach jedem Neustart ein neues
+      # Zertifikat. Let's Encrypt begrenzt das – nach fünf Versuchen pro Woche
+      # steht die Seite ohne TLS da.
+      - caddy-daten:/data
+      - caddy-konfig:/config
+
+volumes:
+  caddy-daten:
+  caddy-konfig:

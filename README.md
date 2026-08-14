@@ -382,9 +382,18 @@ docker compose exec web python manage.py createsuperuser
 ```
 
 > **Ausführlich in [docs/EINRICHTUNG.md](docs/EINRICHTUNG.md):** jedes Feld der
-> `.env` einzeln erklärt, Beispiele für nginx und Caddy, Sicherung und
-> Aktualisierung – und eine Liste der Meldungen, mit denen der Start abbricht,
-> samt dem, was dann zu tun ist.
+> `.env` einzeln erklärt, Sicherung und Aktualisierung – und eine Liste der
+> Meldungen, mit denen der Start abbricht, samt dem, was dann zu tun ist.
+
+Wer auf dem Server keinen Reverse Proxy betreibt, nimmt die mitgelieferte
+Ergänzung: Sie stellt Caddy davor, das sich das TLS-Zertifikat selbst holt.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
+```
+
+Läuft dort bereits nginx oder Traefik, bleibt diese Datei ungenutzt und der
+vorhandene Proxy zeigt auf `127.0.0.1:8000`.
 
 `docker compose` startet drei Container: die Datenbank, den Webserver
 (gunicorn) und einen Worker, der die wiederkehrenden Jobs abarbeitet.

@@ -1,0 +1,24 @@
+# Wird von docker-compose.tls.yml eingebunden. Der Name kommt aus TLS_DOMAIN
+# in der .env; Caddy holt das Zertifikat dafür selbst.
+
+{$TLS_DOMAIN} {
+	encode zstd gzip
+
+	# Die Zustandsseite braucht niemand von außen: Die Container prüfen sich
+	# selbst über 127.0.0.1. Wer sie doch von außen abfragen möchte – etwa mit
+	# einer Überwachung von einem anderen Server –, löscht diesen Block.
+	#
+	# Bewusst als handle-Block und nicht als einzelnes „respond": Caddy führt
+	# die Direktiven in einer festen Reihenfolge aus, in der respond nach
+	# reverse_proxy kommt. Ein loses respond käme also nie zum Zug, weil der
+	# reverse_proxy ohne Matcher vorher alles abgreift. handle-Blöcke werden
+	# dagegen in der Reihenfolge geprüft, in der sie hier stehen.
+	handle /healthz {
+		respond 404
+	}
+
+	# Caddy setzt X-Forwarded-Proto, X-Forwarded-For und Host selbst.
+	handle {
+		reverse_proxy web:8000
+	}
+}
