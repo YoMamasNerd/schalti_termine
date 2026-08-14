@@ -214,3 +214,46 @@ class Buchungshorizont(Basis):
 
         letzter_termin = Termin.objects.order_by("-beginn").first()
         self.assertEqual(letzter_termin.beginn_lokal.date(), buchungshorizont())
+
+
+class HandplanungNurZukunft(Basis):
+    """Dieselbe Zusage wie beim Generator: keine Termine in der Vergangenheit."""
+
+    def test_fenster_das_heute_frueher_begann_faengt_jetzt_an(self):
+        from termine.services.planung import termine_manuell_anlegen
+
+        heute = timezone.localdate()
+        jetzt = timezone.localtime()
+        if jetzt.hour < 2 or jetzt.hour > 21:
+            self.skipTest("Zu dicht am Tagesrand für diesen Fall.")
+
+        neue, uebersprungen = termine_manuell_anlegen(
+            self.anna, self.art, heute, dt.time(0, 0), dt.time(23, 30)
+        )
+
+        self.assertTrue(neue, "Für den Rest des Tages muss etwas entstehen.")
+        self.assertTrue(uebersprungen, "Der Vormittag muss übersprungen worden sein.")
+        for termin in neue:
+            self.assertGreaterEqual(termin.beginn, jetzt)
+
+    def test_raster_bleibt_am_fensterbeginn_haengen(self):
+        # „ab 9 Uhr, 30 Minuten" darf nicht zu 14:07 führen, nur weil es
+        # gerade 14:07 ist.
+        from termine.services.planung import termine_manuell_anlegen
+
+        heute = timezone.localdate()
+        neue, _ = termine_manuell_anlegen(
+            self.anna, self.art, heute, dt.time(0, 0), dt.time(23, 30)
+        )
+        for termin in neue:
+            self.assertIn(termin.beginn_lokal.minute, (0, 30))
+
+    def test_morgen_bleibt_vollstaendig(self):
+        from termine.services.planung import termine_manuell_anlegen
+
+        morgen = timezone.localdate() + dt.timedelta(days=1)
+        neue, uebersprungen = termine_manuell_anlegen(
+            self.anna, self.art, morgen, dt.time(9, 0), dt.time(11, 0)
+        )
+        self.assertEqual(len(neue), 4)
+        self.assertEqual(uebersprungen, 0)

@@ -560,7 +560,7 @@ sein. Wer unterwegs nachsehen will, wer morgen kommt, dreht das Gerät quer.
 python manage.py test termine
 ```
 
-238 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
+241 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
 Fehler unbemerkt bleiben würden:
 
 | Bereich | Was geprüft wird |
@@ -617,7 +617,7 @@ termine/
     einrichtung.py     Erkennt die noch nicht eingerichtete Installation
     zustand.py         Datenbank erreichbar? Laufen die Jobs?
   templatetags/    Einrichtungshinweis und aktiver Navigationspunkt
-  tests/           238 Tests, 97 % Zeilenabdeckung (siehe unten)
+  tests/           241 Tests, 97 % Zeilenabdeckung (siehe unten)
 static/            CSS und htmx
 docs/bilder/       Screenshots für diese README
 ```

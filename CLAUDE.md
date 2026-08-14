@@ -101,7 +101,7 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
   durchgerechneten Regeln.
 - Der Generator (`services/planung.py`) hält vier Zusagen, jede durch Tests
   abgesichert: nur Zukunft, nie gebuchte/reservierte löschen, nie manuelle
-  Termine löschen, idempotent.
+  Termine löschen, idempotent. **Nur Zukunft gilt auch für die Handplanung.**
 - Feiertage auf **Bundesland-Ebene**; örtliche Feiertage über eine Sperrzeit.
 - Manuelle und generierte Termine leben friedlich nebeneinander.
 - **Termine nie direkt löschen**, immer über `planung.termine_entfernen()`:
@@ -160,7 +160,7 @@ coverage run manage.py test termine && coverage report
 
 - `main` trägt den stabilen Stand. Entwickelt wird auf einem eigenen Branch,
   der erst nach grüner Testsuite dorthin zurückfließt.
-- Stand: 238 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
+- Stand: 241 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
   der Schwerpunkt liegt dort, wo ein Fehler unbemerkt bliebe (Jobs, Kommandos,
   Ausfallpfade des Mailversands).
 - Commit-Nachrichten auf Deutsch, im Stil der bestehenden Historie: erst was

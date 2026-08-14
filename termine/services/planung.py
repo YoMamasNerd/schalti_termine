@@ -279,9 +279,15 @@ def generiere_termine(
 
     if neue:
         # ignore_conflicts schützt gegen parallele Läufe (Unique-Constraint auf
-        # fahrlehrer + beginn), ohne den ganzen Lauf abzubrechen.
+        # fahrlehrer + beginn), ohne den ganzen Lauf abzubrechen. Genau deshalb
+        # ist len(neue) nicht die Wahrheit: Ein paralleler Lauf kann einzelne
+        # Zeilen still verworfen haben. Deshalb wird nachgezählt.
+        im_fenster = Termin.objects.filter(
+            fahrlehrer=fahrlehrer, beginn__gte=fenster_start, beginn__lte=fenster_ende
+        )
+        vorher = len(bestand)
         Termin.objects.bulk_create(neue, ignore_conflicts=True)
-        bericht.erstellt = len(neue)
+        bericht.erstellt = max(im_fenster.count() - vorher, 0)
 
     logger.info("Terminplanung %s (%s bis %s): %s", fahrlehrer, von, bis, bericht.als_text())
     return bericht
@@ -328,6 +334,13 @@ def termine_manuell_anlegen(
     fenster_beginn = lokal(tag, von)
     fenster_ende = lokal(tag, bis)
 
+    # „Nur die Zukunft" gilt auch für die Handplanung: Wer heute um 14 Uhr ein
+    # Fenster ab 9 Uhr einträgt, meint den Rest des Tages und nicht den Vormittag.
+    jetzt = timezone.now()
+    vergangen = 0
+    if fenster_beginn < jetzt:
+        fenster_beginn = jetzt
+
     belegt = list(
         Termin.objects.select_for_update()
         .filter(fahrlehrer=fahrlehrer, beginn__lt=fenster_ende, ende__gt=fenster_beginn)
@@ -336,7 +349,12 @@ def termine_manuell_anlegen(
 
     neue: list[Termin] = []
     uebersprungen = 0
-    cursor = fenster_beginn
+    # Das Raster bleibt am ursprünglichen Fensterbeginn hängen, damit „ab 9 Uhr"
+    # nicht zu krummen Uhrzeiten wie 14:07 führt.
+    cursor = lokal(tag, von)
+    while cursor < jetzt and cursor + dauer <= fenster_ende:
+        cursor += schritt
+        vergangen += 1
     while cursor + dauer <= fenster_ende:
         beginn, ende = cursor, cursor + dauer
         if any(_ueberschneidet(beginn, ende, b, e) for b, e in belegt):
@@ -358,4 +376,4 @@ def termine_manuell_anlegen(
 
     if neue:
         Termin.objects.bulk_create(neue, ignore_conflicts=True)
-    return neue, uebersprungen
+    return neue, uebersprungen + vergangen
