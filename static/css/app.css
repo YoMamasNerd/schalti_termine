@@ -453,3 +453,10 @@ table.liste tr:last-child td { border-bottom: none; }
 .zusammenfassung dd { margin: 0; font-weight: 600; }
 
 .htmx-request { opacity: 0.55; transition: opacity 120ms; }
+
+/* --- Fehlerseiten --- */
+
+.fehler-nummer {
+  font-size: 0.85rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-leise); margin: 0 0 0.3rem;
+}

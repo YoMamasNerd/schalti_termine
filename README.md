@@ -48,6 +48,8 @@ anhand des Bundeslands übersprungen.
   bestätigt – ein bloßer Aufruf des Links genügt nicht
 - Bestätigungsmail mit Kalendereintrag (`.ics`) im Anhang
 - Selbstständiges Absagen über einen persönlichen Link
+- Löschen der eigenen Daten über denselben Link, ohne Nachfrage bei der
+  Fahrschule
 - Erinnerungsmail vor dem Termin
 - Die Terminauswahl lässt sich als Baustein in die Seite der Fahrschule
   einbetten ([Anleitung](docs/EINBETTEN.md))
@@ -523,6 +525,30 @@ zurücksetzen“ im Admin sie neu.
 - Impressum und Datenschutzerklärung werden über `IMPRESSUM_URL` und
   `DATENSCHUTZ_URL` in den Seitenfuß eingebunden.
 
+### Löschen auf Kundenwunsch
+
+Auf der Terminseite steht neben dem Absagen der Punkt **„Meine Daten löschen“**.
+Er überschreibt dieselben vier Felder wie die automatische Frist, nur eben
+sofort. Drei Dinge sind daran wichtig:
+
+- **Der Termin wird dabei freigegeben.** Wer seine Daten löscht, hat für die
+  Fahrschule keinen ansprechbaren Kunden mehr – der Platz muss also zurück in
+  den Kalender. Der Hinweis darauf steht schon *vor* dem Klick auf der Seite,
+  nicht erst danach.
+- **Die Absagebestätigung geht noch raus**, an den Kunden und an den
+  Fahrlehrer. Sie ist die letzte Nachricht an diese Adresse; danach ist sie
+  gelöscht.
+- **Der Link aus der Bestätigungsmail trägt danach nicht mehr.** Er liefert
+  404, nicht 403 – eine gelöschte Buchung soll sich auch nicht mehr als
+  vorhanden zu erkennen geben.
+
+Ein vergangener Termin bleibt gebucht: Ihn nachträglich freizugeben würde die
+Historie der Fahrschule fälschen. Gelöscht werden die Daten trotzdem.
+
+Wer fremde Daten löschen wollte, müsste den Token aus der fremden
+Bestätigungsmail raten – 256 Bit Zufall, dieselbe Hürde wie beim Ansehen und
+Absagen. Einen zweiten Weg zur Buchung gibt es nicht.
+
 ---
 
 ## Grenzen und offene Punkte
@@ -561,7 +587,7 @@ sein. Wer unterwegs nachsehen will, wer morgen kommt, dreht das Gerät quer.
 python manage.py test termine
 ```
 
-249 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
+263 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
 Fehler unbemerkt bleiben würden:
 
 | Bereich | Was geprüft wird |
@@ -570,6 +596,8 @@ Fehler unbemerkt bleiben würden:
 | Buchungsablauf | Double-Opt-in, Ablauf der Reservierung, Storno, Erinnerung, DSGVO-Anonymisierung |
 | Doppelbuchung | zwei Interessenten auf denselben Termin, inklusive des Falls, dass der Datenbank-Index zuerst greift |
 | Zugriffsschutz | Fahrlehrer sieht nur eigene Daten, fremde Termine liefern 404, Benutzer ohne Profil bekommen 403 |
+| Löschen auf Wunsch | dass der Termin frei wird, die Absagemail noch rausgeht und der Link danach ins Leere führt |
+| Fehlerseiten | dass 400/403/404 wirklich die eigenen Seiten zeigen – und dass die 500 ohne Request und ohne Datenbank auskommt |
 | Hintergrundjobs | dass die Jobs tun, was sie sollen – und dass der Scheduler sie über die eingetragenen Pfade überhaupt findet |
 | Kommandos | alle Argumente, inklusive der Abbruchfälle |
 | Ausfälle | ein streikender Mailserver darf keine Buchung zerstören, muss aber im Log auftauchen |
@@ -618,7 +646,7 @@ termine/
     einrichtung.py     Erkennt die noch nicht eingerichtete Installation
     zustand.py         Datenbank erreichbar? Laufen die Jobs?
   templatetags/    Einrichtungshinweis und aktiver Navigationspunkt
-  tests/           249 Tests, 97 % Zeilenabdeckung (siehe unten)
+  tests/           263 Tests, 97 % Zeilenabdeckung (siehe unten)
 static/            CSS und htmx
 docs/bilder/       Screenshots für diese README
 ```

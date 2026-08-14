@@ -1,0 +1,13 @@
+{% extends "_fehler.html" %}
+{% block titel %}Dafür fehlt die Berechtigung – {{ SITE_NAME }}{% endblock %}
+{% block inhalt %}{% with fehler_nummer="403" fehler_titel="Dafür fehlt die Berechtigung" fehler_text="Diese Seite gehört zum internen Bereich der Fahrschule. Wenn Sie dort hingehören, melden Sie sich bitte an – möglicherweise sind Sie unter einem Zugang angemeldet, der diesen Bereich nicht sehen darf." %}{{ block.super }}{% endwith %}{% endblock %}
+
+{% comment %}
+  Ohne diesen Link führt der Satz „melden Sie sich bitte an" ins Leere: Der
+  Anmeldepunkt steht im Seitenfuß, nicht im Kopf.
+{% endcomment %}
+{% block fehler_extra %}
+  <p class="knopfreihe" style="margin-top:1.5rem">
+    <a class="knopf knopf--leise" href="{% url 'termine:login' %}">Zur Anmeldung</a>
+  </p>
+{% endblock %}

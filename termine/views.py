@@ -232,6 +232,11 @@ def _buchung_holen(token: str) -> Buchung:
     )
     if buchung is None:
         raise Http404("Diese Buchung gibt es nicht (mehr).")
+    if buchung.anonymisiert_am is not None:
+        # Nach dem Löschen führt der alte Link ins Leere. Sonst zeigte er
+        # weiterhin Termin, Uhrzeit und Fahrlehrer – von einer Buchung, die es
+        # aus Sicht des Kunden nicht mehr gibt.
+        raise Http404("Diese Buchung wurde gelöscht.")
     return buchung
 
 
@@ -282,6 +287,28 @@ def buchung_ansicht(request, token: str):
             "form": StornoForm(),
             "stornierbar": buchung.ist_aktiv and buchung.termin.beginn > timezone.now(),
         },
+    )
+
+
+@require_POST
+def buchung_loeschen(request, token: str):
+    """Löscht die Daten dieser Buchung auf Wunsch des Kunden (Art. 17 DSGVO).
+
+    Der Token ist der Nachweis: Wer ihn hat, hat die Bestätigungsmail bekommen.
+    Genau derselbe Nachweis erlaubt schon das Ansehen und das Absagen – fremde
+    Daten kann damit niemand löschen, weil er sie nicht einmal sehen könnte.
+    """
+    buchung = _buchung_holen(token)
+    termin_stand_bevor = buchung.ist_aktiv and buchung.termin.beginn > timezone.now()
+
+    buchung = buchungs_service.daten_loeschen(buchung)
+
+    # Nicht umleiten: Der Token trägt ab jetzt nicht mehr, die Seite dahinter
+    # antwortet mit 404.
+    return render(
+        request,
+        "termine/geloescht.html",
+        {"termin_freigegeben": termin_stand_bevor, "termin": buchung.termin},
     )
 
 

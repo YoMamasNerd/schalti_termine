@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="de">
+<!--
+  Bewusst eigenständig und ohne base.html: Django rendert diese Seite ohne
+  Request und damit ohne Kontextprozessoren – SITE_NAME wäre leer. Vor allem
+  aber wird sie genau dann gebraucht, wenn etwas kaputt ist; sie darf weder
+  die Datenbank noch eine statische Datei brauchen. Deshalb steht das bisschen
+  Gestaltung hier direkt drin.
+-->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kurz gestolpert</title>
+  <meta name="color-scheme" content="light dark">
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      padding: 2rem 1rem;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.55; background: #ebefe7; color: #2b5883;
+    }
+    main { max-width: 30rem; }
+    .nummer {
+      font-size: 0.85rem; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: #4d6b87; margin: 0 0 0.5rem;
+    }
+    h1 {
+      font-size: 1.6rem; line-height: 1.25; margin: 0 0 0.2rem;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      border-bottom: 4px double #c72e2e; padding-bottom: 0.2rem;
+      display: inline-block;
+    }
+    p { margin: 1rem 0 0; }
+    a {
+      display: inline-block; margin-top: 1.5rem; padding: 0.55rem 1.1rem;
+      border-radius: 6px; background: #2b5883; color: #fff; text-decoration: none;
+      font-weight: 600;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { background: #121a20; color: #dde8ef; }
+      .nummer { color: #9db0be; }
+      a { background: #8fb9e3; color: #10202e; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="nummer">500</p>
+    <h1>Kurz gestolpert</h1>
+    <p>
+      Auf unserer Seite ist etwas schiefgegangen – nicht bei Ihnen. Wir wurden
+      benachrichtigt und sehen nach.
+    </p>
+    <p>
+      Falls Sie gerade einen Termin buchen wollten: Versuchen Sie es in ein paar
+      Minuten noch einmal. Eine bereits bestätigte Buchung bleibt davon
+      unberührt.
+    </p>
+    <a href="/">Zur Terminauswahl</a>
+  </main>
+</body>
+</html>

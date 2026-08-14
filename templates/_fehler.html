@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% comment %}
+  Gemeinsames Gerüst für alle Fehlerseiten des Projekts. Django rendert 400,
+  403 und 404 mit dem Request, also stehen Kopfzeile und Seitenfuß zur
+  Verfügung. Die 500 kann das nicht – sie hat eine eigene, eigenständige Datei.
+
+  Die Seiten setzen ihre Überschrift zweimal: einmal als `titel`-Block für den
+  Reiter, einmal als `{% templatetag openblock %} with {% templatetag closeblock %}` um diesen Inhalt. Zwei Blöcke sind zwei
+  getrennte Geltungsbereiche – eine Variable aus dem einen ist im anderen nicht
+  zu sehen, und ein leerer Reiter fällt beim Prüfen zuletzt auf.
+{% endcomment %}
+
+{% block inhalt %}
+<div class="huelle-schmal" style="padding:0">
+  <p class="fehler-nummer">{{ fehler_nummer }}</p>
+  <h1>{{ fehler_titel }}</h1>
+
+  <p>{{ fehler_text }}</p>
+
+  {% block fehler_extra %}{% endblock %}
+
+  <p class="knopfreihe" style="margin-top:1.5rem">
+    <a class="knopf" href="{% url 'termine:start' %}">Zur Terminauswahl</a>
+  </p>
+</div>
+{% endblock %}

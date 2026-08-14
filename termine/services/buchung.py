@@ -206,6 +206,46 @@ def erinnerungen_versenden(stunden_vorher: int | None = None) -> int:
     return anzahl
 
 
+#: Was beim Anonymisieren überschrieben wird. Die Buchung selbst bleibt
+#: bestehen, damit Termin, Dauer und Fahrlehrer für die Statistik erhalten
+#: sind – ohne jeden Bezug zur Person.
+ANONYM = {
+    "name": "Gelöscht",
+    "email": "",
+    "telefon": "",
+    "nachricht": "",
+}
+
+
+@transaction.atomic
+def daten_loeschen(buchung: Buchung) -> Buchung:
+    """Löscht die personenbezogenen Daten einer Buchung auf Wunsch des Kunden.
+
+    Steht der Termin noch bevor und ist die Buchung aktiv, wird er zuvor
+    storniert – sonst bliebe ein Termin belegt, zu dem niemand mehr zuzuordnen
+    wäre. Die Absage geht dabei den gewohnten Weg samt Benachrichtigung: Der
+    Kunde bekommt seine Stornobestätigung, der Fahrlehrer erfährt, dass sein
+    Termin wieder frei ist. Danach erst wird überschrieben – die Mail braucht
+    die Adresse ja noch.
+    """
+    buchung = Buchung.objects.select_for_update().select_related("termin").get(pk=buchung.pk)
+
+    if buchung.ist_aktiv and buchung.termin.beginn > timezone.now():
+        stornieren(buchung, von="kunde")
+
+    Buchung.objects.filter(pk=buchung.pk).update(**ANONYM, anonymisiert_am=timezone.now())
+
+    # Bewusst frisch geladen statt refresh_from_db(): Die Storno-Mails hängen
+    # als on_commit-Rückruf an der Instanz, die `stornieren` sich geholt hat,
+    # und die trägt die E-Mail-Adresse noch. Würde diese Instanz hier
+    # überschrieben, ginge die Absagebestätigung an eine leere Adresse – also
+    # gar nicht. Der Kunde bekäme nichts mehr zu sehen und nichts mehr zu
+    # lesen.
+    frisch = Buchung.objects.select_related("termin").get(pk=buchung.pk)
+    logger.info("Buchung %s auf Kundenwunsch gelöscht", frisch.referenz)
+    return frisch
+
+
 def alte_buchungen_anonymisieren(tage: int | None = None) -> int:
     """Löscht personenbezogene Daten abgelaufener Buchungen (DSGVO-Löschkonzept).
 
@@ -217,13 +257,7 @@ def alte_buchungen_anonymisieren(tage: int | None = None) -> int:
     betroffen = Buchung.objects.filter(
         anonymisiert_am__isnull=True, termin__beginn__lt=grenze
     )
-    anzahl = betroffen.update(
-        name="Gelöscht",
-        email="",
-        telefon="",
-        nachricht="",
-        anonymisiert_am=timezone.now(),
-    )
+    anzahl = betroffen.update(**ANONYM, anonymisiert_am=timezone.now())
     if anzahl:
         logger.info("%s Buchungen anonymisiert (älter als %s Tage)", anzahl, tage)
     return anzahl

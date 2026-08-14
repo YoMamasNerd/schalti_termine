@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block titel %}Daten gelöscht – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+<div class="huelle-schmal" style="padding:0">
+  <h1>Ihre Daten sind gelöscht</h1>
+
+  <div class="hinweis hinweis--erfolg">
+    Name, E-Mail-Adresse, Telefonnummer und Nachricht wurden überschrieben. Wir
+    können sie nicht wiederherstellen.
+  </div>
+
+  {% if termin_freigegeben %}
+    <p>
+      Ihr Termin am {{ termin.beginn_lokal|date:"l, j. F Y" }} um
+      {{ termin.beginn_lokal|date:"H:i" }} Uhr wurde dabei abgesagt und steht
+      wieder anderen zur Verfügung. Eine Bestätigung der Absage ist an Ihre
+      E-Mail-Adresse unterwegs – sie war die letzte Nachricht, die wir Ihnen
+      schicken konnten.
+    </p>
+  {% endif %}
+
+  <p>
+    Der Link aus Ihrer Bestätigungsmail führt ab jetzt ins Leere. Wenn Sie
+    später wieder einen Termin möchten, buchen Sie einfach neu.
+  </p>
+
+  <p><a class="knopf" href="{% url 'termine:start' %}">Zur Terminauswahl</a></p>
+</div>
+{% endblock %}

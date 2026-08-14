@@ -66,6 +66,42 @@
     </div>
   {% endif %}
 
+  <div class="karte">
+    <h2>Meine Daten löschen</h2>
+    <p>
+      Auf Wunsch löschen wir Ihre Angaben sofort statt nach Ablauf der üblichen
+      Frist. Überschrieben werden Name, E-Mail-Adresse, Telefonnummer und Ihre
+      Nachricht – unwiderruflich.
+    </p>
+
+    {% if stornierbar %}
+      {% comment %}
+        Der Hinweis muss vor dem Klick stehen, nicht danach: Wer löscht, sagt
+        damit auch ab, und das ist eine Entscheidung über den Termin und nicht
+        nur über Daten.
+      {% endcomment %}
+      <div class="hinweis hinweis--warnung">
+        <strong>Damit sagen Sie auch Ihren Termin ab.</strong>
+        Der Termin am {{ termin.beginn_lokal|date:"SHORT_DATE_FORMAT" }} um
+        {{ termin.beginn_lokal|date:"H:i" }} Uhr wird wieder für andere
+        freigegeben, und dieser Link hier verliert seine Gültigkeit. Eine
+        Bestätigung der Absage schicken wir Ihnen noch an Ihre E-Mail-Adresse –
+        danach haben wir sie nicht mehr.
+      </div>
+    {% else %}
+      <div class="hinweis hinweis--warnung">
+        Dieser Link verliert damit seine Gültigkeit. Sie können den Termin
+        danach nicht mehr aufrufen.
+      </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'termine:buchung_loeschen' buchung.token %}"
+          onsubmit="return confirm('Ihre Daten werden unwiderruflich gelöscht. Fortfahren?');">
+      {% csrf_token %}
+      <button class="knopf knopf--gefahr" type="submit">Meine Daten löschen</button>
+    </form>
+  </div>
+
   <p class="leer" style="margin-top:1.5rem">
     Bei Rückfragen erreichen Sie {{ termin.fahrlehrer.name }} unter
     <a href="mailto:{{ termin.fahrlehrer.email }}">{{ termin.fahrlehrer.email }}</a>{% if termin.fahrlehrer.telefon %}

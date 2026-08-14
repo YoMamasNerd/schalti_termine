@@ -120,6 +120,25 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
   für die Statistik erhalten.
 - Ausdrückliche Einwilligung im Formular mit Zeitstempel.
 - Impressum/Datenschutz über `IMPRESSUM_URL` / `DATENSCHUTZ_URL`.
+- **Löschen auf Kundenwunsch** über denselben Token-Link (`daten_loeschen()`),
+  nur per POST. Nachweis ist der Token – derselbe wie fürs Ansehen und
+  Absagen, ein zweiter Weg wäre eine zweite Angriffsfläche.
+- Löschen gibt den Termin frei; der Hinweis darauf steht **vor** dem Klick auf
+  der Seite. Die Absagemail geht noch raus, danach ist die Adresse weg. Ein
+  vergangener Termin bleibt gebucht (Historie).
+- Danach liefert der Link **404** – eine gelöschte Buchung gibt sich nicht mehr
+  als vorhanden zu erkennen.
+- **Nicht angefasst** (ausdrücklich entschieden): personenbezogene Daten im
+  ICS-Feed, Logs des Reverse Proxy, Aufbewahrung der Sicherungen.
+
+### Fehlerseiten
+
+- `templates/_fehler.html` ist das gemeinsame Gerüst, `400/403/404.html` füllen
+  es. Die **500 ist eigenständig mit eingebettetem CSS**: Django rendert sie
+  ohne Request und ohne Kontextprozessoren – ein `{% url %}` oder `{{ SITE_NAME }}`
+  darin wäre ein Fehler beim Anzeigen des Fehlers.
+- Überschrift und Reiter (`titel`) stehen in **zwei getrennten Blöcken**; eine
+  Variable aus dem einen ist im anderen nicht sichtbar. Jede Seite setzt beides.
 
 ### Bewusst **nicht** gebaut
 
@@ -162,7 +181,7 @@ coverage run manage.py test termine && coverage report
 
 - `main` trägt den stabilen Stand. Entwickelt wird auf einem eigenen Branch,
   der erst nach grüner Testsuite dorthin zurückfließt.
-- Stand: 249 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
+- Stand: 263 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
   der Schwerpunkt liegt dort, wo ein Fehler unbemerkt bliebe (Jobs, Kommandos,
   Ausfallpfade des Mailversands).
 - Commit-Nachrichten auf Deutsch, im Stil der bestehenden Historie: erst was

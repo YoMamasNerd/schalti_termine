@@ -1,0 +1,3 @@
+{% extends "_fehler.html" %}
+{% block titel %}Die Anfrage war unverständlich – {{ SITE_NAME }}{% endblock %}
+{% block inhalt %}{% with fehler_nummer="400" fehler_titel="Die Anfrage war unverständlich" fehler_text="Der Browser hat etwas geschickt, mit dem die Seite nichts anfangen kann. Meist hilft es, die Seite neu zu laden und den Weg noch einmal zu gehen." %}{{ block.super }}{% endwith %}{% endblock %}
