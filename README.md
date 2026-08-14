@@ -381,6 +381,11 @@ docker compose up -d --build
 docker compose exec web python manage.py createsuperuser
 ```
 
+> **Ausführlich in [docs/EINRICHTUNG.md](docs/EINRICHTUNG.md):** jedes Feld der
+> `.env` einzeln erklärt, Beispiele für nginx und Caddy, Sicherung und
+> Aktualisierung – und eine Liste der Meldungen, mit denen der Start abbricht,
+> samt dem, was dann zu tun ist.
+
 `docker compose` startet drei Container: die Datenbank, den Webserver
 (gunicorn) und einen Worker, der die wiederkehrenden Jobs abarbeitet.
 Migrationen und die Job-Einrichtung laufen beim Start des Web-Containers
