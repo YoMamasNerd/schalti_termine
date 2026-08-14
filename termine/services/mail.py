@@ -2,6 +2,11 @@
 
 Fehler beim Mailversand dürfen eine Buchung nie zerstören: Wenn der SMTP-Server
 klemmt, wird geloggt, aber die Buchung bleibt gültig.
+
+Jede Mail geht zweigestaltig raus: erst der Text, dann dieselbe Nachricht als
+HTML im Bild der Webseite. Postfächer, die kein HTML anzeigen wollen oder
+dürfen, nehmen den Text – deshalb bleibt er vollwertig und ist keine Notiz mit
+Verweis auf „siehe HTML-Fassung“.
 """
 
 from __future__ import annotations
@@ -9,8 +14,9 @@ from __future__ import annotations
 import logging
 
 from django.conf import settings
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 
 from .ics import buchung_als_ics
@@ -29,6 +35,11 @@ def _kontext(buchung, **extra) -> dict:
         "ende": timezone.localtime(termin.ende),
         "site_name": settings.SITE_NAME,
         "site_url": settings.SITE_BASE_URL,
+        "buchungen_url": settings.SITE_BASE_URL + reverse("termine:buchungen"),
+        # Mails entstehen ohne Request, also auch ohne Kontextprozessor: Die
+        # rechtlichen Links für den Fuß müssen hier von Hand dazu.
+        "impressum_url": settings.IMPRESSUM_URL,
+        "datenschutz_url": settings.DATENSCHUTZ_URL,
         **extra,
     }
 
@@ -44,16 +55,17 @@ def _senden(
     ics_methode: str = "PUBLISH",
     antwort_an: str | None = None,
 ) -> bool:
+    """`template` ist der Name ohne Endung; `.txt` und `.html` gehören zusammen."""
     if not empfaenger:
         return False
-    body = render_to_string(template, kontext)
-    nachricht = EmailMessage(
+    nachricht = EmailMultiAlternatives(
         subject=betreff,
-        body=body,
+        body=render_to_string(f"mail/{template}.txt", kontext),
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=empfaenger,
         reply_to=[antwort_an] if antwort_an else None,
     )
+    nachricht.attach_alternative(render_to_string(f"mail/{template}.html", kontext), "text/html")
     if ics:
         nachricht.attach(ics_name, ics, f'text/calendar; charset=utf-8; method={ics_methode}')
     try:
@@ -69,7 +81,7 @@ def bestaetigung_anfordern(buchung) -> bool:
     kontext = _kontext(buchung, minuten=settings.RESERVATION_MINUTES)
     return _senden(
         betreff=f"Bitte bestätigen: Ihr Beratungstermin am {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
-        template="mail/bestaetigung_anfordern.txt",
+        template="bestaetigung_anfordern",
         empfaenger=[buchung.email],
         kontext=kontext,
         antwort_an=buchung.termin.fahrlehrer.email,
@@ -80,7 +92,7 @@ def buchung_bestaetigt_kunde(buchung) -> bool:
     """Schritt 2: verbindliche Bestätigung mit Kalendereintrag im Anhang."""
     return _senden(
         betreff=f"Terminbestätigung: {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
-        template="mail/buchung_bestaetigt.txt",
+        template="buchung_bestaetigt",
         empfaenger=[buchung.email],
         kontext=_kontext(buchung),
         ics=buchung_als_ics(buchung),
@@ -92,7 +104,7 @@ def buchung_bestaetigt_fahrlehrer(buchung) -> bool:
     """Benachrichtigung an den Fahrlehrer über eine neue bestätigte Buchung."""
     return _senden(
         betreff=f"Neue Buchung: {buchung.name} am {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
-        template="mail/buchung_intern.txt",
+        template="buchung_intern",
         empfaenger=[buchung.termin.fahrlehrer.email],
         kontext=_kontext(buchung),
         ics=buchung_als_ics(buchung),
@@ -103,7 +115,7 @@ def buchung_bestaetigt_fahrlehrer(buchung) -> bool:
 def storno_kunde(buchung) -> bool:
     return _senden(
         betreff=f"Termin storniert: {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
-        template="mail/storno_kunde.txt",
+        template="storno_kunde",
         empfaenger=[buchung.email],
         kontext=_kontext(buchung),
         ics=buchung_als_ics(buchung, storniert=True),
@@ -115,7 +127,7 @@ def storno_kunde(buchung) -> bool:
 def storno_fahrlehrer(buchung) -> bool:
     return _senden(
         betreff=f"Storniert: {buchung.name} am {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
-        template="mail/storno_intern.txt",
+        template="storno_intern",
         empfaenger=[buchung.termin.fahrlehrer.email],
         kontext=_kontext(buchung),
         ics=buchung_als_ics(buchung, storniert=True),
@@ -126,7 +138,7 @@ def storno_fahrlehrer(buchung) -> bool:
 def erinnerung(buchung) -> bool:
     return _senden(
         betreff=f"Erinnerung: Ihr Beratungstermin am {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
-        template="mail/erinnerung.txt",
+        template="erinnerung",
         empfaenger=[buchung.email],
         kontext=_kontext(buchung),
         ics=buchung_als_ics(buchung),

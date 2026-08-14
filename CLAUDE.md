@@ -63,6 +63,26 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
 - Die öffentliche Seite ist auf das Handy optimiert, der interne Bereich auf den
   Schreibtisch. Das ist eine Entscheidung, kein Versehen.
 
+### E-Mails
+
+- Jede Mail geht **zweigestaltig** raus: Text und HTML im Bild der Seite
+  (`EmailMultiAlternatives`). Die Textfassung bleibt **vollwertig** – kein
+  „siehe HTML-Fassung“.
+- `_senden(template=…)` bekommt den Namen **ohne Endung**; `mail/<name>.txt`
+  und `mail/<name>.html` gehören zusammen.
+- Gemeinsames Gerüst: `mail/_geruest.html`, dazu `_karte_termin`, `_knopf`,
+  `_hinweis`. Farben aus `app.css`, aber **ausgeschrieben** – Postfächer kennen
+  kein `var()`.
+- Tabellen statt Grid/Flex, tragende Stile **am Element**. `<style>` nur für
+  dunkle Fassung und schmale Geräte; fällt es weg, steht die helle Fassung.
+- **Kein Bild im Kopf** (Gmail blockt `data:`, externe Bilder werden geblockt),
+  unter jedem Knopf die Adresse zum Abtippen.
+- Mails an die Fahrschule leeren den Block `ueberschrift_schmuck` und bleiben
+  damit sachlich – wie der interne Bereich.
+- Mails entstehen **ohne Request**, also ohne Kontextprozessor: Was der Fuß
+  braucht, steht in `settings` (`IMPRESSUM_URL`, `DATENSCHUTZ_URL`) und wird in
+  `_kontext()` dazugelegt.
+
 ### Einbettung
 
 - Die Terminauswahl gibt es unter `/einbetten/` ohne Kopf und Fuß.
@@ -181,7 +201,7 @@ coverage run manage.py test termine && coverage report
 
 - `main` trägt den stabilen Stand. Entwickelt wird auf einem eigenen Branch,
   der erst nach grüner Testsuite dorthin zurückfließt.
-- Stand: 263 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
+- Stand: 276 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
   der Schwerpunkt liegt dort, wo ein Fehler unbemerkt bliebe (Jobs, Kommandos,
   Ausfallpfade des Mailversands).
 - Commit-Nachrichten auf Deutsch, im Stil der bestehenden Historie: erst was

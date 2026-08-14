@@ -1,0 +1,39 @@
+{% extends "mail/_geruest.html" %}
+
+{% block titel %}Bitte bestätigen Sie Ihren Termin{% endblock %}
+{% block vorschau %}Ein Klick fehlt noch – dann ist der Termin verbindlich für Sie reserviert.{% endblock %}
+{% block ueberschrift %}Fast geschafft{% endblock %}
+
+{% block inhalt %}
+<p class="m-text" style="margin:0 0 16px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.55; color:#2b5883;">
+  Hallo {{ buchung.name }},
+</p>
+<p class="m-text" style="margin:0 0 20px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.55; color:#2b5883;">
+  vielen Dank für Ihre Terminanfrage. Ein Klick fehlt noch, dann ist der Termin
+  verbindlich für Sie reserviert:
+</p>
+
+{% include "mail/_knopf.html" with url=buchung.bestaetigungs_url text="Termin jetzt bestätigen" %}
+
+{% include "mail/_karte_termin.html" %}
+
+{% comment %}
+  Derselbe Kasten wie in _hinweis.html, hier ausgeschrieben: Die Frist gehört
+  mit ihrer Zahl in den Satz, und ein Include kann keine Zeichenkette aus
+  Text und Variable zusammensetzen.
+{% endcomment %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       class="m-warnung" style="background-color:#ffebb6; border:1px solid #8a6100; border-radius:6px; margin:0 0 20px;">
+  <tr>
+    <td class="m-warnung" style="padding:12px 16px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:15px; line-height:1.5; color:#8a6100;">
+      <strong>Wir halten den Termin {{ minuten }} Minuten für Sie frei.</strong><br>
+      Wird der Knopf bis dahin nicht gedrückt, geben wir ihn wieder für andere frei.
+    </td>
+  </tr>
+</table>
+
+<p class="m-leise" style="margin:0; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:13px; line-height:1.6; color:#4d6b87;">
+  Sie haben keinen Termin angefragt? Dann können Sie diese E-Mail einfach
+  löschen – ohne Bestätigung passiert nichts.
+</p>
+{% endblock %}

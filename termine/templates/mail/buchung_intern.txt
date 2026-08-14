@@ -14,7 +14,7 @@ Nachricht:
 
 {{ buchung.nachricht }}
 {% endif %}
-Buchung im Backend öffnen:
-{{ site_url }}/intern/buchungen/
+Buchung im internen Bereich öffnen:
+{{ buchungen_url }}
 
 Der Kalendereintrag hängt an.

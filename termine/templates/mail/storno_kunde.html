@@ -1,0 +1,34 @@
+{% extends "mail/_geruest.html" %}
+
+{% block titel %}Ihr Termin wurde storniert{% endblock %}
+{% block vorschau %}Der Termin ist abgesagt – hier geht es zu einem neuen.{% endblock %}
+{% block ueberschrift %}Termin storniert{% endblock %}
+
+{% block inhalt %}
+<p class="m-text" style="margin:0 0 16px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.55; color:#2b5883;">
+  Hallo {{ buchung.name }},
+</p>
+<p class="m-text" style="margin:0 0 20px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.55; color:#2b5883;">
+  Ihr Beratungstermin wurde storniert:
+</p>
+
+{% include "mail/_karte_termin.html" %}
+
+{% if buchung.storniert_von == "fahrschule" %}
+  <p class="m-text" style="margin:0 0 12px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.55; color:#2b5883;">
+    Die Absage kam von uns – das tut uns leid. Bitte suchen Sie sich gerne
+    einen neuen Termin aus:
+  </p>
+{% else %}
+  <p class="m-text" style="margin:0 0 12px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.55; color:#2b5883;">
+    Sie haben den Termin selbst abgesagt. Einen neuen können Sie jederzeit
+    buchen:
+  </p>
+{% endif %}
+
+{% include "mail/_knopf.html" with url=site_url text="Neuen Termin auswählen" %}
+
+<p class="m-leise" style="margin:0; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:13px; line-height:1.6; color:#4d6b87;">
+  Der angehängte Kalendereintrag entfernt den Termin wieder aus Ihrem Kalender.
+</p>
+{% endblock %}

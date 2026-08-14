@@ -1,0 +1,122 @@
+{% comment %}
+  Gemeinsames Gerüst aller HTML-Mails.
+
+  Die Farben und Formen stammen aus static/css/app.css, sind hier aber
+  ausgeschrieben statt über Variablen geholt: Postfächer kennen weder
+  `var()` noch eine zweite Datei. Deshalb gilt für alle Mail-Vorlagen:
+
+  - Tabellen statt Grid und Flex (Outlook rendert mit der Word-Engine),
+  - Stile direkt am Element, weil viele Postfächer <style> streichen,
+  - <style> im Kopf nur für das, was ohne Aufsatz auskommt: dunkle
+    Fassung und schmale Geräte. Fällt es weg, bleibt die helle Fassung
+    stehen – die ist vollständig.
+
+  Kein Bild im Kopf: Gmail blockt `data:`-URIs, externe Bilder laden
+  viele Postfächer erst auf Klick. Ein Logo, das bei der Hälfte der
+  Empfänger als leerer Rahmen ankommt, ist schlechter als keins.
+{% endcomment %}<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>{% block titel %}{{ site_name }}{% endblock %}</title>
+<style>
+  /* Die dunkle Fassung der Seite, auf die Postfächer übertragen. Stile am
+     Element schlagen Klassen – deshalb hier überall !important. */
+  @media (prefers-color-scheme: dark) {
+    .m-grund { background-color: #121a20 !important; }
+    .m-flaeche { background-color: #1a242c !important; border-color: #2e3d48 !important; }
+    .m-neutral { background-color: #121a20 !important; border-color: #2e3d48 !important; }
+    .m-text, .m-text a { color: #dde8ef !important; }
+    .m-leise, .m-leise a { color: #9db0be !important; }
+    .m-marke, .m-link { color: #8fb9e3 !important; }
+    /* Der rote Strich unter der Überschrift wird hell, sonst verschwindet er
+       auf dunklem Grund – wie --rot in der dunklen Fassung des Stylesheets. */
+    .m-strich { border-bottom-color: #f2b8b5 !important; }
+    .m-karte { background-color: #1d2c3a !important; border-color: #2e3d48 !important; }
+    .m-linie { border-color: #2e3d48 !important; }
+    /* Der Akzent wird hell statt dunkel, deshalb kippt die Schrift darauf
+       von Weiß auf Dunkel – genau wie --auf-akzent im Stylesheet. */
+    .m-knopf { background-color: #8fb9e3 !important; border-color: #8fb9e3 !important; }
+    .m-knopf a { color: #10202e !important; }
+    .m-erfolg { background-color: #1e2a17 !important; border-color: #8fc46a !important; }
+    .m-erfolg, .m-erfolg strong { color: #a9d68a !important; }
+    .m-warnung { background-color: #332914 !important; border-color: #e5c37c !important; }
+    .m-warnung, .m-warnung strong { color: #e5c37c !important; }
+  }
+  @media only screen and (max-width: 620px) {
+    .m-huelle { width: 100% !important; }
+    .m-polster { padding: 20px !important; }
+    .m-rand { padding-left: 12px !important; padding-right: 12px !important; }
+  }
+</style>
+</head>
+<body class="m-grund" style="margin:0; padding:0; width:100%; background-color:#ebefe7; -webkit-text-size-adjust:100%;">
+
+{% comment %}
+  Der Vorschautext ist die Zeile, die die Postfachliste hinter dem Betreff
+  zeigt. Ohne ihn stünde dort „Hallo Max, vielen Dank …“. Die unsichtbaren
+  Zeichen dahinter schieben den Rest des Textes aus der Vorschau.
+{% endcomment %}
+<div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#ebefe7; opacity:0;">
+  {% block vorschau %}{% endblock %}
+  &#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       class="m-grund" style="background-color:#ebefe7;">
+  <tr>
+    <td align="center" class="m-rand" style="padding:24px 16px 32px;">
+
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"
+             class="m-huelle" style="width:600px; max-width:600px;">
+
+        {# Kopfzeile: nur der Name der Fahrschule, wie oben links auf der Seite. #}
+        <tr>
+          <td style="padding:0 4px 14px;">
+            <span class="m-marke" style="font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:17px; font-weight:700; letter-spacing:-0.01em; color:#2b5883;">{{ site_name }}</span>
+          </td>
+        </tr>
+
+        {# Der Inhalt sitzt auf einer Karte – dieselbe wie .karte im Stylesheet. #}
+        <tr>
+          <td class="m-flaeche" style="background-color:#ffffff; border:1px solid #cfdbe2; border-radius:10px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td class="m-polster m-text" style="padding:28px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.55; color:#2b5883;">
+
+                  {% comment %}
+                    Gesperrte Versalien über doppeltem rotem Strich – die
+                    Schreibweise der öffentlichen Seite (.oeffentlich main h1).
+                    Mails an die Fahrschule selbst leeren den Block
+                    „ueberschrift_schmuck“ und bleiben damit sachlich, genau
+                    wie der interne Bereich.
+                  {% endcomment %}
+                  <h1 class="m-marke m-strich" style="margin:0 0 18px; display:inline-block; font-size:20px; line-height:1.25; font-weight:650; color:#2b5883; {% block ueberschrift_schmuck %}text-transform:uppercase; letter-spacing:0.08em; border-bottom:4px double #c72e2e; padding-bottom:4px;{% endblock %}">{% block ueberschrift %}{% endblock %}</h1>
+
+                  {% block inhalt %}{% endblock %}
+
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        {# Fuß: dieselben Links wie unten auf der Seite. #}
+        <tr>
+          <td class="m-leise" style="padding:18px 6px 0; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:12px; line-height:1.6; color:#4d6b87;">
+            {{ site_name }}<br>
+            {% if impressum_url %}<a href="{{ impressum_url }}" style="color:#4d6b87;">Impressum</a>{% if datenschutz_url %} &middot; {% endif %}{% endif %}{% if datenschutz_url %}<a href="{{ datenschutz_url }}" style="color:#4d6b87;">Datenschutz</a>{% endif %}{% if impressum_url or datenschutz_url %}<br>{% endif %}
+            Diese Nachricht wurde automatisch erzeugt. Antworten kommen bei uns an.
+          </td>
+        </tr>
+
+      </table>
+
+    </td>
+  </tr>
+</table>
+</body>
+</html>

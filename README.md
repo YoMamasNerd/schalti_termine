@@ -21,6 +21,7 @@ anhand des Bundeslands übersprungen.
 
 - [Was die App kann](#was-die-app-kann)
 - [Der Weg des Interessenten](#der-weg-des-interessenten)
+- [Die E-Mails](#die-e-mails)
 - [Die zwei Planungswege](#die-zwei-planungswege)
 - [Der interne Bereich](#der-interne-bereich)
 - [Wie der Login gelöst ist](#wie-der-login-gelöst-ist)
@@ -46,7 +47,7 @@ anhand des Bundeslands übersprungen.
 - Buchung mit Name, E-Mail, Telefon, Führerscheinklasse und Nachricht
 - Double-Opt-in: verbindlich erst, wenn der Kunde auf der verlinkten Seite
   bestätigt – ein bloßer Aufruf des Links genügt nicht
-- Bestätigungsmail mit Kalendereintrag (`.ics`) im Anhang
+- Bestätigungsmail im Design der Seite, mit Kalendereintrag (`.ics`) im Anhang
 - Selbstständiges Absagen über einen persönlichen Link
 - Löschen der eigenen Daten über denselben Link, ohne Nachfrage bei der
   Fahrschule
@@ -120,6 +121,30 @@ für andere freigegeben.
 </td>
 </tr>
 </table>
+
+---
+
+## Die E-Mails
+
+Jede Nachricht geht zweigestaltig raus: als HTML im Bild der Buchungsseite –
+dieselben Farben, dieselbe Terminkarte, dieselbe Überschrift in gesperrten
+Versalien – und als vollwertige Textfassung darunter. Postfächer, die kein HTML
+anzeigen, verlieren dadurch keine Information.
+
+![Bestätigungsmail im Design der Webseite](docs/bilder/mail-bestaetigung.png)
+
+Was dabei beachtet ist, weil Postfächer kein Browser sind:
+
+- Aufbau in Tabellen, tragende Stile direkt am Element – `<style>` wird
+  vielerorts gestrichen, Outlook rendert mit der Word-Engine.
+- Kein Bild im Kopf: Gmail blockt `data:`-URIs, externe Bilder laden viele
+  Postfächer erst auf Klick.
+- Unter jedem Knopf steht die Adresse noch einmal zum Abtippen. Wer den Knopf
+  nicht angezeigt bekommt, kommt trotzdem zur Bestätigung.
+- Die dunkle Fassung der Seite ist hinterlegt (`prefers-color-scheme`); fällt
+  sie weg, bleibt die helle stehen – die ist vollständig.
+- Mails an die Fahrschule bleiben sachlich, ohne Versalien und roten Strich,
+  genau wie der interne Bereich.
 
 ---
 
@@ -587,7 +612,7 @@ sein. Wer unterwegs nachsehen will, wer morgen kommt, dreht das Gerät quer.
 python manage.py test termine
 ```
 
-263 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
+276 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
 Fehler unbemerkt bleiben würden:
 
 | Bereich | Was geprüft wird |
@@ -608,6 +633,7 @@ Fehler unbemerkt bleiben würden:
 | Zustand | Zustandsseite und Job-Fahrplan, jeweils auch im Ausfall – diese Prüfungen sind selbst die Alarmanlage |
 | Datensparsamkeit | im Log steht die Buchungsreferenz, nie Name oder E-Mail-Adresse |
 | Darstellung | deutsche Schreibweise von Datum und Uhrzeit, geprüft am einstelligen Tag und am Nachmittag |
+| E-Mails | dass jede Nachricht als HTML **und** als Text rausgeht, der Text vollwertig bleibt und der Kalendereintrag daneben bestehen bleibt |
 | Einrichtung | der Hinweis erscheint ohne Superuser, verschwindet mit ihm, und überlebt eine noch nicht migrierte Datenbank |
 | Öffentliche Seite | manipulierte URL-Parameter dürfen keinen Fehler auslösen |
 
@@ -642,11 +668,13 @@ termine/
     buchung.py         Buchungsablauf mit Double-Opt-in
     verfuegbarkeit.py  Abfragen für die öffentliche Seite
     ics.py             Kalendereinträge und Abo-Feed
-    mail.py            E-Mail-Versand
+    mail.py            E-Mail-Versand (Text und HTML)
     einrichtung.py     Erkennt die noch nicht eingerichtete Installation
     zustand.py         Datenbank erreichbar? Laufen die Jobs?
+  templates/
+    mail/          Jede Mail als .txt und .html, Gerüst in _geruest.html
   templatetags/    Einrichtungshinweis und aktiver Navigationspunkt
-  tests/           263 Tests, 97 % Zeilenabdeckung (siehe unten)
+  tests/           276 Tests, 97 % Zeilenabdeckung (siehe unten)
 static/            CSS und htmx
 docs/bilder/       Screenshots für diese README
 ```
