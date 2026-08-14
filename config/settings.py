@@ -28,6 +28,15 @@ def env_list(name: str, default: str = "") -> list[str]:
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "unsicher-nur-fuer-entwicklung")
 DEBUG = env_bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+
+# Der Healthcheck des Containers ruft die App über 127.0.0.1 auf. Stünde dort
+# nur die öffentliche Domain, bekäme er 400 (DisallowedHost) und würde einen
+# gesunden Container für krank erklären. Für Besucher ändert das nichts: Die
+# Links dieser App entstehen aus SITE_BASE_URL, nicht aus dem Host-Kopf – das
+# ist genau der Grund, warum es SITE_BASE_URL überhaupt gibt.
+for _lokal in ("127.0.0.1", "localhost"):
+    if _lokal not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_lokal)
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 
 # Öffentliche Basis-URL. Wird für Links in E-Mails und für den ICS-Feed gebraucht,
@@ -201,6 +210,10 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", default=True)
     SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=False)
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    # Der Healthcheck spricht den Container direkt über HTTP an, ohne den
+    # Reverse Proxy und damit ohne X-Forwarded-Proto. Ohne diese Ausnahme
+    # bekäme er eine Umleitung auf https://127.0.0.1/ – und dort hört niemand.
+    SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
     # HSTS erst einschalten, wenn die Seite dauerhaft per HTTPS läuft – ein zu
     # früh gesetzter Wert sperrt Besucher für die eingestellte Dauer aus.
     SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "0"))

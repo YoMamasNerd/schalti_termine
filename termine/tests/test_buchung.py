@@ -483,3 +483,30 @@ class RobusteParameter(BuchungsBasis):
         weit = (timezone.localdate() + dt.timedelta(days=365)).strftime("%Y-%m")
         antwort = self.client.get(reverse("termine:start"), {"monat": weit})
         self.assertIsNone(antwort.context["naechster_monat"])
+
+
+class LogOhnePersonenbezug(BuchungsBasis):
+    """Das Löschkonzept endet sonst an der Datenbankgrenze.
+
+    Nach DATA_RETENTION_DAYS anonymisiert die App die Buchung. Stünde die
+    E-Mail-Adresse im Log, bliebe sie dort trotzdem stehen – Protokolle
+    werden nicht mit anonymisiert.
+    """
+
+    def test_reservierung_protokolliert_die_referenz_statt_der_adresse(self):
+        with self.assertLogs("termine.services.buchung", level="INFO") as protokoll:
+            buchung = self.reservieren()
+
+        zeilen = "\n".join(protokoll.output)
+        self.assertIn(str(buchung.referenz), zeilen)
+        self.assertNotIn(buchung.email, zeilen)
+
+    def test_auch_bestaetigung_und_storno_nennen_nur_die_referenz(self):
+        buchung = self.reservieren()
+        with self.assertLogs("termine.services.buchung", level="INFO") as protokoll:
+            self.mit_commit(buchungs_service.bestaetigen, buchung)
+            self.mit_commit(buchungs_service.stornieren, buchung)
+
+        zeilen = "\n".join(protokoll.output)
+        self.assertNotIn(buchung.email, zeilen)
+        self.assertNotIn(buchung.name, zeilen)

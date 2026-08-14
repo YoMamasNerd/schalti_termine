@@ -366,11 +366,42 @@ still unbrauchbar machen können:
   Request, aus dem sich der Hostname ableiten ließe.
 - Es ist kein Mailversand eingerichtet – dann bekäme niemand einen
   Bestätigungslink, und keine einzige Buchung käme zustande.
+- Ein Geheimnis steht noch auf `bitte-aendern`, oder `EMAIL_HOST` zeigt auf
+  einen Beispielserver. Beides sieht nach fertiger Konfiguration aus und ist
+  keine.
 
 Selbst prüfen lässt sich das jederzeit mit `python manage.py check --deploy`.
 
 Vor die App gehört ein Reverse Proxy mit TLS (nginx, Caddy, Traefik). Der
 Webserver lauscht absichtlich nur auf `127.0.0.1`.
+
+### Woran man sieht, dass die Anlage läuft
+
+Beide Container prüfen sich selbst; `docker compose ps` zeigt das Ergebnis als
+`healthy` oder `unhealthy`.
+
+| Container | Was geprüft wird |
+| --- | --- |
+| `web` | `GET /healthz` – antwortet gunicorn, **und** ist die Datenbank erreichbar? |
+| `worker` | `python manage.py jobs_pruefen` – läuft der Fahrplan der Jobs weiter? |
+
+Für den Worker taugt kein Prozess-Check: `qcluster` kann laufen und trotzdem
+nichts abarbeiten. Geprüft wird deshalb der Fahrplan selbst. django-q2 schiebt
+den nächsten Ausführungszeitpunkt nach jedem Lauf weiter; bleibt er in der
+Vergangenheit stehen, arbeitet niemand die Warteschlange ab. Der häufigste Job
+läuft alle fünf Minuten, eine Viertelstunde Rückstand ist also ein klares
+Zeichen. Das ist genau die Sorte Ausfall, die sonst tagelang unbemerkt bleibt:
+Es stürzt nichts ab, es kommen nur keine Termine mehr dazu.
+
+Daran hängt auch die Startreihenfolge. Der Worker wartet nicht mehr nur auf die
+Datenbank, sondern auf einen gesunden `web`-Container – dort laufen Migration
+und Job-Einrichtung. Vorher startete er regelmäßig zu früh, fand seine Tabellen
+nicht und starb so lange, bis der Neustart zufällig spät genug kam.
+
+`/healthz` ist ohne Login erreichbar und antwortet bewusst nur `ok` oder
+`fehler`; woran es hakt, steht im Log. Wer die Adresse aus dem Netz fernhalten
+will, sperrt sie im Reverse Proxy – die Container prüfen sich selbst und
+brauchen sie von außen nicht.
 
 ---
 
@@ -407,6 +438,7 @@ python manage.py termine_generieren                  # alle Fahrlehrer
 python manage.py termine_generieren --fahrlehrer anna-berger --wochen 8
 python manage.py buchungen_pflegen                   # Reservierungen, Erinnerungen, DSGVO
 python manage.py jobs_einrichten                     # wiederkehrende Jobs registrieren
+python manage.py jobs_pruefen                        # läuft der Fahrplan noch? (0 = ja)
 python manage.py qcluster                            # Worker für die Jobs
 python manage.py beispieldaten                       # Demodaten
 python manage.py test termine                        # Testsuite
@@ -483,7 +515,7 @@ sein. Wer unterwegs nachsehen will, wer morgen kommt, dreht das Gerät quer.
 python manage.py test termine
 ```
 
-178 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
+202 Tests, 97 % der Zeilen abgedeckt. Der Schwerpunkt liegt bewusst dort, wo
 Fehler unbemerkt bleiben würden:
 
 | Bereich | Was geprüft wird |
@@ -495,7 +527,9 @@ Fehler unbemerkt bleiben würden:
 | Hintergrundjobs | dass die Jobs tun, was sie sollen – und dass der Scheduler sie über die eingetragenen Pfade überhaupt findet |
 | Kommandos | alle Argumente, inklusive der Abbruchfälle |
 | Ausfälle | ein streikender Mailserver darf keine Buchung zerstören, muss aber im Log auftauchen |
-| Konfiguration | die Prüfungen aus `checks.py` |
+| Konfiguration | die Prüfungen aus `checks.py`, inklusive unveränderter Geheimnisse aus der Beispieldatei |
+| Zustand | Zustandsseite und Job-Fahrplan, jeweils auch im Ausfall – diese Prüfungen sind selbst die Alarmanlage |
+| Datensparsamkeit | im Log steht die Buchungsreferenz, nie Name oder E-Mail-Adresse |
 | Darstellung | deutsche Schreibweise von Datum und Uhrzeit, geprüft am einstelligen Tag und am Nachmittag |
 | Einrichtung | der Hinweis erscheint ohne Superuser, verschwindet mit ihm, und überlebt eine noch nicht migrierte Datenbank |
 | Öffentliche Seite | manipulierte URL-Parameter dürfen keinen Fehler auslösen |
@@ -533,8 +567,9 @@ termine/
     ics.py             Kalendereinträge und Abo-Feed
     mail.py            E-Mail-Versand
     einrichtung.py     Erkennt die noch nicht eingerichtete Installation
+    zustand.py         Datenbank erreichbar? Laufen die Jobs?
   templatetags/    Einrichtungshinweis und aktiver Navigationspunkt
-  tests/           178 Tests, 97 % Zeilenabdeckung (siehe unten)
+  tests/           202 Tests, 97 % Zeilenabdeckung (siehe unten)
 static/            CSS und htmx
 docs/bilder/       Screenshots für diese README
 ```

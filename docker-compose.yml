@@ -33,6 +33,27 @@ services:
              python manage.py migrate --noinput &&
              python manage.py jobs_einrichten &&
              gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60 --access-logfile -"
+    # Fragt die App über sich selbst ab: Antwortet gunicorn und ist die
+    # Datenbank erreichbar? Ein reiner Prozess-Check würde beides verwechseln.
+    # curl ist im Image nicht vorhanden – Python ist es ohnehin.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import sys, urllib.request
+          try:
+              sys.exit(0 if urllib.request.urlopen(
+                  "http://127.0.0.1:8000/healthz", timeout=5).status == 200 else 1)
+          except Exception:
+              sys.exit(1)
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # Migration und Job-Einrichtung laufen vor gunicorn; bis dahin ist noch
+      # nichts zu holen, ohne dass etwas kaputt wäre.
+      start_period: 60s
 
   # Führt die wiederkehrenden Jobs aus: Vorausplanung, Erinnerungen,
   # Freigabe abgelaufener Reservierungen, Datenpflege.
@@ -45,7 +66,22 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      # Nicht nur auf die Datenbank warten, sondern auf den Webserver: Dort
+      # laufen Migration und Job-Einrichtung. Ohne diese Zeile startet der
+      # Worker vor der Migration, findet seine Tabellen nicht und stirbt so
+      # lange, bis der Neustart zufällig spät genug kommt.
+      web:
+        condition: service_healthy
     command: python manage.py qcluster
+    # Ein laufender Prozess sagt nichts darüber, ob er noch etwas tut. Geprüft
+    # wird deshalb der Fahrplan selbst: Bleibt ein Job überfällig liegen,
+    # arbeitet niemand die Warteschlange ab.
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "jobs_pruefen"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
 
 volumes:
   postgres-daten:

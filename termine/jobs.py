@@ -6,16 +6,12 @@ daher auf Modulebene liegen und ohne Argumente laufen.
 
 from __future__ import annotations
 
-import logging
-
 from .services.buchung import (
     abgelaufene_reservierungen_freigeben,
     alte_buchungen_anonymisieren,
     erinnerungen_versenden,
 )
 from .services.planung import generiere_alle
-
-logger = logging.getLogger(__name__)
 
 
 def termine_vorausplanen() -> str:

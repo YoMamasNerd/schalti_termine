@@ -106,10 +106,18 @@ ausdrücklich danach:
 - Geschäftslogik **vollständig** in `termine/services/`. Views, Kommandos und
   Jobs rufen sie nur auf – dadurch ohne HTTP testbar.
 - `apps.py` lädt nur die Systemprüfungen in `ready()`, sonst nichts.
-- `checks.py` fängt zwei Fehlkonfigurationen ab, die still unbrauchbar machen:
-  `SITE_BASE_URL` auf localhost und Konsolen-Mailbackend im Betrieb. Beide mit
+- `checks.py` fängt Fehlkonfigurationen ab, die still unbrauchbar machen:
+  `SITE_BASE_URL` auf localhost, Konsolen-Mailbackend im Betrieb, Beispielserver
+  als `EMAIL_HOST`, unveränderte Geheimnisse aus `.env.example`. Alle mit
   `deploy=True` registriert, weil Djangos Testrunner `DEBUG=False` setzt.
 - `docker-compose` ruft `check --deploy` **vor** der Migration auf.
+- Beide Container prüfen sich selbst: `web` über `GET /healthz` (Datenbank),
+  `worker` über `manage.py jobs_pruefen` (Fahrplan statt Prozess). Der Worker
+  wartet auf einen gesunden `web`, weil dort die Migration läuft.
+- `/healthz` braucht zwei Ausnahmen, damit der Container sich selbst erreicht:
+  Loopback in `ALLOWED_HOSTS` und `SECURE_REDIRECT_EXEMPT`. Beide nicht entfernen.
+- **Keine personenbezogenen Daten ins Log** – dort greift das Löschkonzept nicht.
+  Immer die Buchungsreferenz protokollieren, nie Name oder E-Mail.
 
 ## Arbeitsweise
 
@@ -120,7 +128,7 @@ coverage run manage.py test termine && coverage report
 
 - `main` trägt den stabilen Stand. Entwickelt wird auf einem eigenen Branch,
   der erst nach grüner Testsuite dorthin zurückfließt.
-- Stand: 178 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
+- Stand: 202 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
   der Schwerpunkt liegt dort, wo ein Fehler unbemerkt bliebe (Jobs, Kommandos,
   Ausfallpfade des Mailversands).
 - Commit-Nachrichten auf Deutsch, im Stil der bestehenden Historie: erst was

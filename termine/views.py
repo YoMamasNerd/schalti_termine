@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import calendar
 import datetime as dt
+import logging
 
 from django.contrib import messages
 from django.http import Http404, HttpResponse
@@ -15,6 +16,7 @@ from django.views.decorators.http import require_POST
 from .forms import BuchungsForm, StornoForm
 from .models import Buchung, Fahrlehrer, Termin, Terminart
 from .services import buchung as buchungs_service
+from .services import zustand
 from .services.feiertage import feiertag_name
 from .services.ics import fahrlehrer_feed
 from .services.verfuegbarkeit import (
@@ -23,6 +25,8 @@ from .services.verfuegbarkeit import (
     monatsgitter,
     termine_nach_tag,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _datum_aus_get(request, name: str) -> dt.date | None:
@@ -253,4 +257,24 @@ def ics_feed(request, token: str):
     antwort["Content-Disposition"] = f'inline; filename="{fahrlehrer.slug}.ics"'
     antwort["Cache-Control"] = "private, max-age=300"
     antwort["X-Robots-Tag"] = "noindex, nofollow"
+    return antwort
+
+
+def healthz(request):
+    """Zustandsprüfung für den Webserver – ohne Login, absichtlich karg.
+
+    Die Seite ist öffentlich erreichbar und sagt deshalb nach außen nur „ok"
+    oder „fehler". Woran es liegt, steht im Log; ein Fremder muss aus dieser
+    Antwort nicht ablesen können, welcher Teil der Anlage gerade schwächelt.
+    """
+    befund = zustand.datenbank()
+    if not befund.gesund:
+        logger.warning("Zustandsprüfung fehlgeschlagen: %s", befund.meldung)
+
+    antwort = HttpResponse(
+        "ok\n" if befund.gesund else "fehler\n",
+        status=200 if befund.gesund else 503,
+        content_type="text/plain; charset=utf-8",
+    )
+    antwort["Cache-Control"] = "no-store"
     return antwort

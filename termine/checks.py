@@ -20,6 +20,7 @@ nicht erst hoch, statt tote Links zu verschicken.
 
 from __future__ import annotations
 
+import os
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -27,6 +28,15 @@ from django.core.checks import Error, Tags, Warning, register
 
 LOKALE_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0", ""}
 BEISPIEL_DOMAENEN = ("example.org", "example.com", "example.net", "beispiel.de")
+
+# So sind die Felder in .env.example vorbelegt. Wer die Datei kopiert und nur
+# halb ausfüllt, lässt diesen Wert stehen.
+PLATZHALTER = "bitte-aendern"
+ENTWICKLUNGSSCHLUESSEL = "unsicher-nur-fuer-entwicklung"
+
+# Geheimnisse, die aus der Umgebung kommen und deshalb nicht in den Settings
+# stehen, wo eine Prüfung sie sonst fände.
+GEHEIMNISSE_AUS_DER_UMGEBUNG = ("POSTGRES_PASSWORD", "EMAIL_HOST_PASSWORD")
 
 
 @register(Tags.security, deploy=True)
@@ -84,6 +94,18 @@ def pruefe_mailversand(app_configs, **kwargs):
             )
         )
 
+    mailserver = getattr(settings, "EMAIL_HOST", "") or ""
+    if any(domaene in mailserver for domaene in BEISPIEL_DOMAENEN):
+        meldungen.append(
+            Error(
+                f"EMAIL_HOST steht noch auf einem Beispielserver ({mailserver!r}).",
+                hint="Die Installation fährt damit hoch, aber der Versand scheitert bei "
+                "jeder Buchung – und weil der Bestätigungslink nie ankommt, kommt keine "
+                "Buchung zustande. Tragen Sie den SMTP-Server Ihres Anbieters ein.",
+                id="termine.E003",
+            )
+        )
+
     absender = settings.DEFAULT_FROM_EMAIL or ""
     if any(domaene in absender for domaene in BEISPIEL_DOMAENEN):
         meldungen.append(
@@ -93,6 +115,50 @@ def pruefe_mailversand(app_configs, **kwargs):
                 "deren Domain ihnen nicht gehört. Tragen Sie die echte Adresse der "
                 "Fahrschule ein.",
                 id="termine.W002",
+            )
+        )
+
+    return meldungen
+
+
+@register(Tags.security, deploy=True)
+def pruefe_platzhalter(app_configs, **kwargs):
+    """Kein Geheimnis darf so bleiben, wie es in .env.example steht.
+
+    Djangos eigene Prüfung meckert einen zu kurzen Schlüssel nur als Warnung
+    an – und Warnungen halten den Container nicht auf, der mit
+    `--fail-level ERROR` startet. Ein unverändertes Geheimnis ist aber kein
+    Schönheitsfehler: Wer die Beispieldatei kennt, kennt damit den Schlüssel,
+    mit dem diese Installation ihre Sitzungen signiert.
+    """
+    if settings.DEBUG:
+        return []
+
+    meldungen = []
+
+    schluessel = settings.SECRET_KEY or ""
+    if PLATZHALTER in schluessel or schluessel == ENTWICKLUNGSSCHLUESSEL:
+        meldungen.append(
+            Error(
+                "DJANGO_SECRET_KEY steht noch auf dem Wert aus der Beispieldatei.",
+                hint="Damit sind Sitzungen und Formular-Token für jeden fälschbar, der "
+                "diese Beispieldatei kennt. Neuen Wert erzeugen mit: python -c "
+                "'import secrets; print(secrets.token_urlsafe(50))'",
+                id="termine.E004",
+            )
+        )
+
+    unveraendert = [
+        name
+        for name in GEHEIMNISSE_AUS_DER_UMGEBUNG
+        if PLATZHALTER in os.environ.get(name, "")
+    ]
+    if unveraendert:
+        meldungen.append(
+            Error(
+                f"Unverändert aus der Beispieldatei übernommen: {', '.join(unveraendert)}.",
+                hint="Tragen Sie die echten Zugangsdaten in die .env ein.",
+                id="termine.E005",
             )
         )
 

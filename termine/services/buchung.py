@@ -86,7 +86,10 @@ def reservieren(
     termin.save(update_fields=["status", "geaendert_am"])
 
     transaction.on_commit(lambda: mail.bestaetigung_anfordern(buchung))
-    logger.info("Termin %s für %s reserviert", termin.pk, buchung.email)
+    # Bewusst die Referenz statt der E-Mail-Adresse: Nach DATA_RETENTION_DAYS
+    # putzt die Anonymisierung die Datenbank – im Log stünde die Adresse sonst
+    # weiter, und zwar für immer.
+    logger.info("Termin %s reserviert (%s)", termin.pk, buchung.referenz)
     return buchung
 
 
