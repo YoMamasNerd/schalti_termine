@@ -14,6 +14,9 @@ urlpatterns = [
     path("termin/<str:token>/", views.buchung_ansicht, name="buchung"),
     path("termin/<str:token>/stornieren/", views.buchung_stornieren, name="buchung_stornieren"),
     path("kalender/<str:token>.ics", views.ics_feed, name="ics_feed"),
+    # Nur die Terminauswahl, ohne Kopf und Fuß – für den Rahmen in einer
+    # fremden Seite. Siehe docs/EINBETTEN.md.
+    path("einbetten/", views.einbetten, name="einbetten"),
     # Ohne Schrägstrich am Ende: Der Container fragt diese Adresse alle paar
     # Sekunden ab, eine Umleitung wäre dabei nur unnötiger Verkehr.
     path("healthz", views.healthz, name="healthz"),

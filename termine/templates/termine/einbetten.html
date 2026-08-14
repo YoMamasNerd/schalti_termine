@@ -1,0 +1,102 @@
+{% load static %}<!doctype html>
+<html lang="de">
+{% comment %}
+  Die Terminauswahl zum Einbetten in eine fremde Seite – bewusst ohne
+  base.html: keine Kopfzeile, kein Fuß, keine Marke. Was hier steht, sitzt
+  später mitten in der Seite der Fahrschule, und zwei Kopfzeilen übereinander
+  sähen nach Versehen aus.
+
+  Die Buchung selbst bleibt außerhalb: Ein Klick auf eine Uhrzeit öffnet das
+  Formular in einem neuen Tab. Das ist nicht nur bequemer, sondern der
+  entscheidende Punkt für die Verlässlichkeit – ein Formular in einem fremden
+  Rahmen braucht Cookies, die Browser dort zunehmend blockieren. Der Kalender
+  selbst kommt ohne aus, er liest nur.
+{% endcomment %}
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Freie Termine – {{ SITE_NAME }}</title>
+  <meta name="color-scheme" content="light dark">
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="{% static 'js/htmx.min.js' %}" defer></script>
+  <style>
+    /* Der Rahmen bringt seinen eigenen Rand mit; hier zählt jeder Pixel. */
+    body { background: transparent; }
+    .einbettung { padding: 0.25rem; max-width: 1040px; margin: 0 auto; }
+  </style>
+</head>
+<body class="oeffentlich einbettung-koerper">
+  <main class="einbettung">
+    {% if terminart_auswahl or fahrlehrer_auswahl %}
+      <form class="karte" method="get" style="margin-bottom:1rem">
+        <div {% if terminart_auswahl and fahrlehrer_auswahl %}class="raster-zwei"{% endif %}>
+          {% if terminart_auswahl %}
+            <div class="feld" style="margin-bottom:0">
+              <label for="art">Worum geht es?</label>
+              <select name="art" id="art">
+                <option value="">Alle Terminarten</option>
+                {% for art in alle_terminarten %}
+                  <option value="{{ art.slug }}" {% if terminart and terminart.pk == art.pk %}selected{% endif %}>
+                    {{ art.name }} ({{ art.dauer_minuten }} Min.)
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          {% endif %}
+          {% if fahrlehrer_auswahl %}
+            <div class="feld" style="margin-bottom:0">
+              <label for="fahrlehrer">Bei wem?</label>
+              <select name="fahrlehrer" id="fahrlehrer">
+                <option value="">Egal – alle anzeigen</option>
+                {% for person in alle_fahrlehrer %}
+                  <option value="{{ person.slug }}" {% if fahrlehrer and fahrlehrer.pk == person.pk %}selected{% endif %}>
+                    {{ person.name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          {% endif %}
+        </div>
+        <div class="knopfreihe" style="margin-top:0.9rem">
+          <button class="knopf" type="submit">Termine anzeigen</button>
+        </div>
+      </form>
+    {% endif %}
+
+    <div class="raster-zwei" id="buchungsbereich">
+      <div class="karte">
+        {% include "termine/_kalender.html" %}
+      </div>
+      <div class="karte">
+        {% include "termine/_tagesliste.html" %}
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Ein Rahmen wächst nicht mit seinem Inhalt – er hat die Höhe, die die
+    // einbettende Seite ihm gibt. Diese paar Zeilen melden die tatsächliche
+    // Höhe nach oben; das Gegenstück steht in der Anleitung. Ohne das
+    // Gegenstück funktioniert die Auswahl trotzdem, der Rahmen scrollt dann
+    // eben selbst.
+    (function () {
+      var zuletzt = 0;
+      function melden() {
+        var hoehe = Math.ceil(document.documentElement.scrollHeight);
+        if (hoehe !== zuletzt) {
+          zuletzt = hoehe;
+          parent.postMessage({ typ: "schalti-termine:hoehe", hoehe: hoehe }, "*");
+        }
+      }
+      window.addEventListener("load", melden);
+      // Nach jedem htmx-Austausch ist die Seite anders hoch (anderer Monat,
+      // mehr oder weniger Uhrzeiten).
+      document.body.addEventListener("htmx:afterSwap", melden);
+      if (window.ResizeObserver) {
+        new ResizeObserver(melden).observe(document.documentElement);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -8,7 +8,7 @@
        href="?monat={{ vorheriger_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
        hx-get="?monat={{ vorheriger_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
        hx-select="#buchungsbereich" hx-target="#buchungsbereich" hx-swap="outerHTML"
-       hx-push-url="true"
+       {% if not einbetten %}hx-push-url="true"{% endif %}
        aria-label="Vorheriger Monat">&larr;</a>
   {% else %}
     <span class="knopf knopf--leise knopf--klein" aria-hidden="true" style="visibility:hidden">&larr;</span>
@@ -21,7 +21,7 @@
        href="?monat={{ naechster_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
        hx-get="?monat={{ naechster_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
        hx-select="#buchungsbereich" hx-target="#buchungsbereich" hx-swap="outerHTML"
-       hx-push-url="true"
+       {% if not einbetten %}hx-push-url="true"{% endif %}
        aria-label="Nächster Monat">&rarr;</a>
   {% else %}
     <span class="knopf knopf--leise knopf--klein" aria-hidden="true" style="visibility:hidden">&rarr;</span>
@@ -50,7 +50,7 @@
                  href="?tag={{ zelle.datum|date:'Y-m-d' }}&monat={{ jahr }}-{{ monat|stringformat:'02d' }}{% if querystring %}&{{ querystring }}{% endif %}"
                  hx-get="?tag={{ zelle.datum|date:'Y-m-d' }}&monat={{ jahr }}-{{ monat|stringformat:'02d' }}{% if querystring %}&{{ querystring }}{% endif %}"
                  hx-select="#buchungsbereich" hx-target="#buchungsbereich" hx-swap="outerHTML"
-                 hx-push-url="true"
+                 {% if not einbetten %}hx-push-url="true"{% endif %}
                  title="{{ zelle.datum|date:'l, j. F Y' }} – {{ zelle.anzahl }} freie Termine">
                 <span class="zahl">{{ zelle.tag }}</span>
                 <span class="punkt"></span>

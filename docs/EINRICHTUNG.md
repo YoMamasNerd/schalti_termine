@@ -138,6 +138,7 @@ Alle vier haben brauchbare Vorgaben und können erst einmal so bleiben.
 | `TIME_ZONE` | `Europe/Berlin`. Bestimmt auch die Sommerzeitumstellung. |
 | `LOG_LEVEL` | `INFO` ist richtig. `WARNING` macht das Protokoll ruhiger, `DEBUG` sehr geschwätzig. |
 | `TLS_DOMAIN` | Nur für `docker-compose.tls.yml`: der Name, für den Caddy das Zertifikat holt. Muss mit `SITE_BASE_URL` übereinstimmen. |
+| `EMBED_ORIGINS` | Seiten, die die Terminauswahl in einen Rahmen setzen dürfen. Leer = niemand. Siehe [Einbetten](EINBETTEN.md). |
 | `IMPRESSUM_URL` | Adresse eures Impressums. Erscheint im Seitenfuß. |
 | `DATENSCHUTZ_URL` | Adresse der Datenschutzerklärung. Erscheint im Seitenfuß. Die Einwilligung im Buchungsformular ist ein eigenes Pflichtfeld und verlinkt sie nicht – wer das möchte, verlinkt sie über den Seitenfuß. |
 

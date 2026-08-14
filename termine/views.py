@@ -6,6 +6,7 @@ import calendar
 import datetime as dt
 import logging
 
+from django.conf import settings
 from django.contrib import messages
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -154,6 +155,33 @@ def _querystring(fahrlehrer, terminart) -> str:
 
 def startseite(request, slug: str | None = None):
     return render(request, "termine/start.html", _basis_kontext(request, slug))
+
+
+def einbetten(request):
+    """Nur die Terminauswahl – gedacht für einen Rahmen in einer fremden Seite.
+
+    Wer einen Rahmen darum setzen darf, steht in EMBED_ORIGINS. Ohne Eintrag
+    ist die Seite weiterhin direkt aufrufbar, aber von niemandem
+    einbettbar – ein offener Rahmen lädt zum Klickfang ein, bei dem eine
+    fremde Seite die Auswahl unsichtbar über eigene Schaltflächen legt.
+
+    Umgesetzt über frame-ancestors und nicht über X-Frame-Options: Letzteres
+    kennt nur eine einzige Adresse, und die Fahrschule hat oft zwei (mit und
+    ohne www).
+    """
+    kontext = _basis_kontext(request)
+    kontext["einbetten"] = True
+    antwort = render(request, "termine/einbetten.html", kontext)
+
+    erlaubt = settings.EMBED_ORIGINS
+    if erlaubt:
+        antwort.headers["Content-Security-Policy"] = "frame-ancestors " + " ".join(erlaubt)
+        # Sagt der XFrameOptionsMiddleware, dass sie ihr DENY hier weglässt;
+        # sonst überstimmt es die Freigabe oben.
+        antwort.xframe_options_exempt = True
+    else:
+        antwort.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
+    return antwort
 
 
 def buchen(request, termin_id: int):

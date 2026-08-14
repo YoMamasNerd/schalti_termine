@@ -63,6 +63,17 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
 - Die öffentliche Seite ist auf das Handy optimiert, der interne Bereich auf den
   Schreibtisch. Das ist eine Entscheidung, kein Versehen.
 
+### Einbettung
+
+- Die Terminauswahl gibt es unter `/einbetten/` ohne Kopf und Fuß.
+- Wer einrahmen darf, steht in `EMBED_ORIGINS`; leer = niemand. Umgesetzt über
+  `frame-ancestors` plus `xframe_options_exempt`, weil `X-Frame-Options` nur
+  eine Adresse kennt und die Fahrschule zwei hat (mit und ohne www).
+- **Das Buchungsformular bleibt außerhalb des Rahmens** (`target="_blank"`):
+  Es braucht Cookies, die Browser in fremden Rahmen blockieren. Nur der
+  Kalender liest und kommt ohne aus. Ausnahme wäre eine Unterdomain derselben
+  Domain – dann ginge auch das Formular im Rahmen.
+
 ### Zugriff und Login
 
 - **Kein Kundenkonto.** Interessenten buchen ohne Registrierung.
@@ -142,7 +153,7 @@ coverage run manage.py test termine && coverage report
 
 - `main` trägt den stabilen Stand. Entwickelt wird auf einem eigenen Branch,
   der erst nach grüner Testsuite dorthin zurückfließt.
-- Stand: 217 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
+- Stand: 227 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
   der Schwerpunkt liegt dort, wo ein Fehler unbemerkt bliebe (Jobs, Kommandos,
   Ausfallpfade des Mailversands).
 - Commit-Nachrichten auf Deutsch, im Stil der bestehenden Historie: erst was

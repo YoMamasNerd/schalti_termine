@@ -44,6 +44,12 @@ CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "http://localhost:8000").rstrip("/")
 SITE_NAME = os.environ.get("SITE_NAME", "Fahrschule – Beratungstermine")
 
+# Seiten, die die Terminauswahl unter /einbetten/ in einen Rahmen setzen
+# dürfen, z. B. https://fahrschule-schaltwerk.de. Leer = niemand; die
+# Auswahl bleibt dann nur direkt aufrufbar. Bewusst eine ausdrückliche
+# Liste: Wer beliebige Einbettung zulässt, lädt zum Klickfang ein.
+EMBED_ORIGINS = env_list("EMBED_ORIGINS")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
