@@ -155,22 +155,13 @@ class RechtlicheLinks(MailBasis):
     """Mails entstehen ohne Request, also ohne Kontextprozessor – die Links
     für den Fuß müssen trotzdem ankommen."""
 
-    @override_settings(
-        IMPRESSUM_URL="https://example.org/impressum",
-        DATENSCHUTZ_URL="https://example.org/datenschutz",
-    )
     def test_impressum_und_datenschutz_stehen_im_fuss(self):
         mail_service.erinnerung(self.buchung)
         _, _, html = self.letzte()
-        self.assertIn("https://example.org/impressum", html)
-        self.assertIn("https://example.org/datenschutz", html)
-
-    @override_settings(IMPRESSUM_URL="", DATENSCHUTZ_URL="")
-    def test_ohne_gepflegte_adressen_bleibt_der_fuss_leer(self):
-        mail_service.erinnerung(self.buchung)
-        _, _, html = self.letzte()
-        self.assertNotIn("Impressum", html)
-        self.assertNotIn("Datenschutz", html)
+        self.assertIn("/impressum/", html)
+        self.assertIn("/datenschutz/", html)
+        self.assertIn("Impressum", html)
+        self.assertIn("Datenschutz", html)
 
 
 class InterneMail(MailBasis):

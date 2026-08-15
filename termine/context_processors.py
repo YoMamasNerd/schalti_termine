@@ -13,7 +13,5 @@ def site(request):
         "SITE_BASE_URL": settings.SITE_BASE_URL,
         "KONTAKT_EMAIL": kontakt_email,
         "RESERVATION_MINUTES": settings.RESERVATION_MINUTES,
-        "IMPRESSUM_URL": settings.IMPRESSUM_URL,
-        "DATENSCHUTZ_URL": settings.DATENSCHUTZ_URL,
         "FSM_SYNC_ENABLED": getattr(settings, "FSM_SYNC_ENABLED", False),
     }

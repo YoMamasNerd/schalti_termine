@@ -39,8 +39,8 @@
 
   <footer class="fuss">
     <div class="huelle">
-      {% if IMPRESSUM_URL %}<a href="{{ IMPRESSUM_URL }}">Impressum</a> · {% endif %}
-      {% if DATENSCHUTZ_URL %}<a href="{{ DATENSCHUTZ_URL }}">Datenschutz</a> · {% endif %}
+      <a href="{% url 'termine:impressum' %}">Impressum</a> ·
+      <a href="{% url 'termine:datenschutz' %}">Datenschutz</a> ·
       <a href="{% url 'termine:dashboard' %}">Interner Bereich</a>
     </div>
   </footer>
