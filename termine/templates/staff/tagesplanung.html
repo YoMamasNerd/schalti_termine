@@ -40,9 +40,21 @@
               <span>
                 {{ eintrag.beginn_uhrzeit }}
                 {% if eintrag.status == "gebucht" %}
-                  <span class="name"><strong>{{ eintrag.detail }}</strong></span>
+                  <span class="name">
+                    {% if eintrag.buchung %}
+                      <a href="{% url 'termine:buchung_detail' eintrag.buchung.pk %}" style="text-decoration:underline"><strong>{{ eintrag.detail }}</strong></a>
+                    {% else %}
+                      <strong>{{ eintrag.detail }}</strong>
+                    {% endif %}
+                  </span>
                 {% elif eintrag.status == "reserviert" %}
-                  <span class="name">Reserviert</span>
+                  <span class="name">
+                    {% if eintrag.buchung %}
+                      <a href="{% url 'termine:buchung_detail' eintrag.buchung.pk %}">Reserviert</a>
+                    {% else %}
+                      Reserviert
+                    {% endif %}
+                  </span>
                 {% else %}
                   <span class="name">{{ eintrag.titel }} (frei)</span>
                 {% endif %}

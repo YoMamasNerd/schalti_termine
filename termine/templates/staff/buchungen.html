@@ -26,11 +26,15 @@
           {% for buchung in buchungen %}
             <tr>
               <td>
-                {{ buchung.termin.beginn_lokal|date:"D" }}, {{ buchung.termin.beginn_lokal|date:"SHORT_DATE_FORMAT" }}<br>
-                <strong>{{ buchung.termin.beginn_lokal|date:"H:i" }}–{{ buchung.termin.ende_lokal|date:"H:i" }}</strong><br>
+                <a href="{% url 'termine:buchung_detail' buchung.pk %}">
+                  {{ buchung.termin.beginn_lokal|date:"D" }}, {{ buchung.termin.beginn_lokal|date:"SHORT_DATE_FORMAT" }}<br>
+                  <strong>{{ buchung.termin.beginn_lokal|date:"H:i" }}–{{ buchung.termin.ende_lokal|date:"H:i" }}</strong>
+                </a><br>
                 <span class="leer">{{ buchung.termin.terminart.name }}</span>
               </td>
-              <td>{{ buchung.name }}</td>
+              <td>
+                <a href="{% url 'termine:buchung_detail' buchung.pk %}"><strong>{{ buchung.name }}</strong></a>
+              </td>
               <td>
                 {% if buchung.email %}<a href="mailto:{{ buchung.email }}">{{ buchung.email }}</a>{% endif %}
                 {% if buchung.telefon %}<br>{{ buchung.telefon }}{% endif %}
@@ -53,10 +57,11 @@
                   {{ buchung.get_status_display }}
                 </span>
               </td>
-              <td>
+              <td style="text-align:right; white-space:nowrap">
+                <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:buchung_detail' buchung.pk %}">Details</a>
                 {% if buchung.ist_aktiv %}
                   <form method="post" action="{% url 'termine:buchung_absagen' buchung.pk %}"
-                        onsubmit="return confirm('Buchung wirklich absagen? Der Kunde bekommt eine E-Mail.');">
+                        onsubmit="return confirm('Buchung wirklich absagen? Der Kunde bekommt eine E-Mail.');" style="display:inline-block; margin-left:4px">
                     {% csrf_token %}
                     <button class="knopf knopf--gefahr knopf--klein" type="submit">Absagen</button>
                   </form>

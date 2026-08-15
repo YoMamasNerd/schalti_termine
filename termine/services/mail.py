@@ -149,3 +149,15 @@ def erinnerung(buchung) -> bool:
         ics=buchung_als_ics(buchung),
         antwort_an=None,
     )
+
+
+def buchung_verschoben_kunde(buchung, alter_beginn: dt.datetime) -> bool:
+    """Benachrichtigung an den Kunden über einen verschobenen Termin."""
+    return _senden(
+        betreff=f"Termin verschoben: Neuer Termin am {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
+        template="buchung_verschoben",
+        empfaenger=[buchung.email],
+        kontext=_kontext(buchung, alter_beginn=alter_beginn),
+        ics=buchung_als_ics(buchung),
+        antwort_an=None,
+    )

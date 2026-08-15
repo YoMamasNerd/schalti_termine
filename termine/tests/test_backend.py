@@ -503,3 +503,47 @@ class Randfaelle(BackendBasis):
         )
 
         self.assertEqual(antwort["Location"], reverse("termine:tagesplanung"))
+
+    def test_buchung_detail_zeigt_daten_und_historie(self):
+        termin1 = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
+        b1 = Buchung.objects.create(
+            termin=termin1, name="Klaus Meyer", email="klaus@example.com",
+            telefon="0171123456", status=Buchung.Status.BESTAETIGT,
+        )
+        termin2 = self.termin_fuer(self.anna, tage_voraus=2, stunde=14)
+        b2 = Buchung.objects.create(
+            termin=termin2, name="Klaus Meyer", email="klaus@example.com",
+            telefon="0171123456", status=Buchung.Status.BESTAETIGT,
+        )
+
+        antwort = self.client.get(reverse("termine:buchung_detail", args=[b1.pk]))
+
+        self.assertEqual(antwort.status_code, 200)
+        self.assertContains(antwort, "Klaus Meyer")
+        self.assertContains(antwort, "klaus@example.com")
+        self.assertIn(b2, antwort.context["andere_buchungen"])
+
+    def test_buchung_verschieben_legt_termin_um(self):
+        termin1 = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
+        termin1.status = Termin.Status.GEBUCHT
+        termin1.save()
+        b = Buchung.objects.create(
+            termin=termin1, name="Sarah Schulz", email="sarah@example.com",
+            status=Buchung.Status.BESTAETIGT,
+        )
+        termin2 = self.termin_fuer(self.anna, tage_voraus=2, stunde=11)
+
+        antwort = self.client.post(
+            reverse("termine:buchung_verschieben", args=[b.pk]),
+            {"neuer_termin_id": termin2.pk},
+            follow=True,
+        )
+
+        self.assertEqual(antwort.status_code, 200)
+        b.refresh_from_db()
+        self.assertEqual(b.termin_id, termin2.pk)
+        termin1.refresh_from_db()
+        termin2.refresh_from_db()
+        self.assertEqual(termin1.status, Termin.Status.FREI)
+        self.assertEqual(termin2.status, Termin.Status.GEBUCHT)
+

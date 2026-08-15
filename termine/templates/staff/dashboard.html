@@ -228,11 +228,16 @@
 
               {% if item.buchung %}
                 <div style="margin-top:0.4rem; padding-top:0.4rem; border-top:1px dashed var(--linie); font-size:0.9rem">
-                  <div>
-                    <strong>Kunde:</strong> {{ item.buchung.name }}
-                    {% if item.buchung.fuehrerscheinklasse %}
-                      <span class="leer">({{ item.buchung.get_fuehrerscheinklasse_display }})</span>
-                    {% endif %}
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem">
+                    <div>
+                      <strong>Kunde:</strong> <a href="{% url 'termine:buchung_detail' item.buchung.pk %}" style="font-weight:700">{{ item.buchung.name }}</a>
+                      {% if item.buchung.fuehrerscheinklasse %}
+                        <span class="leer">({{ item.buchung.get_fuehrerscheinklasse_display }})</span>
+                      {% endif %}
+                    </div>
+                    <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:buchung_detail' item.buchung.pk %}" style="font-size:0.8rem">
+                      Details &amp; Verwalten &rarr;
+                    </a>
                   </div>
                   <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.2rem">
                     {% if item.buchung.telefon %}
@@ -276,6 +281,7 @@
               <th>Kontakt</th>
               <th>Terminart</th>
               <th>Fahrlehrer</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -283,7 +289,7 @@
               <tr>
                 <td><strong>{{ buchung.termin.beginn_lokal|date:"D, j. M Y, H:i" }} Uhr</strong></td>
                 <td>
-                  {{ buchung.name }}
+                  <a href="{% url 'termine:buchung_detail' buchung.pk %}"><strong>{{ buchung.name }}</strong></a>
                   {% if buchung.fuehrerscheinklasse %}
                     <br><span class="leer">{{ buchung.get_fuehrerscheinklasse_display }}</span>
                   {% endif %}
@@ -294,6 +300,11 @@
                 </td>
                 <td>{{ buchung.termin.terminart.name }}</td>
                 <td>{{ buchung.termin.fahrlehrer.name }}</td>
+                <td style="text-align:right">
+                  <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:buchung_detail' buchung.pk %}">
+                    Details &rarr;
+                  </a>
+                </td>
               </tr>
             {% endfor %}
           </tbody>

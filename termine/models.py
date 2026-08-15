@@ -577,6 +577,10 @@ class Buchung(models.Model):
         "Datenschutz-Einwilligung", null=True, blank=True
     )
     anonymisiert_am = models.DateTimeField(null=True, blank=True)
+    email_hash = models.CharField(
+        "E-Mail-Hash", max_length=64, blank=True, db_index=True,
+        help_text="Pseudonymisierter Hash für Historien-Matching auch nach Datenlöschung"
+    )
 
     class Meta:
         verbose_name = "Buchung"
@@ -595,6 +599,12 @@ class Buchung(models.Model):
 
     def __str__(self) -> str:
         return f"{self.name} – {self.termin}"
+
+    def save(self, *args, **kwargs):
+        if self.email and not self.email_hash and self.email != "Gelöscht":
+            import hashlib
+            self.email_hash = hashlib.sha256(self.email.lower().strip().encode("utf-8")).hexdigest()
+        super().save(*args, **kwargs)
 
     @property
     def ist_aktiv(self) -> bool:

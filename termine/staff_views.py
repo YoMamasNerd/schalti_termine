@@ -405,6 +405,7 @@ def tagesplanung(request):
                     "titel": t.terminart.name,
                     "detail": buchung.name if buchung else "",
                     "termin": t,
+                    "buchung": buchung,
                 }
             )
 
@@ -632,6 +633,80 @@ def buchungsliste(request):
 
 
 @mitarbeiter
+def buchung_detail(request, pk: int):
+    """Einzelansicht einer Buchung mit Kundendaten, Historie, Verschieben und Absagen."""
+    erlaubt = _erlaubte_fahrlehrer(request.user)
+    buchung = get_object_or_404(
+        Buchung.objects.select_related("termin", "termin__fahrlehrer", "termin__terminart"),
+        pk=pk,
+        termin__fahrlehrer__in=erlaubt,
+    )
+
+    # Frühere/weitere Buchungen dieses Kunden (per E-Mail, Telefon oder email_hash)
+    andere_filter = Q()
+    if buchung.email and buchung.email != "Gelöscht":
+        andere_filter |= Q(email__iexact=buchung.email)
+    if buchung.email_hash:
+        andere_filter |= Q(email_hash=buchung.email_hash)
+    if buchung.telefon and buchung.telefon != "Gelöscht":
+        andere_filter |= Q(telefon=buchung.telefon)
+
+    andere_buchungen = []
+    if andere_filter:
+        andere_buchungen = list(
+            Buchung.objects.filter(andere_filter)
+            .exclude(pk=buchung.pk)
+            .select_related("termin", "termin__fahrlehrer", "termin__terminart")
+            .order_by("-termin__beginn")
+        )
+
+    # Freie Termine für Verschiebung (ab jetzt, für alle erlaubten Fahrlehrer)
+    jetzt = timezone.now()
+    freie_termine = list(
+        Termin.objects.filter(
+            fahrlehrer__in=erlaubt,
+            status=Termin.Status.FREI,
+            beginn__gte=jetzt,
+        )
+        .select_related("fahrlehrer", "terminart")
+        .order_by("beginn")[:60]
+    )
+
+    return render(
+        request,
+        "staff/buchung_detail.html",
+        {
+            "buchung": buchung,
+            "andere_buchungen": andere_buchungen,
+            "freie_termine": freie_termine,
+        },
+    )
+
+
+@mitarbeiter
+@require_POST
+def buchung_verschieben(request, pk: int):
+    erlaubt = _erlaubte_fahrlehrer(request.user)
+    buchung = get_object_or_404(Buchung, pk=pk, termin__fahrlehrer__in=erlaubt)
+
+    neuer_termin_id = request.POST.get("neuer_termin_id")
+    if not neuer_termin_id:
+        messages.error(request, "Bitte wählen Sie einen Ziel-Termin aus.")
+        return redirect("termine:buchung_detail", pk=buchung.pk)
+
+    try:
+        buchungs_service.verschieben(buchung, int(neuer_termin_id))
+        messages.success(
+            request,
+            f"Termin für {buchung.name} erfolgreich auf {date_format(buchung.termin.beginn_lokal, 'SHORT_DATE_FORMAT')}, {buchung.termin.beginn_lokal:%H:%M} Uhr verschoben.",
+        )
+    except buchungs_service.BuchungsFehler as exc:
+        messages.error(request, str(exc))
+
+    return redirect("termine:buchung_detail", pk=buchung.pk)
+
+
+@mitarbeiter
 @require_POST
 def buchung_absagen(request, pk: int):
     buchung = get_object_or_404(
@@ -641,8 +716,10 @@ def buchung_absagen(request, pk: int):
         messages.info(request, "Diese Buchung war bereits beendet.")
     else:
         buchungs_service.stornieren(buchung, von="fahrschule")
-        messages.success(request, f"Buchung von {buchung.name} abgesagt, der Kunde wurde informiert.")
-    return redirect("termine:buchungen")
+        messages.success(
+            request, f"Buchung von {buchung.name} abgesagt, der Kunde wurde per E-Mail informiert."
+        )
+    return redirect(_sicheres_ziel(request, "termine:buchungen"))
 
 
 @mitarbeiter

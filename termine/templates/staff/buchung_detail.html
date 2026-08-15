@@ -1,0 +1,272 @@
+{% extends "staff/base_staff.html" %}
+{% load i18n %}
+
+{% block titel %}Buchung {{ buchung.referenz }} – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+  <div style="margin-bottom:1.25rem">
+    <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:buchungen' %}">&larr; Zurück zur Buchungsübersicht</a>
+  </div>
+
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem">
+    <h1 style="margin:0">Buchung <span style="font-family:monospace; font-size:1.1rem; color:var(--marke-dunkel)">#{{ buchung.referenz }}</span></h1>
+    <div>
+      <span class="marke-status
+        {% if buchung.status == 'bestaetigt' %}status-frei
+        {% elif buchung.status == 'offen' %}status-reserviert
+        {% else %}status-gebucht{% endif %}" style="font-size:0.95rem; padding:0.4rem 0.8rem">
+        {{ buchung.get_status_display }}
+      </span>
+    </div>
+  </div>
+
+  <div class="raster-zwei" style="gap:1.5rem">
+    <!-- Linke Spalte: Termindetails, Kundendaten & Historie -->
+    <div>
+      <!-- Termindaten -->
+      <div class="karte" style="margin-bottom:1.5rem">
+        <h2 style="margin-top:0; font-size:1.15rem; border-bottom:1px solid var(--linie); padding-bottom:0.6rem; margin-bottom:1rem">
+          📅 Termindetails
+        </h2>
+        <dl style="display:grid; grid-template-columns:140px 1fr; gap:0.6rem 1rem; margin:0; font-size:0.95rem">
+          <dt style="color:var(--text-leise); font-weight:500">Datum & Zeit:</dt>
+          <dd style="margin:0; font-weight:600">
+            {{ buchung.termin.beginn_lokal|date:"l, j. F Y" }}<br>
+            <span style="font-size:1.1rem; color:var(--text)">{{ buchung.termin.beginn_lokal|date:"H:i" }} – {{ buchung.termin.ende_lokal|date:"H:i" }} Uhr</span>
+          </dd>
+
+          <dt style="color:var(--text-leise); font-weight:500">Terminart:</dt>
+          <dd style="margin:0">
+            <strong>{{ buchung.termin.terminart.name }}</strong>
+            <span class="leer">({{ buchung.termin.terminart.dauer_minuten }} Min.)</span>
+          </dd>
+
+          <dt style="color:var(--text-leise); font-weight:500">Fahrlehrer:</dt>
+          <dd style="margin:0"><strong>{{ buchung.termin.fahrlehrer.name }}</strong></dd>
+
+          {% if buchung.termin.terminart.ort %}
+            <dt style="color:var(--text-leise); font-weight:500">Ort:</dt>
+            <dd style="margin:0">{{ buchung.termin.terminart.ort }}</dd>
+          {% endif %}
+
+          <dt style="color:var(--text-leise); font-weight:500">Erstellt am:</dt>
+          <dd style="margin:0; font-size:0.85rem; color:var(--text-leise)">
+            {{ buchung.erstellt_am|date:"SHORT_DATETIME_FORMAT" }} Uhr
+          </dd>
+
+          {% if buchung.bestaetigt_am %}
+            <dt style="color:var(--text-leise); font-weight:500">Bestätigt am:</dt>
+            <dd style="margin:0; font-size:0.85rem; color:var(--gruen-dunkel)">
+              ✓ {{ buchung.bestaetigt_am|date:"SHORT_DATETIME_FORMAT" }} Uhr
+            </dd>
+          {% endif %}
+
+          {% if buchung.storniert_am %}
+            <dt style="color:var(--text-leise); font-weight:500">Storniert am:</dt>
+            <dd style="margin:0; font-size:0.85rem; color:var(--rot)">
+              {{ buchung.storniert_am|date:"SHORT_DATETIME_FORMAT" }} Uhr (von {{ buchung.storniert_von|default:"Kunde" }})
+            </dd>
+          {% endif %}
+        </dl>
+      </div>
+
+      <!-- Kundendaten -->
+      <div class="karte" style="margin-bottom:1.5rem">
+        <h2 style="margin-top:0; font-size:1.15rem; border-bottom:1px solid var(--linie); padding-bottom:0.6rem; margin-bottom:1rem">
+          👤 Kundendaten
+        </h2>
+        <dl style="display:grid; grid-template-columns:140px 1fr; gap:0.6rem 1rem; margin:0; font-size:0.95rem">
+          <dt style="color:var(--text-leise); font-weight:500">Name:</dt>
+          <dd style="margin:0; font-size:1.05rem; font-weight:700">{{ buchung.name }}</dd>
+
+          <dt style="color:var(--text-leise); font-weight:500">E-Mail:</dt>
+          <dd style="margin:0">
+            {% if buchung.email and buchung.email != "Gelöscht" %}
+              <a href="mailto:{{ buchung.email }}" style="font-weight:600">{{ buchung.email }}</a>
+            {% else %}
+              <span class="leer">Gelöscht (DSGVO)</span>
+            {% endif %}
+          </dd>
+
+          <dt style="color:var(--text-leise); font-weight:500">Telefon:</dt>
+          <dd style="margin:0">
+            {% if buchung.telefon and buchung.telefon != "Gelöscht" %}
+              <a href="tel:{{ buchung.telefon }}" style="font-weight:600">{{ buchung.telefon }}</a>
+            {% else %}
+              <span class="leer">—</span>
+            {% endif %}
+          </dd>
+
+          <dt style="color:var(--text-leise); font-weight:500">Führerschein:</dt>
+          <dd style="margin:0">
+            {% if buchung.fuehrerscheinklasse %}
+              <span class="abzeichen" style="background:var(--flaeche-dunkler); font-weight:600; padding:2px 8px; border-radius:4px">
+                {{ buchung.get_fuehrerscheinklasse_display }}
+              </span>
+            {% else %}
+              <span class="leer">—</span>
+            {% endif %}
+          </dd>
+
+          <dt style="color:var(--text-leise); font-weight:500">Nachricht / Notiz:</dt>
+          <dd style="margin:0">
+            {% if buchung.nachricht and buchung.nachricht != "Gelöscht" %}
+              <div style="background:var(--flaeche-dunkler); padding:0.6rem 0.8rem; border-radius:6px; font-style:italic">
+                „{{ buchung.nachricht }}“
+              </div>
+            {% else %}
+              <span class="leer">—</span>
+            {% endif %}
+          </dd>
+        </dl>
+      </div>
+
+      <!-- Kundenhistorie -->
+      <div class="karte" style="margin-bottom:1.5rem">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--linie); padding-bottom:0.6rem; margin-bottom:1rem">
+          <h2 style="margin:0; font-size:1.15rem">
+            📜 Historie dieses Kunden
+          </h2>
+          <span class="leer" style="font-size:0.85rem">
+            {% if andere_buchungen %}
+              {{ andere_buchungen|length }} weitere Buchung(en)
+            {% else %}
+              Erstbucher
+            {% endif %}
+          </span>
+        </div>
+
+        {% if andere_buchungen %}
+          <div class="tabelle-huelle">
+            <table class="liste" style="font-size:0.88rem">
+              <thead>
+                <tr>
+                  <th>Termin</th>
+                  <th>Art</th>
+                  <th>Fahrlehrer</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for hist in andere_buchungen %}
+                  <tr>
+                    <td>
+                      <strong>{{ hist.termin.beginn_lokal|date:"SHORT_DATE_FORMAT" }}</strong><br>
+                      <span class="leer">{{ hist.termin.beginn_lokal|date:"H:i" }} Uhr</span>
+                    </td>
+                    <td>{{ hist.termin.terminart.name }}</td>
+                    <td>{{ hist.termin.fahrlehrer.name }}</td>
+                    <td>
+                      <span class="marke-status
+                        {% if hist.status == 'bestaetigt' %}status-frei
+                        {% elif hist.status == 'offen' %}status-reserviert
+                        {% else %}status-gebucht{% endif %}" style="font-size:0.75rem; padding:2px 6px">
+                        {{ hist.get_status_display }}
+                      </span>
+                    </td>
+                    <td style="text-align:right">
+                      <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:buchung_detail' hist.pk %}">
+                        Öffnen &rarr;
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="leer" style="margin:0; font-size:0.9rem">
+            Keine weiteren früheren oder zukünftigen Buchungen unter dieser E-Mail / Telefonnummer vorhanden.
+          </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Rechte Spalte: Aktionen (Verschieben & Stornieren) -->
+    <div>
+      {% if buchung.ist_aktiv %}
+        <!-- Termin verschieben -->
+        <div class="karte" style="margin-bottom:1.5rem; border-top:4px solid var(--marke-dunkel)">
+          <h2 style="margin-top:0; font-size:1.15rem; margin-bottom:0.5rem">
+            🔄 Termin verschieben
+          </h2>
+          <p class="leer" style="font-size:0.88rem; margin-bottom:1rem">
+            Wählen Sie einen freien Slot aus. Die Buchung wird sofort umgehängt und der Kunde erhält eine E-Mail mit der aktualisierten Kalenderdatei.
+          </p>
+
+          {% if freie_termine %}
+            <form method="post" action="{% url 'termine:buchung_verschieben' buchung.pk %}">
+              {% csrf_token %}
+              <div class="feld" style="margin-bottom:1rem">
+                <label for="neuer_termin_id" style="font-weight:600; display:block; margin-bottom:0.3rem">
+                  Neuen freien Slot wählen:
+                </label>
+                <select name="neuer_termin_id" id="neuer_termin_id" required style="width:100%; font-size:0.95rem; padding:0.5rem">
+                  <option value="">-- Bitte wählen --</option>
+                  {% for ft in freie_termine %}
+                    {% if ft.pk != buchung.termin.pk %}
+                      <option value="{{ ft.pk }}">
+                        {{ ft.beginn_lokal|date:"D, j. M Y, H:i" }}–{{ ft.ende_lokal|date:"H:i" }} Uhr — {{ ft.fahrlehrer.name }} ({{ ft.terminart.name }})
+                      </option>
+                    {% endif %}
+                  {% endfor %}
+                </select>
+              </div>
+
+              <button class="knopf knopf--primaer" type="submit" style="width:100%; justify-content:center"
+                      onclick="return confirm('Termin wirklich auf den gewählten Slot verschieben? Der Kunde wird per E-Mail benachrichtigt.');">
+                Termin jetzt verschieben
+              </button>
+            </form>
+          {% else %}
+            <p class="leer" style="font-size:0.9rem">
+              Aktuell sind keine weiteren freien Termine im System vorhanden. Bitte legen Sie zuerst in der Tagesplanung neue Termine an.
+            </p>
+            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:tagesplanung' %}">
+              Zur Tagesplanung &rarr;
+            </a>
+          {% endif %}
+        </div>
+
+        <!-- Termin absagen (Stornieren) -->
+        <div class="karte" style="border-top:4px solid var(--rot)">
+          <h2 style="margin-top:0; font-size:1.15rem; color:var(--rot); margin-bottom:0.5rem">
+            ❌ Termin absagen
+          </h2>
+          <p class="leer" style="font-size:0.88rem; margin-bottom:1rem">
+            Die Buchung wird storniert, der Termin wird wieder für andere Kunden freigegeben und der Kunde erhält automatisch eine Stornierungs-E-Mail.
+          </p>
+
+          <form method="post" action="{% url 'termine:buchung_absagen' buchung.pk %}"
+                onsubmit="return confirm('Buchung von {{ buchung.name }} wirklich absagen? Der Kunde bekommt sofort eine Stornierungs-E-Mail.');">
+            {% csrf_token %}
+            <button class="knopf knopf--gefahr" type="submit" style="width:100%; justify-content:center">
+              Buchung jetzt absagen
+            </button>
+          </form>
+        </div>
+      {% else %}
+        <div class="karte" style="background:var(--flaeche-dunkler)">
+          <h2 style="margin-top:0; font-size:1.1rem; color:var(--text-leise); margin-bottom:0.5rem">
+            ℹ️ Buchung ist nicht mehr aktiv
+          </h2>
+          <p class="leer" style="font-size:0.88rem; margin:0">
+            Diese Buchung ist bereits {{ buchung.get_status_display|lower }} und kann nicht mehr verschoben oder abgesagt werden.
+          </p>
+        </div>
+      {% endif %}
+
+      <!-- Öffentlicher Kunden-Verwaltungslink -->
+      <div class="karte" style="margin-top:1.5rem">
+        <h3 style="margin-top:0; font-size:0.95rem; margin-bottom:0.4rem">🔗 Kunden-Buchungslink</h3>
+        <p class="leer" style="font-size:0.8rem; margin-bottom:0.6rem">
+          Diesen Link hat der Kunde per E-Mail zur Verwaltung erhalten:
+        </p>
+        <a class="knopf knopf--leise knopf--klein" href="{{ buchung.verwaltungs_url }}" target="_blank" rel="noopener">
+          Öffentliche Buchungsansicht &rarr;
+        </a>
+      </div>
+    </div>
+  </div>
+{% endblock %}

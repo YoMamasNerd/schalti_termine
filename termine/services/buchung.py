@@ -163,6 +163,80 @@ def stornieren(buchung: Buchung, *, von: str = "kunde", benachrichtigen: bool = 
     return buchung
 
 
+@transaction.atomic
+def verschieben(
+    buchung: Buchung,
+    neuer_termin_id: int,
+    *,
+    benachrichtigen: bool = True,
+) -> Buchung:
+    """Verschiebt eine bestehende Buchung auf einen anderen freien Termin."""
+    buchung = (
+        Buchung.objects.select_for_update()
+        .select_related("termin", "termin__fahrlehrer", "termin__terminart")
+        .get(pk=buchung.pk)
+    )
+
+    if not buchung.ist_aktiv:
+        raise BuchungsFehler("Nur aktive Buchungen können verschoben werden.")
+
+    alter_termin = buchung.termin
+    alter_beginn = timezone.localtime(alter_termin.beginn)
+
+    try:
+        neuer_termin = (
+            Termin.objects.select_for_update()
+            .select_related("fahrlehrer", "terminart")
+            .get(pk=neuer_termin_id)
+        )
+    except Termin.DoesNotExist as exc:
+        raise TerminNichtVerfuegbar("Der gewählte Ziel-Termin existiert nicht.") from exc
+
+    if neuer_termin.pk == alter_termin.pk:
+        return buchung
+
+    if neuer_termin.status != Termin.Status.FREI:
+        raise TerminNichtVerfuegbar("Der gewählte Ziel-Termin ist nicht mehr frei.")
+
+    # Alter Termin wird wieder frei, falls er noch in der Zukunft liegt
+    if alter_termin.beginn > timezone.now():
+        Termin.objects.filter(pk=alter_termin.pk).update(status=Termin.Status.FREI)
+        alter_termin.status = Termin.Status.FREI
+
+    # Neuer Termin wird belegt
+    neuer_status = (
+        Termin.Status.GEBUCHT
+        if buchung.status == Buchung.Status.BESTAETIGT
+        else Termin.Status.RESERVIERT
+    )
+    Termin.objects.filter(pk=neuer_termin.pk).update(status=neuer_status)
+    neuer_termin.status = neuer_status
+
+    # Bei FSM-Sync: Altes FSM-Event stornieren und auf neuem Termin eintragen
+    war_bestaetigt = buchung.status == Buchung.Status.BESTAETIGT
+    if war_bestaetigt:
+        fsm_sync.storniere_in_fsm(buchung)
+
+    buchung.termin = neuer_termin
+    buchung.save(update_fields=["termin"])
+
+    if war_bestaetigt:
+        def _nach_verschieben():
+            if benachrichtigen:
+                mail.buchung_verschoben_kunde(buchung, alter_beginn)
+            fsm_sync.buche_in_fsm(buchung)
+
+        transaction.on_commit(_nach_verschieben)
+
+    logger.info(
+        "Buchung %s verschoben von %s auf %s",
+        buchung.referenz,
+        alter_beginn,
+        neuer_termin.beginn,
+    )
+    return buchung
+
+
 def abgelaufene_reservierungen_freigeben() -> int:
     """Gibt Termine frei, deren Bestätigungslink nicht rechtzeitig geklickt wurde."""
     jetzt = timezone.now()
