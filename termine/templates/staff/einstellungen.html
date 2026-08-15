@@ -3,7 +3,25 @@
 {% block titel %}Einstellungen – {{ SITE_NAME }}{% endblock %}
 
 {% block inhalt %}
-  <h1>Einstellungen</h1>
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem">
+    <h1 style="margin:0">Einstellungen</h1>
+
+    {% if alle_fahrlehrer.count > 1 %}
+      <form method="get" style="margin:0">
+        <div style="display:flex; align-items:center; gap:0.5rem">
+          <label for="fahrlehrer" style="font-weight:600; font-size:0.9rem; color:var(--text-leise)">Fahrlehrer:</label>
+          <select name="fahrlehrer" id="fahrlehrer" style="width:auto; padding:0.35rem 0.6rem; font-size:0.9rem" onchange="this.form.submit()">
+            {% for person in alle_fahrlehrer %}
+              <option value="{{ person.slug }}" {% if person.pk == fahrlehrer.pk %}selected{% endif %}>
+                {{ person.name }}{% if not person.aktiv %} (inaktiv){% endif %}
+              </option>
+            {% endfor %}
+          </select>
+          <noscript><button class="knopf knopf--klein" type="submit">Wechseln</button></noscript>
+        </div>
+      </form>
+    {% endif %}
+  </div>
 
   {% if not fahrlehrer %}
     <div class="karte">
@@ -19,102 +37,182 @@
     </div>
   {% else %}
 
-    {% if alle_fahrlehrer.count > 1 %}
-      <form class="karte" method="get" style="margin-bottom:1rem">
-        <div class="knopfreihe">
-          <label for="fahrlehrer" style="font-weight:600">Fahrlehrer</label>
-          <select name="fahrlehrer" id="fahrlehrer" style="width:auto" onchange="this.form.submit()">
-            {% for person in alle_fahrlehrer %}
-              <option value="{{ person.slug }}" {% if person.pk == fahrlehrer.pk %}selected{% endif %}>
-                {{ person.name }}{% if not person.aktiv %} (inaktiv){% endif %}
-              </option>
-            {% endfor %}
-          </select>
-          <noscript><button class="knopf knopf--klein" type="submit">Wechseln</button></noscript>
-        </div>
-      </form>
-    {% endif %}
+    {# --- Tab Leiste --- #}
+    <div class="einstellungen-tabs" style="display:flex; gap:0.4rem; border-bottom:2px solid var(--linie); margin-bottom:1.5rem; overflow-x:auto; padding-bottom:2px;">
+      <button type="button" class="tab-schalter active" data-tab="tab-profil">
+        👤 Fahrlehrer &amp; Profil
+      </button>
+      <button type="button" class="tab-schalter" data-tab="tab-buchung">
+        🌐 Globale Buchungsregeln
+      </button>
+      <button type="button" class="tab-schalter" data-tab="tab-urlaube">
+        🏖️ Urlaube &amp; Sperrzeiten
+        {% if sperrzeiten %}<span class="tab-badge">{{ sperrzeiten.count }}</span>{% endif %}
+      </button>
+      <button type="button" class="tab-schalter" data-tab="tab-system">
+        ⚙️ Schnittstellen &amp; System
+      </button>
+    </div>
 
-    <div class="raster-zwei">
-      <form class="karte" method="post"
-            action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}" novalidate>
-        {% csrf_token %}
-        <h2>{{ fahrlehrer.name }}</h2>
-        {% if form.non_field_errors %}
-          <div class="hinweis hinweis--fehler">{{ form.non_field_errors }}</div>
-        {% endif %}
+    {# --- TAB 1: Fahrlehrer & Profil --- #}
+    <div id="tab-profil" class="tab-inhalt">
+      <div class="raster-zwei">
+        <form class="karte" method="post"
+              action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}" novalidate>
+          {% csrf_token %}
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+            <h2 style="margin:0">{{ fahrlehrer.name }}</h2>
+            {% if fahrlehrer.aktiv %}
+              <span class="status status--gebucht" style="font-size:0.8rem">Aktiv</span>
+            {% else %}
+              <span class="status status--entfallen" style="font-size:0.8rem">Inaktiv</span>
+            {% endif %}
+          </div>
 
-        {% for feld in form %}
-          {% include "termine/_feld.html" with feld=feld %}
-        {% endfor %}
+          {% if form.non_field_errors %}
+            <div class="hinweis hinweis--fehler">{{ form.non_field_errors }}</div>
+          {% endif %}
 
-        <div class="knopfreihe">
-          <button class="knopf" type="submit">Speichern</button>
-        </div>
-      </form>
+          {% for feld in form %}
+            {% include "termine/_feld.html" with feld=feld %}
+          {% endfor %}
 
-      <div>
-        <div class="karte">
-          <h2>Buchungsfenster (Global)</h2>
-          <p class="leer">
-            Gilt fahrschulweit für alle Fahrlehrer: Mindest-Vorlauf und Planungshorizont bilden das Fenster, in dem Kunden buchen können.
-          </p>
+          <div class="knopfreihe" style="margin-top:1.5rem">
+            <button class="knopf" type="submit">Änderungen speichern</button>
+          </div>
+        </form>
+
+        <div>
+          <div class="karte">
+            <h2>📅 Persönliches Kalender-Abo</h2>
+            <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+              Tragen Sie diese Webcal-Adresse in Ihrer Kalender-App (Apple Kalender, Google Kalender, Outlook) als Kalender-Abonnement ein. Neue Buchungen und Stornierungen erscheinen dort automatisch.
+            </p>
+            <pre class="befehl" style="word-break:break-all; white-space:pre-wrap; font-size:0.85rem"><code>{{ fahrlehrer.feed_url }}</code></pre>
+            <form method="post"
+                  action="{% url 'termine:feed_token_neu' %}?fahrlehrer={{ fahrlehrer.slug }}"
+                  onsubmit="return confirm('Neue Abo-Adresse erzeugen? Das bisherige Abo hört danach auf zu funktionieren.');">
+              {% csrf_token %}
+              <button class="knopf knopf--leise knopf--klein" type="submit">
+                Neue Abo-Adresse generieren
+              </button>
+            </form>
+          </div>
+
           {% if ist_inhaber %}
-            <form method="post" action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}" novalidate style="margin-top:0.8rem">
+            <div class="karte" style="margin-top:1rem">
+              <h2>Team-Verwaltung</h2>
+              <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+                Weitere Fahrlehrer anlegen oder bestehende Zugänge verwalten.
+              </p>
+              <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:fahrlehrer_neu' %}">
+                + Neuen Fahrlehrer anlegen
+              </a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# --- TAB 2: Globale Buchungsregeln --- #}
+    <div id="tab-buchung" class="tab-inhalt" style="display:none">
+      <div class="raster-zwei">
+        <div class="karte">
+          <h2>🌐 Buchungsfenster (Fahrschulweit)</h2>
+          <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+            Gilt zentral für alle Fahrlehrer: Mindest-Vorlauf und Planungshorizont bestimmen das Buchungsfenster für Kunden auf der Webseite.
+          </p>
+
+          {% if ist_inhaber %}
+            <form method="post" action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}" novalidate>
               {% csrf_token %}
               <input type="hidden" name="form_art" value="global">
               {% for feld in globale_form %}
                 {% include "termine/_feld.html" with feld=feld %}
               {% endfor %}
-              <div class="knopfreihe" style="margin-top:0.8rem">
-                <button class="knopf knopf--klein" type="submit">Buchungsfenster speichern</button>
+              <div class="knopfreihe" style="margin-top:1.2rem">
+                <button class="knopf" type="submit">Buchungsfenster speichern</button>
               </div>
             </form>
           {% else %}
-            <dl style="font-size:0.9rem">
-              <dt><strong>Mindest-Vorlauf: {{ globale_einstellungen.vorlauf_stunden }} Stunden</strong></dt>
-              <dd style="margin:0 0 0.7rem">
-                So kurzfristig wird nichts mehr angeboten.
+            <dl style="font-size:0.95rem; line-height:1.6">
+              <dt><strong>Mindest-Vorlauf:</strong> {{ globale_einstellungen.vorlauf_stunden }} Stunden</dt>
+              <dd style="margin:0 0 0.8rem; color:var(--text-leise)">
+                So kurzfristig wird online kein Termin mehr angeboten.
               </dd>
-              <dt><strong>Planungshorizont: {{ globale_einstellungen.horizont_wochen }} Wochen</strong></dt>
-              <dd style="margin:0">
-                Gebucht werden kann bis einschließlich <strong>{{ buchbar_bis|date:"SHORT_DATE_FORMAT" }}</strong>.
+              <dt><strong>Planungshorizont:</strong> {{ globale_einstellungen.horizont_wochen }} Wochen</dt>
+              <dd style="margin:0; color:var(--text-leise)">
+                Kunden können Termine bis einschließlich <strong>{{ buchbar_bis|date:"SHORT_DATE_FORMAT" }}</strong> buchen.
               </dd>
             </dl>
           {% endif %}
         </div>
 
         <div class="karte">
-          <h2>Kalender-Abo</h2>
-          <p class="leer">
-            Diese Adresse im Kalenderprogramm als Abo eintragen – dort erscheinen
-            dann alle gebuchten Termine. Wer die Adresse kennt, sieht sie alle,
-            also nicht weitergeben.
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem">
+            <h2 style="margin:0">📋 Terminarten</h2>
+            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:terminarten' %}">
+              Verwalten &rarr;
+            </a>
+          </div>
+          <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+            Definieren Sie, welche Beratungstermine und Längen für Interessenten zur Auswahl stehen.
           </p>
-          <pre class="befehl"><code>{{ fahrlehrer.feed_url }}</code></pre>
-          <form method="post"
-                action="{% url 'termine:feed_token_neu' %}?fahrlehrer={{ fahrlehrer.slug }}"
-                onsubmit="return confirm('Neue Abo-Adresse erzeugen? Das bisherige Abo hört danach auf zu funktionieren.');">
-            {% csrf_token %}
-            <button class="knopf knopf--leise knopf--klein" type="submit">
-              Neue Abo-Adresse erzeugen
-            </button>
-          </form>
-        </div>
 
+          <div class="tabelle-huelle">
+            <table class="liste">
+              <thead><tr><th>Terminart</th><th>Dauer</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for art in terminarten %}
+                  <tr>
+                    <td><strong>{{ art.name }}</strong></td>
+                    <td>{{ art.dauer_minuten }} Min.</td>
+                    <td>
+                      {% if art.aktiv %}
+                        <span class="status status--gebucht" style="font-size:0.75rem">Aktiv</span>
+                      {% else %}
+                        <span class="status status--entfallen" style="font-size:0.75rem">Inaktiv</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="3" class="leer">Noch keine Terminart angelegt.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <p class="knopfreihe" style="margin-top:1rem">
+            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:terminart_neu' %}">
+              + Neue Terminart anlegen
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    {# --- TAB 3: Urlaube & Sperrzeiten --- #}
+    <div id="tab-urlaube" class="tab-inhalt" style="display:none">
+      <div class="raster-zwei">
         <div class="karte">
-          <h2>Sperrzeiten & Urlaube</h2>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+            <h2 style="margin:0">🏖️ Urlaube &amp; Abwesenheiten</h2>
+            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:tagesplanung' %}?fahrlehrer={{ fahrlehrer.slug }}">
+              + Urlaub eintragen
+            </a>
+          </div>
+
           {% if sperrzeiten %}
-            <p class="leer">Kommende Urlaube und manuelle Abwesenheiten von {{ fahrlehrer.name }}.</p>
+            <p class="leer">Geplante Urlaube und manuelle Abwesenheiten von <strong>{{ fahrlehrer.name }}</strong>:</p>
             <div class="tabelle-huelle">
               <table class="liste">
                 <thead><tr><th>Zeitraum</th><th>Grund</th><th></th></tr></thead>
                 <tbody>
                   {% for sperre in sperrzeiten %}
                     <tr>
-                      <td>{{ sperre.beginn|date:"SHORT_DATE_FORMAT" }} – {{ sperre.ende|date:"SHORT_DATE_FORMAT" }}</td>
+                      <td><strong>{{ sperre.beginn|date:"SHORT_DATE_FORMAT" }} – {{ sperre.ende|date:"SHORT_DATE_FORMAT" }}</strong></td>
                       <td>{{ sperre.grund|default:"Urlaub" }}</td>
-                      <td>
+                      <td style="text-align:right">
                         <form method="post"
                               action="{% url 'termine:sperrzeit_loeschen' sperre.pk %}?fahrlehrer={{ fahrlehrer.slug }}"
                               onsubmit="return confirm('Sperrzeit wirklich aufheben?');">
@@ -128,78 +226,155 @@
               </table>
             </div>
           {% else %}
-            <p class="leer">Keine manuellen Urlaube eingetragen.</p>
+            <div style="padding:1.5rem; text-align:center; background:var(--grund-leise); border-radius:6px; margin-bottom:1rem">
+              <p class="leer" style="margin:0">Keine anstehenden Urlaube für {{ fahrlehrer.name }} hinterlegt.</p>
+            </div>
           {% endif %}
+        </div>
 
+        <div>
           {% if fsm_sperren_count %}
-            <div style="margin-top:1rem; padding:0.7rem 0.9rem; background:color-mix(in srgb, #3b82f6 8%, var(--grund)); border-left:3px solid #3b82f6; border-radius:4px; font-size:0.88rem">
-              <strong>{{ fsm_sperren_count }} FSM-Fahrstunden &amp; Termine synchronisiert.</strong>
-              <p style="margin:0.3rem 0 0.5rem; color:var(--text-leise); font-size:0.8rem">
-                Fahrstunden aus FSM blockieren automatisch die Beratungszeitfenster und werden direkt im Kalender dargestellt.
+            <div class="karte" style="border-left:4px solid #3b82f6">
+              <h2 style="color:#2563eb">🚗 FSM-Fahrstunden synchronisiert</h2>
+              <p style="margin:0.5rem 0 1rem; line-height:1.55">
+                Aktuell sind <strong>{{ fsm_sperren_count }}</strong> Fahrstunden und Prüfungen aus dem Fahrschulmanager für {{ fahrlehrer.name }} hinterlegt.
+              </p>
+              <p class="leer" style="font-size:0.88rem; margin-bottom:1rem">
+                Diese Fahrstunden blockieren automatisch alle kollidierenden Beratungszeitfenster im Online-Kalender.
               </p>
               <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:tagesplanung' %}?fahrlehrer={{ fahrlehrer.slug }}">
-                Im Wochenkalender anzeigen &rarr;
+                Im Wochenkalender ansehen &rarr;
               </a>
             </div>
           {% endif %}
 
-          <p class="knopfreihe" style="margin-top:1rem">
-            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:tagesplanung' %}?fahrlehrer={{ fahrlehrer.slug }}">
-              Urlaub eintragen
-            </a>
-          </p>
+          <div class="karte" style="{% if fsm_sperren_count %}margin-top:1rem{% endif %}">
+            <h2>Feiertage</h2>
+            <p class="leer" style="margin:0 0 0.8rem; line-height:1.55">
+              Gesetzliche Feiertage für das Bundesland <strong>{{ fahrlehrer.get_bundesland_display }}</strong> werden bei Rhythmus-Regeln automatisch berücksichtigt und freigehalten.
+            </p>
+            <p style="margin:0; font-size:0.88rem; color:var(--text-leise)">
+              Das Bundesland kann im Reiter <em>„Fahrlehrer &amp; Profil“</em> geändert werden.
+            </p>
+          </div>
         </div>
+      </div>
+    </div>
 
-        <div class="karte">
-          <h2>Terminarten</h2>
-          <p class="leer">Was gebucht werden kann – gilt für die ganze Fahrschule.</p>
-          <ul>
-            {% for art in terminarten %}
-              <li>
-                {{ art.name }} – {{ art.dauer_minuten }} Min.{% if not art.aktiv %} <span class="leer">(inaktiv)</span>{% endif %}
-              </li>
-            {% empty %}
-              <li class="leer">Noch keine Terminart angelegt.</li>
-            {% endfor %}
-          </ul>
-          <p class="knopfreihe">
-            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:terminarten' %}">
-              Terminarten verwalten
-            </a>
-          </p>
-        </div>
-
+    {# --- TAB 4: Schnittstellen & System --- #}
+    <div id="tab-system" class="tab-inhalt" style="display:none">
+      <div class="raster-zwei">
         {% if FSM_SYNC_ENABLED %}
           <div class="karte">
-            <h2>Fahrschulmanager (FSM)</h2>
-            <p class="leer">
-              Kalender-Synchronisation und Vorab-Blockierung mit dem Fahrschulmanager.
+            <h2>🔌 Fahrschulmanager (FSM)</h2>
+            <p class="leer" style="line-height:1.55; margin-bottom:1rem">
+              Verknüpft die Online-Terminbuchung direkt mit dem Fahrschulmanager. Synchronisiert Fahrlehrer, blockiert Zeiten automatisch und trägt gebuchte Beratungstermine direkt in den Kalender ein.
             </p>
-            <p class="knopfreihe">
-              <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:fsm_einstellungen' %}">
-                FSM-Verknüpfung verwalten
+            <div class="knopfreihe">
+              <a class="knopf" href="{% url 'termine:fsm_einstellungen' %}">
+                FSM-Verknüpfung &amp; Sync verwalten &rarr;
               </a>
-            </p>
+            </div>
           </div>
         {% endif %}
 
         {% if ist_inhaber %}
           <div class="karte">
-            <h2>Fahrschule</h2>
-            <p class="leer">
-              Ein weiterer Fahrlehrer bekommt einen eigenen Kalender, eigene
-              Regeln und ein eigenes Abo. Den Zugang dazu vergibt die
-              Benutzerverwaltung im Django-Admin.
+            <h2>👥 Team &amp; Zugangsrechte</h2>
+            <p class="leer" style="line-height:1.55; margin-bottom:1rem">
+              Jeder Fahrlehrer erhält einen eigenen Login, eigene Regeln und ein eigenes Kalender-Abo. Neue Benutzerkonten und detaillierte Berechtigungen werden über den Administrationsbereich vergeben.
             </p>
-            <p class="knopfreihe">
+            <div class="knopfreihe">
               <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:fahrlehrer_neu' %}">
-                Fahrlehrer anlegen
+                + Neuen Fahrlehrer anlegen
               </a>
-              <a class="knopf knopf--leise knopf--klein" href="/django-admin/">Stammdaten im Admin</a>
-            </p>
+              <a class="knopf knopf--leise knopf--klein" href="/django-admin/">
+                Stammdaten &amp; Benutzer (Admin)
+              </a>
+            </div>
           </div>
         {% endif %}
       </div>
     </div>
+
+    <style>
+      .tab-schalter {
+        background: transparent;
+        border: none;
+        border-bottom: 3px solid transparent;
+        padding: 0.7rem 1.1rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text-leise);
+        cursor: pointer;
+        transition: color 0.15s, border-color 0.15s;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+      .tab-schalter:hover {
+        color: var(--text);
+      }
+      .tab-schalter.active {
+        color: var(--primaer);
+        border-bottom-color: var(--primaer);
+      }
+      .tab-badge {
+        font-size: 0.75rem;
+        background: var(--grund-leise);
+        color: var(--text);
+        padding: 0.1rem 0.45rem;
+        border-radius: 999px;
+        font-weight: 700;
+      }
+      .tab-schalter.active .tab-badge {
+        background: var(--primaer);
+        color: #ffffff;
+      }
+    </style>
+
+    <script>
+      (function() {
+        const schalter = document.querySelectorAll('.tab-schalter');
+        const inhalte = document.querySelectorAll('.tab-inhalt');
+
+        function aktiviereTab(tabId) {
+          if (!tabId || !document.getElementById(tabId)) {
+            tabId = 'tab-profil';
+          }
+          schalter.forEach(btn => {
+            if (btn.getAttribute('data-tab') === tabId) {
+              btn.classList.add('active');
+            } else {
+              btn.classList.remove('active');
+            }
+          });
+          inhalte.forEach(inhalt => {
+            if (inhalt.id === tabId) {
+              inhalt.style.display = 'block';
+            } else {
+              inhalt.style.display = 'none';
+            }
+          });
+        }
+
+        schalter.forEach(btn => {
+          btn.addEventListener('click', () => {
+            const tabId = btn.getAttribute('data-tab');
+            aktiviereTab(tabId);
+            window.location.hash = tabId;
+          });
+        });
+
+        // Hash aus URL lesen
+        if (window.location.hash) {
+          const hashId = window.location.hash.replace('#', '');
+          if (document.getElementById(hashId)) {
+            aktiviereTab(hashId);
+          }
+        }
+      })();
+    </script>
   {% endif %}
 {% endblock %}
