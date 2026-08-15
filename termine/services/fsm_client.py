@@ -93,8 +93,8 @@ class FsmClient:
 
     def auto_login(self, email: str | None = None, password: str | None = None) -> str:
         """Führt einen vollautomatischen OAuth2-Login gegen FSM durch."""
-        email = email or getattr(settings, "FSM_EMAIL", "")
-        password = password or getattr(settings, "FSM_PASSWORD", "")
+        email = (email or getattr(settings, "FSM_EMAIL", "")).strip().strip("'\"")
+        password = (password or getattr(settings, "FSM_PASSWORD", "")).strip().strip("'\"")
 
         if not email or not password:
             raise FsmConfigError("FSM_EMAIL und FSM_PASSWORD sind nicht konfiguriert.")
@@ -172,8 +172,12 @@ class FsmClient:
             post_resp = opener.open(post_req, timeout=self.timeout)
             callback_path = json.loads(post_resp.read().decode("utf-8"))
             callback_url = urllib.parse.urljoin("https://login.fahren-lernen.de", callback_path)
+        except urllib.error.HTTPError as exc:
+            err_body = exc.read().decode("utf-8", errors="ignore").strip().strip('"')
+            logger.warning("FSM Login fehlgeschlagen: %s (%s)", err_body, exc.code)
+            raise FsmAuthError(f"FSM Login fehlgeschlagen: {err_body}") from exc
         except Exception as exc:
-            raise FsmAuthError(f"FSM Login fehlgeschlagen (Zugangsdaten falsch?): {exc}") from exc
+            raise FsmAuthError(f"FSM Login fehlgeschlagen: {exc}") from exc
 
         # 3. Callback
         class NoRedirect(urllib.request.HTTPRedirectHandler):
