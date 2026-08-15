@@ -28,75 +28,81 @@
   <div class="woche">
     {% for tag in tage %}
       <div class="wochentag{% if tag.ist_heute %} wochentag--heute{% endif %}{% if tag.ist_vergangen %} wochentag--vergangen{% endif %}{% if tag.feiertag %} wochentag--feiertag{% endif %}">
-        <h3>
-          {{ tag.kurz }}
-          <small>{{ tag.label }}</small>
-        </h3>
-        {% if tag.feiertag %}<div class="feiertag-name">{{ tag.feiertag }}</div>{% endif %}
+        <div class="wochentag-kopf">
+          <h3>
+            {{ tag.kurz }}
+            <small>{{ tag.label }}</small>
+          </h3>
+          {% if tag.feiertag %}<div class="feiertag-name">{{ tag.feiertag }}</div>{% endif %}
+        </div>
 
-        {% for eintrag in tag.eintraege %}
-          {% if eintrag.art == "termin" %}
-            <div class="plan-slot plan-slot--{{ eintrag.status }}" title="{{ eintrag.titel }}{% if eintrag.detail %}: {{ eintrag.detail }}{% endif %}">
-              <span>
-                {{ eintrag.beginn_uhrzeit }}
-                {% if eintrag.status == "gebucht" %}
-                  <span class="name">
-                    {% if eintrag.buchung %}
-                      <a href="{% url 'termine:buchung_detail' eintrag.buchung.pk %}" style="text-decoration:underline"><strong>{{ eintrag.detail }}</strong></a>
-                    {% else %}
-                      <strong>{{ eintrag.detail }}</strong>
-                    {% endif %}
-                  </span>
-                {% elif eintrag.status == "reserviert" %}
-                  <span class="name">
-                    {% if eintrag.buchung %}
-                      <a href="{% url 'termine:buchung_detail' eintrag.buchung.pk %}">Reserviert</a>
-                    {% else %}
-                      Reserviert
-                    {% endif %}
-                  </span>
-                {% else %}
-                  <span class="name">{{ eintrag.titel }} (frei)</span>
+        <div class="wochentag-body">
+          {% for eintrag in tag.eintraege %}
+            {% if eintrag.art == "termin" %}
+              <div class="plan-slot plan-slot--{{ eintrag.status }}" title="{{ eintrag.titel }}{% if eintrag.detail %}: {{ eintrag.detail }}{% endif %}">
+                <span>
+                  {{ eintrag.beginn_uhrzeit }}
+                  {% if eintrag.status == "gebucht" %}
+                    <span class="name">
+                      {% if eintrag.buchung %}
+                        <a href="{% url 'termine:buchung_detail' eintrag.buchung.pk %}" style="text-decoration:underline"><strong>{{ eintrag.detail }}</strong></a>
+                      {% else %}
+                        <strong>{{ eintrag.detail }}</strong>
+                      {% endif %}
+                    </span>
+                  {% elif eintrag.status == "reserviert" %}
+                    <span class="name">
+                      {% if eintrag.buchung %}
+                        <a href="{% url 'termine:buchung_detail' eintrag.buchung.pk %}">Reserviert</a>
+                      {% else %}
+                        Reserviert
+                      {% endif %}
+                    </span>
+                  {% else %}
+                    <span class="name">{{ eintrag.titel }} (frei)</span>
+                  {% endif %}
+                </span>
+                {% if eintrag.status == "frei" %}
+                  <form method="post" action="{% url 'termine:termin_loeschen' eintrag.termin.pk %}" style="display:inline">
+                    {% csrf_token %}
+                    <button class="weg" type="submit" title="Termin löschen" aria-label="Termin löschen">&times;</button>
+                  </form>
                 {% endif %}
-              </span>
-              {% if eintrag.status == "frei" %}
-                <form method="post" action="{% url 'termine:termin_loeschen' eintrag.termin.pk %}" style="display:inline">
-                  {% csrf_token %}
-                  <button class="weg" type="submit" title="Termin löschen" aria-label="Termin löschen">&times;</button>
-                </form>
-              {% endif %}
-            </div>
+              </div>
+            {% else %}
+              <div class="plan-slot plan-slot--sperre {% if eintrag.ist_fsm %}plan-slot--sperre-fsm{% else %}plan-slot--sperre-urlaub{% endif %}"
+                   title="{{ eintrag.titel }}">
+                <span>
+                  {% if eintrag.ist_ganztaegig %}
+                    <span class="badge-ganztaegig">Urlaub</span>
+                  {% else %}
+                    {% if eintrag.ist_fsm %}<span class="badge-fsm">FSM</span>{% endif %}
+                    {{ eintrag.beginn_uhrzeit }}–{{ eintrag.ende_uhrzeit }}
+                  {% endif %}
+                  <span class="name">{{ eintrag.titel|truncatechars:28 }}</span>
+                </span>
+                {% if not eintrag.ist_fsm %}
+                  <form method="post" action="{% url 'termine:sperrzeit_loeschen' eintrag.sperre.pk %}"
+                        style="display:inline"
+                        onsubmit="return confirm('Sperrzeit wirklich aufheben?');">
+                    {% csrf_token %}
+                    <button class="weg" type="submit" title="Sperrzeit aufheben" aria-label="Sperrzeit aufheben">&times;</button>
+                  </form>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% empty %}
+            <p class="leer" style="margin:0.5rem 0">nichts geplant</p>
+          {% endfor %}
+        </div>
+
+        <div class="wochentag-fuss">
+          {% if tag.frei or tag.gebucht or tag.sperren_count %}
+            <span>{{ tag.frei }} frei, {{ tag.gebucht }} gebucht{% if tag.sperren_count %}, {{ tag.sperren_count }} Sperre{{ tag.sperren_count|pluralize:"n" }}{% endif %}</span>
           {% else %}
-            <div class="plan-slot plan-slot--sperre {% if eintrag.ist_fsm %}plan-slot--sperre-fsm{% else %}plan-slot--sperre-urlaub{% endif %}"
-                 title="{{ eintrag.titel }}">
-              <span>
-                {% if eintrag.ist_ganztaegig %}
-                  <span class="badge-ganztaegig">Urlaub</span>
-                {% else %}
-                  {% if eintrag.ist_fsm %}<span class="badge-fsm">FSM</span>{% endif %}
-                  {{ eintrag.beginn_uhrzeit }}–{{ eintrag.ende_uhrzeit }}
-                {% endif %}
-                <span class="name">{{ eintrag.titel|truncatechars:28 }}</span>
-              </span>
-              {% if not eintrag.ist_fsm %}
-                <form method="post" action="{% url 'termine:sperrzeit_loeschen' eintrag.sperre.pk %}"
-                      style="display:inline"
-                      onsubmit="return confirm('Sperrzeit wirklich aufheben?');">
-                  {% csrf_token %}
-                  <button class="weg" type="submit" title="Sperrzeit aufheben" aria-label="Sperrzeit aufheben">&times;</button>
-                </form>
-              {% endif %}
-            </div>
+            <span>0 frei, 0 gebucht</span>
           {% endif %}
-        {% empty %}
-          <p class="leer">nichts geplant</p>
-        {% endfor %}
-
-        {% if tag.eintraege %}
-          <p class="leer" style="margin:0.4rem 0 0;font-size:0.75rem">
-            {{ tag.frei }} frei, {{ tag.gebucht }} gebucht{% if tag.sperren_count %}, {{ tag.sperren_count }} Sperren{% endif %}
-          </p>
-        {% endif %}
+        </div>
       </div>
     {% endfor %}
   </div>

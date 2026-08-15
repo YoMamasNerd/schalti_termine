@@ -504,7 +504,8 @@ table.liste tr:last-child td { border-bottom: none; }
 
 .wochentag {
   border: 1px solid var(--linie); border-radius: var(--radius-klein);
-  background: var(--flaeche); padding: 0.5rem; min-height: 110px;
+  background: var(--flaeche); padding: 0.55rem; min-height: 140px;
+  display: flex; flex-direction: column;
 }
 .wochentag--heute { border-color: var(--gruen); border-width: 2px; }
 .wochentag--vergangen { opacity: 0.55; }
@@ -512,6 +513,15 @@ table.liste tr:last-child td { border-bottom: none; }
 .wochentag h3 { font-size: 0.82rem; margin-bottom: 0.4rem; }
 .wochentag h3 small { display: block; font-weight: 400; color: var(--text-leise); }
 .wochentag .feiertag-name { font-size: 0.72rem; color: var(--rot); margin-bottom: 0.3rem; }
+.wochentag-body { flex: 1 1 auto; display: flex; flex-direction: column; }
+.wochentag-fuss {
+  margin-top: auto;
+  padding-top: 0.45rem;
+  border-top: 1px solid color-mix(in srgb, var(--linie) 65%, transparent);
+  font-size: 0.72rem;
+  color: var(--text-leise);
+  line-height: 1.35;
+}
 
 .plan-slot {
   display: flex; align-items: center; justify-content: space-between; gap: 0.3rem;
