@@ -302,6 +302,14 @@ def generiere_termine(
         Termin.objects.bulk_create(neue, ignore_conflicts=True)
         bericht.erstellt = max(im_fenster.count() - vorher, 0)
 
+        if getattr(settings, "FSM_SYNC_ENABLED", False) and fahrlehrer.fsm_sync_aktiv and fahrlehrer.fsm_id:
+            from . import fsm_sync
+
+            def _sync_generierte():
+                fsm_sync.sync_fahrlehrer_termine(fahrlehrer)
+
+            transaction.on_commit(_sync_generierte)
+
     logger.info("Terminplanung %s (%s bis %s): %s", fahrlehrer, von, bis, bericht.als_text())
     return bericht
 
@@ -389,4 +397,12 @@ def termine_manuell_anlegen(
 
     if neue:
         Termin.objects.bulk_create(neue, ignore_conflicts=True)
+        if getattr(settings, "FSM_SYNC_ENABLED", False) and fahrlehrer.fsm_sync_aktiv and fahrlehrer.fsm_id:
+            from . import fsm_sync
+
+            def _sync_manuelle():
+                fsm_sync.sync_fahrlehrer_termine(fahrlehrer)
+
+            transaction.on_commit(_sync_manuelle)
+
     return neue, uebersprungen + vergangen
