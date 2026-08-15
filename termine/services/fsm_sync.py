@@ -382,11 +382,23 @@ def sync_fahrlehrer_termine(
     return count
 
 
+def is_theorie_termin(terminart: str, titel: str) -> bool:
+    """Erkennt, ob ein FSM-Termin ein Theorieunterricht ist."""
+    art = (terminart or "").strip().upper()
+    tit = (titel or "").strip().lower()
+    if art in ("PT", "TH", "THEORIE"):
+        return True
+    if any(kw in tit for kw in ("theorie", "th-grundstoff", "th-zusatzstoff", "grundstoff", "zusatzstoff")):
+        return True
+    return False
+
+
 def sync_blocker_fuer_fahrlehrer(
     fahrlehrer: Fahrlehrer,
     tage_voraus: int | None = None,
     client: FsmClient | None = None,
-) -> int:
+    return_theorie: bool = False,
+) -> int | tuple[int, list[tuple[str, dt.datetime, dt.datetime, str, Fahrlehrer]]]:
     """Führt den bidirektionalen Abgleich für einen Fahrlehrer durch:
 
     1. Liest Termine und Fahrstunden aus FSM aus.
@@ -396,7 +408,7 @@ def sync_blocker_fuer_fahrlehrer(
        in Schalti Termine ebenfalls entfernt.
     """
     if not is_fsm_aktiv_fuer_fahrlehrer(fahrlehrer):
-        return 0
+        return (0, []) if return_theorie else 0
 
     from ..models import FahrschulEinstellungen
 
@@ -415,7 +427,7 @@ def sync_blocker_fuer_fahrlehrer(
             fahrlehrer.pk,
             exc,
         )
-        return 0
+        return (0, []) if return_theorie else 0
 
     fsm_termin_dict = {t.id: t for t in fsm_termine if t.id}
 
@@ -472,6 +484,7 @@ def sync_blocker_fuer_fahrlehrer(
         eigene_fsm_ids.update(created_ids)
 
     gueltige_fsm_sperren: set[str] = set()
+    theorie_termine: list[tuple[str, dt.datetime, dt.datetime, str, Fahrlehrer]] = []
 
     # 2. Fremde FSM-Events als Sperrzeiten hinterlegen
     from django.utils.html import strip_tags
@@ -488,6 +501,7 @@ def sync_blocker_fuer_fahrlehrer(
                 continue
 
             grund = f"FSM: {termin.terminart}"
+            bereinigt = ""
             if termin.titel:
                 bereinigt = " ".join(strip_tags(termin.titel).split())
                 grund = f"FSM: {bereinigt[:150]}"
@@ -504,6 +518,9 @@ def sync_blocker_fuer_fahrlehrer(
             )
             gueltige_fsm_sperren.add(fsm_id)
 
+            if is_theorie_termin(termin.terminart, termin.titel or ""):
+                theorie_termine.append((fsm_id, beginn, termin_ende, bereinigt or termin.terminart, fahrlehrer))
+
         # Nicht mehr vorhandene fremde Sperrzeiten bereinigen
         Sperrzeit.objects.filter(
             fahrlehrer=fahrlehrer,
@@ -512,6 +529,8 @@ def sync_blocker_fuer_fahrlehrer(
             beginn__lte=ende,
         ).exclude(fsm_id="").exclude(fsm_id__in=gueltige_fsm_sperren).delete()
 
+    if return_theorie:
+        return len(gueltige_fsm_sperren), theorie_termine
     return len(gueltige_fsm_sperren)
 
 
@@ -523,10 +542,68 @@ def sync_alle_fahrlehrer(client: FsmClient | None = None) -> dict[int, int]:
     if not getattr(settings, "FSM_SYNC_ENABLED", False):
         return ergebnisse
 
-    for fahrlehrer in Fahrlehrer.objects.filter(aktiv=True).exclude(fsm_id=""):
+    from ..models import FahrschulEinstellungen
+    einstellungen = FahrschulEinstellungen.get_solo()
+    theorie_beachten = einstellungen.fsm_theorie_blockiert_beratung
+
+    aktive_lehrer = list(Fahrlehrer.objects.filter(aktiv=True).exclude(fsm_id=""))
+    theorie_termine_gesammelt: list[tuple[str, dt.datetime, dt.datetime, str, Fahrlehrer]] = []
+
+    for fahrlehrer in aktive_lehrer:
         if fahrlehrer.fsm_sync_aktiv:
-            anzahl = sync_blocker_fuer_fahrlehrer(fahrlehrer, client=client)
+            res = sync_blocker_fuer_fahrlehrer(fahrlehrer, client=client, return_theorie=True)
+            if isinstance(res, tuple):
+                anzahl, th_termine = res
+            else:
+                anzahl, th_termine = res, []
             ergebnisse[fahrlehrer.pk] = anzahl
+            if theorie_beachten:
+                theorie_termine_gesammelt.extend(th_termine)
+
+    # Theorieunterricht raumweit für alle anderen Fahrlehrer blockieren
+    gueltige_theorie_sperren: set[str] = set()
+
+    if theorie_beachten and theorie_termine_gesammelt:
+        from .planung import termine_entfernen
+
+        alle_fahrschul_lehrer = list(Fahrlehrer.objects.filter(aktiv=True))
+        for fsm_id, von, bis, titel, lehrer_owner in theorie_termine_gesammelt:
+            theorie_fsm_id = f"theorie_{fsm_id}"
+            gueltige_theorie_sperren.add(theorie_fsm_id)
+
+            for ziel_lehrer in alle_fahrschul_lehrer:
+                if ziel_lehrer.pk == lehrer_owner.pk:
+                    continue  # Hat den Blocker bereits direkt erhalten
+
+                grund_text = f"Theorieunterricht (Raum belegt): {titel}" if titel else "Theorieunterricht (Raum belegt)"
+                Sperrzeit.objects.update_or_create(
+                    fahrlehrer=ziel_lehrer,
+                    fsm_id=theorie_fsm_id,
+                    defaults={
+                        "beginn": von,
+                        "ende": bis,
+                        "grund": grund_text[:200],
+                        "typ": Sperrzeit.Typ.SONSTIGE,
+                        "herkunft": Sperrzeit.Herkunft.FSM,
+                    },
+                )
+                # Freie Termine im gesperrten Raum abräumen
+                termine_entfernen(
+                    Termin.objects.filter(
+                        fahrlehrer=ziel_lehrer,
+                        status=Termin.Status.FREI,
+                        beginn__lt=bis,
+                        ende__gt=von,
+                    )
+                )
+
+    # Veraltete oder bei deaktivierter Option noch vorhandene Raum-Theorie-Sperren bereinigen
+    jetzt = timezone.now()
+    Sperrzeit.objects.filter(
+        herkunft=Sperrzeit.Herkunft.FSM,
+        fsm_id__startswith="theorie_",
+        beginn__gte=jetzt - dt.timedelta(days=1),
+    ).exclude(fsm_id__in=gueltige_theorie_sperren).delete()
 
     return ergebnisse
 

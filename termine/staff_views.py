@@ -1155,6 +1155,11 @@ def fsm_einstellungen(request):
             if token_neu:
                 fsm_client.set_auth_token(token_neu)
 
+        # Globale FSM-Optionen speichern
+        globale_einst = FahrschulEinstellungen.get_solo()
+        globale_einst.fsm_theorie_blockiert_beratung = "fsm_theorie_blockiert_beratung" in request.POST
+        globale_einst.save(update_fields=["fsm_theorie_blockiert_beratung"])
+
         # Zuordnungen speichern
         for fahrlehrer in fahrlehrer_liste:
             key_id = f"fsm_id_{fahrlehrer.pk}"
@@ -1202,6 +1207,7 @@ def fsm_einstellungen(request):
             "fsm_lehrer_liste": fsm_lehrer_liste,
             "fsm_fehler": fsm_fehler,
             "fsm_auth_token": fsm_client.get_auth_token() or "",
+            "globale_einst": FahrschulEinstellungen.get_solo(),
             "ist_inhaber": ist_inhaber,
         },
     )

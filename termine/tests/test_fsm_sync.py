@@ -520,10 +520,89 @@ class FsmEinstellungenViewTests(TestCase):
             grund="Urlaub",
         )
 
+    def test_is_theorie_termin(self):
+        from termine.services.fsm_sync import is_theorie_termin
+
+        self.assertTrue(is_theorie_termin("PT", "TH-Grundstoff"))
+        self.assertTrue(is_theorie_termin("TH", "Unterricht"))
+        self.assertTrue(is_theorie_termin("PX", "Theorie Grundstoff Lektion 1"))
+        self.assertTrue(is_theorie_termin("ST", "Zusatzstoff Motorrad"))
+        self.assertFalse(is_theorie_termin("PS", "Fahrstunde Mustermann"))
+        self.assertFalse(is_theorie_termin("PP", "PRIVAT!"))
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_theorieunterricht_blockiert_alle_fahrlehrer(self):
+        from termine.models import FahrschulEinstellungen
+        from termine.services.fsm_sync import sync_alle_fahrlehrer
+
+        # 2 Fahrlehrer
+        einstellungen = FahrschulEinstellungen.get_solo()
+        einstellungen.fsm_theorie_blockiert_beratung = True
+        einstellungen.save()
+
+        fl_anna = Fahrlehrer.objects.create(
+            name="Anna Müller",
+            slug="anna-mueller",
+            fsm_id="fsm-anna-uuid",
+            fsm_sync_aktiv=True,
+        )
+        fl_tom = Fahrlehrer.objects.create(
+            name="Tom Schmidt",
+            slug="tom-schmidt",
+            fsm_id="fsm-tom-uuid",
+            fsm_sync_aktiv=True,
+        )
+
+        jetzt = timezone.now()
+        th_start = jetzt + dt.timedelta(days=1, hours=18)
+        th_ende = jetzt + dt.timedelta(days=1, hours=19, minutes=30)
+
+        # Freier Beratungstermin bei Tom im selben Zeitraum
+        termin_tom = Termin.objects.create(
+            fahrlehrer=fl_tom,
+            terminart=Terminart.objects.create(name="Beratung", slug="beratung-th", dauer_minuten=45),
+            beginn=th_start,
+            ende=th_start + dt.timedelta(minutes=45),
+            status=Termin.Status.FREI,
+        )
+
         mock_client = MagicMock()
-        ids = exportiere_sperrzeit_nach_fsm(sperre, client=mock_client)
-        self.assertEqual(ids, [])
-        mock_client.termin_anlegen.assert_not_called()
+        mock_client.termin_anlegen.return_value = "fsm-mock-created-uuid"
+        # Anna hat Theorieunterricht
+        mock_client.get_termine.side_effect = lambda fl_id, s, e: [
+            FsmTermin(
+                id="fsm-th-101",
+                von=th_start,
+                bis=th_ende,
+                fahrlehrer_id="fsm-anna-uuid",
+                terminart="PT",
+                titel="TH-Grundstoff Lektion 3",
+            )
+        ] if fl_id == "fsm-anna-uuid" else []
+
+        sync_alle_fahrlehrer(client=mock_client)
+
+        # Anna hat direkten FSM-Blocker
+        self.assertTrue(Sperrzeit.objects.filter(fahrlehrer=fl_anna, fsm_id="fsm-th-101").exists())
+
+        # Tom hat automatischen Raum-Blocker erhalten
+        sperre_tom = Sperrzeit.objects.filter(fahrlehrer=fl_tom, fsm_id="theorie_fsm-th-101").first()
+        self.assertIsNotNone(sperre_tom)
+        self.assertIn("Theorieunterricht", sperre_tom.grund)
+        self.assertEqual(sperre_tom.beginn, th_start)
+        self.assertEqual(sperre_tom.ende, th_ende)
+
+        # Toms freier Beratungstermin wurde entfernt
+        self.assertFalse(Termin.objects.filter(pk=termin_tom.pk).exists())
+
+        # Deaktivieren der Option bereinigt den Blocker für Tom beim nächsten Sync
+        einstellungen.fsm_theorie_blockiert_beratung = False
+        einstellungen.save()
+
+        sync_alle_fahrlehrer(client=mock_client)
+        self.assertFalse(Sperrzeit.objects.filter(fahrlehrer=fl_tom, fsm_id="theorie_fsm-th-101").exists())
+        # Annas eigener Blocker bleibt
+        self.assertTrue(Sperrzeit.objects.filter(fahrlehrer=fl_anna, fsm_id="fsm-th-101").exists())
 
 
 

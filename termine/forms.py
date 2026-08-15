@@ -250,11 +250,13 @@ class GlobaleEinstellungenForm(forms.ModelForm):
             "vorlauf_stunden",
             "horizont_wochen",
             "aktive_fuehrerscheinklassen",
+            "fsm_theorie_blockiert_beratung",
         ]
         help_texts = {
             "bundesland": "Bestimmt die gesetzlichen Feiertage der Fahrschule (z. B. Berlin).",
             "vorlauf_stunden": "Termine, die früher als dieser Vorlauf beginnen, sind nicht mehr buchbar.",
             "horizont_wochen": "Wie weit im Voraus Kunden buchen können und der Generator Termine anlegt.",
+            "fsm_theorie_blockiert_beratung": "Verhindert Beratungstermine für alle Fahrlehrer während laufendem Theorieunterricht (gemeinsamer Raum).",
         }
 
     def __init__(self, *args, **kwargs):

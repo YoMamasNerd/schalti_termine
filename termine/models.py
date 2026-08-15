@@ -107,6 +107,11 @@ class FahrschulEinstellungen(models.Model):
         blank=True,
         help_text="Welche Führerscheinklassen die Fahrschule anbietet. Leer = alle Klassen stehen zur Auswahl.",
     )
+    fsm_theorie_blockiert_beratung = models.BooleanField(
+        "Theorieunterricht blockiert Beratungen",
+        default=True,
+        help_text="Wenn ein Fahrlehrer Theorieunterricht (FSM-Terminart PT / Theorie) hat, werden in dieser Zeit für alle Fahrlehrer keine Beratungen angeboten (gemeinsamer Raum).",
+    )
 
     class Meta:
         verbose_name = "Fahrschul-Einstellungen"

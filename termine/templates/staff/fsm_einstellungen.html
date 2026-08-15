@@ -85,6 +85,27 @@
       </div>
     </div>
 
+    <div class="karte" style="margin-bottom: 1.5rem">
+      <h2>Raum- &amp; Buchungsregeln</h2>
+      <p class="leer">
+        Da Theorieunterricht und Beratungstermine im selben Raum ohne Trennwand stattfinden,
+        können während des Unterrichts keine Beratungen durchgeführt werden.
+      </p>
+      <div style="margin-top: 0.75rem">
+        <label style="display:inline-flex; align-items:center; gap:0.6rem; cursor:pointer; font-weight:600">
+          <input type="checkbox"
+                 name="fsm_theorie_blockiert_beratung"
+                 value="on"
+                 {% if globale_einst.fsm_theorie_blockiert_beratung %}checked{% endif %}>
+          Theorieunterricht blockiert Beratungstermine für alle Fahrlehrer
+        </label>
+        <p class="leer" style="margin:0.25rem 0 0 1.75rem; font-size:0.85rem">
+          Sobald ein beliebiger Fahrlehrer im FSM Theorieunterricht eingetragen hat (Kürzel <code>PT</code> / <code>TH</code> / Theorie),
+          wird der Zeitraum automatisch für das gesamte Team als Sperrzeit geblockt.
+        </p>
+      </div>
+    </div>
+
     <div class="karte">
       <h2>Fahrlehrer-Zuordnung</h2>
       <p class="leer" style="margin-bottom: 1.5rem">
