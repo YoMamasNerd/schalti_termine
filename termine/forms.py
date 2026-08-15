@@ -212,17 +212,29 @@ class TerminartForm(forms.ModelForm):
 
 
 class GlobaleEinstellungenForm(forms.ModelForm):
-    """Fahrschulweite Einstellungen für Buchungsfenster und Planungshorizont."""
+    """Fahrschulweite Einstellungen für Buchungsfenster, Planungshorizont und Bundesland."""
 
     class Meta:
         from .models import FahrschulEinstellungen
 
         model = FahrschulEinstellungen
-        fields = ["vorlauf_stunden", "horizont_wochen"]
+        fields = ["bundesland", "vorlauf_stunden", "horizont_wochen"]
         help_texts = {
+            "bundesland": "Bestimmt die gesetzlichen Feiertage der Fahrschule (z. B. Berlin).",
             "vorlauf_stunden": "Termine, die früher als dieser Vorlauf beginnen, sind nicht mehr buchbar.",
             "horizont_wochen": "Wie weit im Voraus Kunden buchen können und der Generator Termine anlegt.",
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "bundesland" in self.fields:
+            self.fields["bundesland"].required = False
+
+    def clean_bundesland(self):
+        val = self.cleaned_data.get("bundesland")
+        if not val and self.instance and self.instance.pk:
+            return self.instance.bundesland or "BE"
+        return val or "BE"
 
 
 class FahrlehrerEinstellungenForm(forms.ModelForm):

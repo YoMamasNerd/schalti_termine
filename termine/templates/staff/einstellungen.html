@@ -136,6 +136,10 @@
             </form>
           {% else %}
             <dl style="font-size:0.95rem; line-height:1.6">
+              <dt><strong>Standard-Bundesland:</strong> {{ globale_einstellungen.get_bundesland_display }}</dt>
+              <dd style="margin:0 0 0.8rem; color:var(--text-leise)">
+                Bestimmt die gesetzlichen Feiertage der Fahrschule.
+              </dd>
               <dt><strong>Mindest-Vorlauf:</strong> {{ globale_einstellungen.vorlauf_stunden }} Stunden</dt>
               <dd style="margin:0 0 0.8rem; color:var(--text-leise)">
                 So kurzfristig wird online kein Termin mehr angeboten.

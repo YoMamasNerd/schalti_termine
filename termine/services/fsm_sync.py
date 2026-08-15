@@ -15,7 +15,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from ..models import Fahrlehrer, Sperrzeit, Termin
+from ..models import Fahrlehrer, FahrschulEinstellungen, Sperrzeit, Termin
 from .fsm_client import FsmClient, FsmError
 
 if TYPE_CHECKING:
@@ -102,7 +102,7 @@ def importiere_fahrlehrer_aus_fsm(
                 fsm_id=fsm_id,
                 fsm_sync_aktiv=True,
                 aktiv=True,
-                bundesland=getattr(settings, "DEFAULT_BUNDESLAND", "BB"),
+                bundesland=getattr(settings, "DEFAULT_BUNDESLAND", None) or FahrschulEinstellungen.get_solo().bundesland,
                 vorlauf_stunden=24,
                 horizont_wochen=4,
             )

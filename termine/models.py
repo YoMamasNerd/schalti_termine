@@ -55,8 +55,15 @@ def neuer_token() -> str:
 
 
 class FahrschulEinstellungen(models.Model):
-    """Zentrale Einstellungen der Fahrschule (Mindest-Vorlauf, Planungshorizont)."""
+    """Zentrale Einstellungen der Fahrschule (Mindest-Vorlauf, Planungshorizont, Bundesland)."""
 
+    bundesland = models.CharField(
+        "Standard-Bundesland",
+        max_length=2,
+        choices=BUNDESLAENDER,
+        default="BE",
+        help_text="Bestimmt die gesetzlichen Feiertage der Fahrschule (z. B. Berlin).",
+    )
     vorlauf_stunden = models.PositiveIntegerField(
         "Mindest-Vorlauf (Stunden)",
         default=24,
@@ -74,7 +81,7 @@ class FahrschulEinstellungen(models.Model):
         verbose_name_plural = "Fahrschul-Einstellungen"
 
     def __str__(self) -> str:
-        return f"Globale Einstellungen ({self.vorlauf_stunden}h Vorlauf, {self.horizont_wochen}w Horizont)"
+        return f"Globale Einstellungen ({self.get_bundesland_display()}, {self.vorlauf_stunden}h Vorlauf, {self.horizont_wochen}w Horizont)"
 
     @classmethod
     def get_solo(cls) -> "FahrschulEinstellungen":
@@ -91,11 +98,17 @@ class Fahrlehrer(models.Model):
         null=True,
         blank=True,
         related_name="fahrlehrer",
-        verbose_name="Login-Benutzer",
-        help_text="Optional. Verknüpft den Fahrlehrer mit einem Login für die Tagesplanung.",
+        verbose_name="Benutzerkonto",
+        help_text="Optional: Verbindet diesen Fahrlehrer mit einem Login-Konto.",
     )
     name = models.CharField("Name", max_length=120)
-    slug = models.SlugField("URL-Kürzel", max_length=140, unique=True, blank=True)
+    slug = models.SlugField(
+        "URL-Kürzel",
+        max_length=140,
+        unique=True,
+        blank=True,
+        help_text="Wird für die persönliche Buchungsseite verwendet.",
+    )
     email = models.EmailField(
         "E-Mail",
         help_text="Hierhin gehen die Benachrichtigungen über neue Buchungen.",
@@ -110,7 +123,7 @@ class Fahrlehrer(models.Model):
         "Bundesland",
         max_length=2,
         choices=BUNDESLAENDER,
-        default="BW",
+        default="BE",
         help_text="Bestimmt, welche gesetzlichen Feiertage bei der automatischen "
         "Terminplanung übersprungen werden.",
     )

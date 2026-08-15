@@ -233,7 +233,7 @@ def dashboard(request):
     kal = calendar.Calendar(firstweekday=0)
     wochen = kal.monthdatescalendar(jahr, monat)
 
-    bundesland = gewaehlter_fahrlehrer.bundesland if gewaehlter_fahrlehrer else "BW"
+    bundesland = gewaehlter_fahrlehrer.bundesland if gewaehlter_fahrlehrer else FahrschulEinstellungen.get_solo().bundesland
     feiertage = feiertage_im_zeitraum(bundesland, gitter_von, gitter_bis)
 
     gitter = []
