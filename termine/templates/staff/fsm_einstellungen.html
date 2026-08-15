@@ -37,25 +37,30 @@
           </p>
         {% endif %}
       </div>
-
-      <div class="knopfreihe">
-        <form method="post" style="display:inline">
+      <div class="knopfreihe" id="fsm-actions">
+        <form method="post" style="display:inline" class="js-fsm-async-form">
           {% csrf_token %}
           <input type="hidden" name="aktion" value="import_fahrlehrer">
-          <button class="knopf" type="submit">
+          <button class="knopf" type="submit" id="btn-import">
             Fahrlehrer aus FSM importieren &amp; verknüpfen
           </button>
         </form>
-        <form method="post" style="display:inline">
+        <form method="post" style="display:inline" class="js-fsm-async-form">
           {% csrf_token %}
           <input type="hidden" name="aktion" value="sync">
-          <button class="knopf knopf--leise" type="submit">
+          <button class="knopf knopf--leise" type="submit" id="btn-sync">
             Jetzt synchronisieren
           </button>
         </form>
       </div>
+      <div id="fsm-loading" style="display:none; margin-top:0.8rem; font-weight:600; color:var(--marke); align-items:center; gap:0.5rem">
+        <span class="spinner" style="display:inline-block; width:18px; height:18px; border:2px solid var(--marke); border-top-color:transparent; border-radius:50%; animation:spin 0.8s linear infinite"></span>
+        <span id="fsm-loading-text">Synchronisiere mit Fahrschulmanager…</span>
+      </div>
     </div>
   </div>
+
+  <div id="fsm-ajax-feedback" style="display:none; margin-bottom:1.5rem"></div>
 
   <!-- Zuordnungstabelle & Token -->
   <form method="post" novalidate>
@@ -82,32 +87,33 @@
 
     <div class="karte">
       <h2>Fahrlehrer-Zuordnung</h2>
+      <p class="leer" style="margin-bottom: 1.5rem">
+        Verknüpfen Sie hier die in Schalti Termine angelegten Fahrlehrer mit den
+        entsprechenden Profilen im Fahrschulmanager.
+      </p>
+
       <div class="tabelle-huelle">
         <table class="liste">
           <thead>
             <tr>
-              <th>Fahrlehrer (Schalti)</th>
-              <th>FSM-Fahrlehrer</th>
-              <th>Sync aktiv</th>
-              <th>Aktive FSM-Sperren</th>
+              <th>Schalti Fahrlehrer</th>
+              <th>FSM Profil</th>
+              <th>Synchronisation</th>
+              <th>Aktuelle Sperren</th>
             </tr>
           </thead>
           <tbody>
             {% for item in fahrlehrer_daten %}
               <tr>
-                <td>
-                  <strong>{{ item.fahrlehrer.name }}</strong>
-                  {% if not item.fahrlehrer.aktiv %}
-                    <br><span class="leer">(inaktiv)</span>
-                  {% endif %}
-                </td>
+                <td><strong>{{ item.fahrlehrer.name }}</strong></td>
                 <td>
                   {% if fsm_lehrer_liste %}
-                    <select name="fsm_id_{{ item.fahrlehrer.pk }}" style="width:100%; max-width:320px">
+                    <select name="fsm_id_{{ item.fahrlehrer.pk }}" style="max-width: 280px">
                       <option value="">– Nicht verknüpft –</option>
-                      {% for fsm_l in fsm_lehrer_liste %}
-                        <option value="{{ fsm_l.id }}" {% if item.fahrlehrer.fsm_id == fsm_l.id %}selected{% endif %}>
-                          {% if fsm_l.vorname and fsm_l.nachname %}{{ fsm_l.vorname }} {{ fsm_l.nachname }}{% elif fsm_l.displayName %}{{ fsm_l.displayName }}{% else %}{{ fsm_l.name }}{% endif %}
+                      {% for fl in fsm_lehrer_liste %}
+                        <option value="{{ fl.id }}"
+                                {% if item.fahrlehrer.fsm_id == fl.id %}selected{% endif %}>
+                          {{ fl.name }}
                         </option>
                       {% endfor %}
                     </select>
@@ -115,8 +121,8 @@
                     <input type="text"
                            name="fsm_id_{{ item.fahrlehrer.pk }}"
                            value="{{ item.fahrlehrer.fsm_id }}"
-                           placeholder="FSM-UUID (z. B. 658688b4-...)"
-                           style="width:100%; max-width:320px">
+                           placeholder="FSM Lehrer-UUID"
+                           style="width: 220px; font-family:monospace; font-size:0.85rem">
                   {% endif %}
                 </td>
                 <td>
@@ -152,4 +158,64 @@
       </div>
     </div>
   </form>
+
+  <style>
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+
+  <script>
+    document.querySelectorAll('.js-fsm-async-form').forEach(form => {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const action = form.querySelector('input[name="aktion"]').value;
+        const btn = form.querySelector('button');
+        const loadingBox = document.getElementById('fsm-loading');
+        const loadingText = document.getElementById('fsm-loading-text');
+        const feedbackBox = document.getElementById('fsm-ajax-feedback');
+
+        if (action === 'import_fahrlehrer') {
+          loadingText.textContent = 'Importiere Fahrlehrer aus FSM…';
+        } else {
+          loadingText.textContent = 'Synchronisiere Fahrpläne mit FSM…';
+        }
+
+        document.querySelectorAll('#fsm-actions button').forEach(b => b.disabled = true);
+        loadingBox.style.display = 'inline-flex';
+        feedbackBox.style.display = 'none';
+
+        try {
+          const formData = new FormData(form);
+          const response = await fetch(window.location.href, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+              'Accept': 'application/json'
+            }
+          });
+
+          const data = await response.json();
+          loadingBox.style.display = 'none';
+
+          if (data.ok) {
+            feedbackBox.className = 'hinweis hinweis--erfolg';
+            feedbackBox.innerHTML = '<strong>' + data.nachricht + '</strong>';
+            feedbackBox.style.display = 'block';
+            setTimeout(() => { window.location.reload(); }, 1200);
+          } else {
+            feedbackBox.className = 'hinweis hinweis--fehler';
+            feedbackBox.innerHTML = '<strong>Fehler:</strong> ' + (data.fehler || 'Unbekannter Fehler');
+            feedbackBox.style.display = 'block';
+            document.querySelectorAll('#fsm-actions button').forEach(b => b.disabled = false);
+          }
+        } catch (err) {
+          loadingBox.style.display = 'none';
+          feedbackBox.className = 'hinweis hinweis--fehler';
+          feedbackBox.innerHTML = '<strong>Netzwerkfehler:</strong> ' + err.message;
+          feedbackBox.style.display = 'block';
+          document.querySelectorAll('#fsm-actions button').forEach(b => b.disabled = false);
+        }
+      });
+    });
+  </script>
 {% endblock %}

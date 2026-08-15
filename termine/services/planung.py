@@ -184,11 +184,7 @@ def termine_entfernen(termine) -> tuple[int, set[int]]:
     if fsm_ids_to_delete:
         from . import fsm_sync
 
-        def _cleanup_fsm():
-            for fid in fsm_ids_to_delete:
-                fsm_sync.loesche_fsm_termin_by_id(fid)
-
-        transaction.on_commit(_cleanup_fsm)
+        transaction.on_commit(lambda: fsm_sync.async_loesche_fsm_termine(fsm_ids_to_delete))
 
     mit_historie = set(
         Buchung.objects.filter(termin_id__in=pks).values_list("termin_id", flat=True)
@@ -307,10 +303,7 @@ def generiere_termine(
         if getattr(settings, "FSM_SYNC_ENABLED", False) and fahrlehrer.fsm_sync_aktiv and fahrlehrer.fsm_id:
             from . import fsm_sync
 
-            def _sync_generierte():
-                fsm_sync.sync_fahrlehrer_termine(fahrlehrer)
-
-            transaction.on_commit(_sync_generierte)
+            transaction.on_commit(lambda: fsm_sync.async_sync_fahrlehrer_termine(fahrlehrer))
 
     logger.info("Terminplanung %s (%s bis %s): %s", fahrlehrer, von, bis, bericht.als_text())
     return bericht
@@ -404,10 +397,7 @@ def termine_manuell_anlegen(
         if getattr(settings, "FSM_SYNC_ENABLED", False) and fahrlehrer.fsm_sync_aktiv and fahrlehrer.fsm_id:
             from . import fsm_sync
 
-            def _sync_manuelle():
-                fsm_sync.sync_fahrlehrer_termine(fahrlehrer)
-
-            transaction.on_commit(_sync_manuelle)
+            transaction.on_commit(lambda: fsm_sync.async_sync_fahrlehrer_termine(fahrlehrer))
 
     return neue, uebersprungen + vergangen
 

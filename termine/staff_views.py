@@ -24,7 +24,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count, Q
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -1092,27 +1092,43 @@ def fsm_einstellungen(request):
 
     if request.method == "POST":
         aktion = request.POST.get("aktion")
+        is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest" or "application/json" in request.headers.get("Accept", "")
 
         if aktion == "sync":
             from .services.fsm_sync import sync_alle_fahrlehrer
 
-            ergebnisse = sync_alle_fahrlehrer(client=fsm_client)
-            gesamt = sum(ergebnisse.values())
-            messages.success(
-                request,
-                f"Synchronisation erfolgreich: {gesamt} Sperrzeiten für {len(ergebnisse)} Fahrlehrer abgeglichen.",
-            )
+            try:
+                ergebnisse = sync_alle_fahrlehrer(client=fsm_client)
+                gesamt = sum(ergebnisse.values())
+                nachricht = f"Synchronisation erfolgreich: {gesamt} Sperrzeiten für {len(ergebnisse)} Fahrlehrer abgeglichen."
+                if is_ajax:
+                    return JsonResponse({"ok": True, "nachricht": nachricht, "gesamt": gesamt})
+                messages.success(request, nachricht)
+            except Exception as exc:
+                if is_ajax:
+                    return JsonResponse({"ok": False, "fehler": str(exc)}, status=500)
+                messages.error(request, f"Fehler bei Synchronisation: {exc}")
             return redirect("termine:fsm_einstellungen")
 
         if aktion == "import_fahrlehrer":
             from .services.fsm_sync import importiere_fahrlehrer_aus_fsm, sync_alle_fahrlehrer
 
-            neu, aktualisiert = importiere_fahrlehrer_aus_fsm(client=fsm_client)
-            sync_alle_fahrlehrer(client=fsm_client)
-            messages.success(
-                request,
-                f"Fahrlehrer-Import erfolgreich: {len(neu)} neu angelegt, {len(aktualisiert)} verknüpft/aktualisiert.",
-            )
+            try:
+                neu, aktualisiert = importiere_fahrlehrer_aus_fsm(client=fsm_client)
+                sync_alle_fahrlehrer(client=fsm_client)
+                nachricht = f"Fahrlehrer-Import erfolgreich: {len(neu)} neu angelegt, {len(aktualisiert)} verknüpft/aktualisiert."
+                if is_ajax:
+                    return JsonResponse({
+                        "ok": True,
+                        "nachricht": nachricht,
+                        "neu_count": len(neu),
+                        "aktualisiert_count": len(aktualisiert),
+                    })
+                messages.success(request, nachricht)
+            except Exception as exc:
+                if is_ajax:
+                    return JsonResponse({"ok": False, "fehler": str(exc)}, status=500)
+                messages.error(request, f"Fehler beim Import: {exc}")
             return redirect("termine:fsm_einstellungen")
 
         if "fsm_auth_token" in request.POST:

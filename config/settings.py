@@ -216,6 +216,7 @@ Q_CLUSTER = {
     "bulk": 10,
     "orm": "default",
     "catch_up": False,
+    "sync": IM_TESTLAUF,
 }
 
 # --- Sicherheit ------------------------------------------------------------

@@ -122,7 +122,7 @@ def bestaetigen(buchung: Buchung) -> Buchung:
     def _nach_bestaetigung():
         mail.buchung_bestaetigt_kunde(buchung)
         mail.buchung_bestaetigt_fahrlehrer(buchung)
-        fsm_sync.buche_in_fsm(buchung)
+        fsm_sync.async_buche_in_fsm(buchung)
 
     transaction.on_commit(_nach_bestaetigung)
     logger.info("Buchung %s bestätigt", buchung.referenz)
@@ -155,7 +155,7 @@ def stornieren(buchung: Buchung, *, von: str = "kunde", benachrichtigen: bool = 
                 mail.storno_kunde(buchung)
                 if von != "fahrschule":
                     mail.storno_fahrlehrer(buchung)
-            fsm_sync.storniere_in_fsm(buchung)
+            fsm_sync.async_storniere_in_fsm(buchung)
 
         transaction.on_commit(_nach_storno)
 
@@ -215,7 +215,7 @@ def verschieben(
     # Bei FSM-Sync: Altes FSM-Event stornieren und auf neuem Termin eintragen
     war_bestaetigt = buchung.status == Buchung.Status.BESTAETIGT
     if war_bestaetigt:
-        fsm_sync.storniere_in_fsm(buchung)
+        fsm_sync.async_storniere_in_fsm(buchung)
 
     buchung.termin = neuer_termin
     buchung.save(update_fields=["termin"])
@@ -224,7 +224,7 @@ def verschieben(
         def _nach_verschieben():
             if benachrichtigen:
                 mail.buchung_verschoben_kunde(buchung, alter_beginn)
-            fsm_sync.buche_in_fsm(buchung)
+            fsm_sync.async_buche_in_fsm(buchung)
 
         transaction.on_commit(_nach_verschieben)
 

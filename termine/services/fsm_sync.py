@@ -388,3 +388,114 @@ def sync_alle_fahrlehrer(client: FsmClient | None = None) -> dict[int, int]:
             ergebnisse[fahrlehrer.pk] = anzahl
 
     return ergebnisse
+
+
+# --- Asynchrone Task-Handler (django-q) --------------------------------------
+
+
+def _fsm_sync_termin_task(termin_id: int):
+    """Hintergrund-Task zum Exportieren/Aktualisieren eines Termins in FSM."""
+    try:
+        termin = Termin.objects.select_related("fahrlehrer", "terminart").get(pk=termin_id)
+    except Termin.DoesNotExist:
+        return None
+    return exportiere_termin_nach_fsm(termin)
+
+
+def _fsm_storno_task(termin_id: int):
+    """Hintergrund-Task nach einer Stornierung."""
+    try:
+        termin = Termin.objects.select_related("fahrlehrer", "terminart").get(pk=termin_id)
+    except Termin.DoesNotExist:
+        return False
+    if termin.beginn > timezone.now() and termin.status == Termin.Status.FREI:
+        return bool(exportiere_termin_nach_fsm(termin))
+    return loesche_termin_aus_fsm(termin)
+
+
+def _fsm_sync_fahrlehrer_task(fahrlehrer_id: int):
+    """Hintergrund-Task zum Abgleich aller Termine eines Fahrlehrers."""
+    try:
+        fahrlehrer = Fahrlehrer.objects.get(pk=fahrlehrer_id)
+    except Fahrlehrer.DoesNotExist:
+        return 0
+    return sync_fahrlehrer_termine(fahrlehrer)
+
+
+def _fsm_loesche_termine_task(fsm_ids: list[str]):
+    """Hintergrund-Task zum Löschen mehrerer FSM-Termine anhand ihrer IDs."""
+    client = FsmClient()
+    for fid in fsm_ids:
+        if fid:
+            loesche_fsm_termin_by_id(fid, client=client)
+
+
+def async_buche_in_fsm(buchung: Buchung):
+    """Startet FSM-Buchungsexport asynchron über django-q."""
+    if not is_fsm_aktiv_fuer_fahrlehrer(buchung.termin.fahrlehrer):
+        return None
+    if getattr(settings, "IM_TESTLAUF", False):
+        return buche_in_fsm(buchung)
+    try:
+        from django_q.tasks import async_task
+
+        return async_task(
+            "termine.services.fsm_sync._fsm_sync_termin_task", buchung.termin.pk
+        )
+    except Exception:
+        logger.exception("Fehler beim Einreihen der FSM-Buchungs-Aufgabe – führe synchron aus")
+        return buche_in_fsm(buchung)
+
+
+def async_storniere_in_fsm(buchung: Buchung):
+    """Startet FSM-Storno asynchron über django-q."""
+    if not is_fsm_aktiv_fuer_fahrlehrer(buchung.termin.fahrlehrer):
+        return None
+    if getattr(settings, "IM_TESTLAUF", False):
+        return storniere_in_fsm(buchung)
+    try:
+        from django_q.tasks import async_task
+
+        return async_task("termine.services.fsm_sync._fsm_storno_task", buchung.termin.pk)
+    except Exception:
+        logger.exception("Fehler beim Einreihen der FSM-Storno-Aufgabe – führe synchron aus")
+        return storniere_in_fsm(buchung)
+
+
+def async_sync_fahrlehrer_termine(fahrlehrer: Fahrlehrer):
+    """Startet den FSM-Terminabgleich eines Fahrlehrers asynchron."""
+    if not is_fsm_aktiv_fuer_fahrlehrer(fahrlehrer):
+        return None
+    if getattr(settings, "IM_TESTLAUF", False):
+        return sync_fahrlehrer_termine(fahrlehrer)
+    try:
+        from django_q.tasks import async_task
+
+        return async_task(
+            "termine.services.fsm_sync._fsm_sync_fahrlehrer_task", fahrlehrer.pk
+        )
+    except Exception:
+        logger.exception("Fehler beim Einreihen der FSM-Sync-Aufgabe – führe synchron aus")
+        return sync_fahrlehrer_termine(fahrlehrer)
+
+
+def async_loesche_fsm_termine(fsm_ids: list[str]):
+    """Startet das Löschen von FSM-Termin-IDs asynchron."""
+    valid_ids = [fid for fid in fsm_ids if fid]
+    if not valid_ids or not getattr(settings, "FSM_SYNC_ENABLED", False):
+        return None
+    if getattr(settings, "IM_TESTLAUF", False):
+        client = FsmClient()
+        for fid in valid_ids:
+            loesche_fsm_termin_by_id(fid, client=client)
+        return True
+    try:
+        from django_q.tasks import async_task
+
+        return async_task("termine.services.fsm_sync._fsm_loesche_termine_task", valid_ids)
+    except Exception:
+        logger.exception("Fehler beim Einreihen der FSM-Lösch-Aufgabe – führe synchron aus")
+        client = FsmClient()
+        for fid in valid_ids:
+            loesche_fsm_termin_by_id(fid, client=client)
+        return True

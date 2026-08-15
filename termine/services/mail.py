@@ -81,7 +81,50 @@ def _senden(
         return False
 
 
-def bestaetigung_anfordern(buchung) -> bool:
+def _sende_mail_task(funktions_name: str, buchung_id: int, **kwargs) -> bool:
+    """Wird im Worker-Prozess (django-q) ausgeführt."""
+    from ..models import Buchung
+
+    try:
+        buchung = (
+            Buchung.objects.select_related("termin", "termin__fahrlehrer", "termin__terminart")
+            .get(pk=buchung_id)
+        )
+    except Buchung.DoesNotExist:
+        logger.warning("Buchung %s für Mail-Task nicht mehr vorhanden", buchung_id)
+        return False
+
+    func = _MAIL_FUNKTIONEN_DIREKT.get(funktions_name)
+    if func:
+        return func(buchung, **kwargs)
+    return False
+
+
+def _im_hintergrund_oder_direkt(funktions_name: str, buchung, **kwargs) -> bool:
+    if getattr(settings, "IM_TESTLAUF", False):
+        func = _MAIL_FUNKTIONEN_DIREKT.get(funktions_name)
+        return func(buchung, **kwargs) if func else False
+
+    try:
+        from django_q.tasks import async_task
+
+        async_task(
+            "termine.services.mail._sende_mail_task",
+            funktions_name,
+            buchung.pk,
+            **kwargs,
+        )
+        return True
+    except Exception:
+        logger.exception(
+            "Fehler beim Einreihen der Mail-Aufgabe (%s) in die Queue – führe synchron aus",
+            funktions_name,
+        )
+        func = _MAIL_FUNKTIONEN_DIREKT.get(funktions_name)
+        return func(buchung, **kwargs) if func else False
+
+
+def _direkt_bestaetigung_anfordern(buchung) -> bool:
     """Schritt 1 des Double-Opt-in: Link zum Bestätigen der Buchung."""
     kontext = _kontext(buchung, minuten=settings.RESERVATION_MINUTES)
     return _senden(
@@ -93,7 +136,7 @@ def bestaetigung_anfordern(buchung) -> bool:
     )
 
 
-def buchung_bestaetigt_kunde(buchung) -> bool:
+def _direkt_buchung_bestaetigt_kunde(buchung) -> bool:
     """Schritt 2: verbindliche Bestätigung mit Kalendereintrag im Anhang."""
     return _senden(
         betreff=f"Terminbestätigung: {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
@@ -105,7 +148,7 @@ def buchung_bestaetigt_kunde(buchung) -> bool:
     )
 
 
-def buchung_bestaetigt_fahrlehrer(buchung) -> bool:
+def _direkt_buchung_bestaetigt_fahrlehrer(buchung) -> bool:
     """Benachrichtigung an den Fahrlehrer über eine neue bestätigte Buchung."""
     return _senden(
         betreff=f"Neue Buchung: {buchung.name} am {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
@@ -117,7 +160,7 @@ def buchung_bestaetigt_fahrlehrer(buchung) -> bool:
     )
 
 
-def storno_kunde(buchung) -> bool:
+def _direkt_storno_kunde(buchung) -> bool:
     return _senden(
         betreff=f"Termin storniert: {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
         template="storno_kunde",
@@ -129,7 +172,7 @@ def storno_kunde(buchung) -> bool:
     )
 
 
-def storno_fahrlehrer(buchung) -> bool:
+def _direkt_storno_fahrlehrer(buchung) -> bool:
     return _senden(
         betreff=f"Storniert: {buchung.name} am {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
         template="storno_intern",
@@ -140,7 +183,7 @@ def storno_fahrlehrer(buchung) -> bool:
     )
 
 
-def erinnerung(buchung) -> bool:
+def _direkt_erinnerung(buchung) -> bool:
     return _senden(
         betreff=f"Erinnerung: Ihr Beratungstermin am {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
         template="erinnerung",
@@ -151,8 +194,10 @@ def erinnerung(buchung) -> bool:
     )
 
 
-def buchung_verschoben_kunde(buchung, alter_beginn: dt.datetime) -> bool:
+def _direkt_buchung_verschoben_kunde(buchung, alter_beginn: dt.datetime | str) -> bool:
     """Benachrichtigung an den Kunden über einen verschobenen Termin."""
+    if isinstance(alter_beginn, str):
+        alter_beginn = timezone.datetime.fromisoformat(alter_beginn)
     return _senden(
         betreff=f"Termin verschoben: Neuer Termin am {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
         template="buchung_verschoben",
@@ -160,4 +205,48 @@ def buchung_verschoben_kunde(buchung, alter_beginn: dt.datetime) -> bool:
         kontext=_kontext(buchung, alter_beginn=alter_beginn),
         ics=buchung_als_ics(buchung),
         antwort_an=None,
+    )
+
+
+_MAIL_FUNKTIONEN_DIREKT = {
+    "bestaetigung_anfordern": _direkt_bestaetigung_anfordern,
+    "buchung_bestaetigt_kunde": _direkt_buchung_bestaetigt_kunde,
+    "buchung_bestaetigt_fahrlehrer": _direkt_buchung_bestaetigt_fahrlehrer,
+    "storno_kunde": _direkt_storno_kunde,
+    "storno_fahrlehrer": _direkt_storno_fahrlehrer,
+    "erinnerung": _direkt_erinnerung,
+    "buchung_verschoben_kunde": _direkt_buchung_verschoben_kunde,
+}
+
+
+def bestaetigung_anfordern(buchung) -> bool:
+    return _im_hintergrund_oder_direkt("bestaetigung_anfordern", buchung)
+
+
+def buchung_bestaetigt_kunde(buchung) -> bool:
+    return _im_hintergrund_oder_direkt("buchung_bestaetigt_kunde", buchung)
+
+
+def buchung_bestaetigt_fahrlehrer(buchung) -> bool:
+    return _im_hintergrund_oder_direkt("buchung_bestaetigt_fahrlehrer", buchung)
+
+
+def storno_kunde(buchung) -> bool:
+    return _im_hintergrund_oder_direkt("storno_kunde", buchung)
+
+
+def storno_fahrlehrer(buchung) -> bool:
+    return _im_hintergrund_oder_direkt("storno_fahrlehrer", buchung)
+
+
+def erinnerung(buchung) -> bool:
+    return _im_hintergrund_oder_direkt("erinnerung", buchung)
+
+
+def buchung_verschoben_kunde(buchung, alter_beginn: dt.datetime) -> bool:
+    alter_beginn_str = (
+        alter_beginn.isoformat() if isinstance(alter_beginn, dt.datetime) else str(alter_beginn)
+    )
+    return _im_hintergrund_oder_direkt(
+        "buchung_verschoben_kunde", buchung, alter_beginn=alter_beginn_str
     )
