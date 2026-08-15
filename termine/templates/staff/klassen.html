@@ -1,0 +1,73 @@
+{% extends "staff/base_staff.html" %}
+
+{% block titel %}Führerscheinklassen verwalten – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem">
+    <h1>Führerscheinklassen</h1>
+    <a class="knopf" href="{% url 'termine:klasse_neu' %}">+ Neue Klasse anlegen</a>
+  </div>
+
+  <div style="margin-bottom:1rem">
+    <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:einstellungen' %}#tab-buchung">
+      &larr; Zurück zu den Einstellungen
+    </a>
+  </div>
+
+  <div class="karte">
+    <p class="leer" style="margin-bottom:1.2rem; line-height:1.55">
+      Hier verwalten Sie alle Fahrerlaubnisklassen (FEK), die Ihre Fahrschule anbietet.
+      Kunden können bei der Terminbuchung aus allen aktiven Klassen wählen.
+    </p>
+
+    <div class="tabelle-huelle">
+      <table class="liste">
+        <thead>
+          <tr>
+            <th>Kürzel</th>
+            <th>Bezeichnung</th>
+            <th>Status</th>
+            <th>Reihenfolge</th>
+            <th style="text-align:right">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for k in klassen %}
+            <tr>
+              <td>
+                <a href="{% url 'termine:klasse_bearbeiten' k.pk %}" style="font-weight:700; font-size:1.05rem">
+                  {{ k.code }}
+                </a>
+              </td>
+              <td>{{ k.name }}</td>
+              <td>
+                {% if k.aktiv %}
+                  <span class="status status--gebucht" style="font-size:0.75rem">Aktiv</span>
+                {% else %}
+                  <span class="status status--entfallen" style="font-size:0.75rem">Inaktiv</span>
+                {% endif %}
+              </td>
+              <td>{{ k.reihenfolge }}</td>
+              <td style="text-align:right">
+                <div style="display:inline-flex; gap:0.4rem; justify-content:flex-end">
+                  <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:klasse_bearbeiten' k.pk %}">
+                    Bearbeiten
+                  </a>
+                  <form method="post" action="{% url 'termine:klasse_loeschen' k.pk %}"
+                        onsubmit="return confirm('Klasse „{{ k.code }}“ wirklich löschen?');">
+                    {% csrf_token %}
+                    <button class="knopf knopf--gefahr knopf--klein" type="submit">Löschen</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="leer">Noch keine Klassen angelegt.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

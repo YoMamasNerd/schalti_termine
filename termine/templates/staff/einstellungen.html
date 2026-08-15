@@ -192,6 +192,21 @@
             </a>
           </p>
         </div>
+
+        <div class="karte" style="margin-top:1rem">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem">
+            <h2 style="margin:0">🚗 Führerscheinklassen (FEK)</h2>
+            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:klassen' %}">
+              Klassen verwalten &rarr;
+            </a>
+          </div>
+          <p class="leer" style="line-height:1.55; margin-bottom:1rem">
+            Verwalten Sie die verfügbaren Fahrerlaubnisklassen, fügen Sie neue hinzu oder passen Sie Bezeichnungen an.
+          </p>
+          <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:klasse_neu' %}">
+            + Neue Klasse anlegen
+          </a>
+        </div>
       </div>
     </div>
 

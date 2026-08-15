@@ -49,6 +49,32 @@ FUEHRERSCHEINKLASSEN: tuple[tuple[str, str], ...] = (
 )
 
 
+class Fuehrerscheinklasse(models.Model):
+    """Verfügbare Führerscheinklassen (FEK), die für Beratungstermine ausgewählt werden können."""
+
+    code = models.CharField("Kürzel / Code", max_length=16, unique=True, help_text="z. B. B, B197, A, C1E")
+    name = models.CharField("Bezeichnung", max_length=120, help_text="z. B. PKW, PKW Automatik-Regelung")
+    aktiv = models.BooleanField("Verfügbar / Aktiv", default=True, help_text="Inaktive Klassen werden Kunden nicht angeboten.")
+    reihenfolge = models.IntegerField("Reihenfolge", default=0)
+
+    class Meta:
+        verbose_name = "Führerscheinklasse"
+        verbose_name_plural = "Führerscheinklassen"
+        ordering = ("reihenfolge", "code")
+
+    def __str__(self) -> str:
+        if self.name and self.name != self.code:
+            return f"{self.code} – {self.name}"
+        return self.code
+
+    @classmethod
+    def choices_fuer_auswahl(cls) -> list[tuple[str, str]]:
+        klassen = cls.objects.filter(aktiv=True)
+        if not klassen.exists():
+            return list(FUEHRERSCHEINKLASSEN)
+        return [(k.code, str(k)) for k in klassen]
+
+
 def neuer_token() -> str:
     """Kryptografisch sicherer Token für Links in E-Mails."""
     return secrets.token_urlsafe(32)
@@ -576,7 +602,7 @@ class Buchung(models.Model):
     email = models.EmailField("E-Mail")
     telefon = models.CharField("Telefon", max_length=40, blank=True)
     fuehrerscheinklasse = models.CharField(
-        "Führerscheinklasse", max_length=8, choices=FUEHRERSCHEINKLASSEN, blank=True
+        "Führerscheinklasse", max_length=32, blank=True
     )
     nachricht = models.TextField("Nachricht", blank=True)
 
@@ -644,3 +670,15 @@ class Buchung(models.Model):
     @property
     def verwaltungs_url(self) -> str:
         return f"{settings.SITE_BASE_URL}{reverse('termine:buchung', args=[self.token])}"
+
+    @property
+    def fuehrerscheinklasse_anzeige(self) -> str:
+        if not self.fuehrerscheinklasse:
+            return ""
+        klasse = Fuehrerscheinklasse.objects.filter(code=self.fuehrerscheinklasse).first()
+        if klasse:
+            return str(klasse)
+        return self.fuehrerscheinklasse
+
+    def get_fuehrerscheinklasse_display(self) -> str:
+        return self.fuehrerscheinklasse_anzeige

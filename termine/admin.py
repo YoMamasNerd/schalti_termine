@@ -3,7 +3,15 @@ from django.utils.formats import date_format
 from django.utils.html import format_html
 
 from .forms import RhythmusRegelForm
-from .models import Buchung, Fahrlehrer, RhythmusRegel, Sperrzeit, Termin, Terminart
+from .models import (
+    Buchung,
+    Fahrlehrer,
+    Fuehrerscheinklasse,
+    RhythmusRegel,
+    Sperrzeit,
+    Termin,
+    Terminart,
+)
 from .services import buchung as buchungs_service
 from .services.planung import generiere_termine, termine_entfernen
 
@@ -234,3 +242,10 @@ class BuchungAdmin(admin.ModelAdmin):
                 buchungs_service.stornieren(buchung, von="fahrschule")
                 anzahl += 1
         self.message_user(request, f"{anzahl} Buchungen abgesagt.", messages.SUCCESS)
+
+
+@admin.register(Fuehrerscheinklasse)
+class FuehrerscheinklasseAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "aktiv", "reihenfolge")
+    list_editable = ("aktiv", "reihenfolge")
+    search_fields = ("code", "name")

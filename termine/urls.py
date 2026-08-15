@@ -64,6 +64,10 @@ urlpatterns = [
         staff_views.terminart_loeschen,
         name="terminart_loeschen",
     ),
+    path("intern/klassen/", staff_views.klassenliste, name="klassen"),
+    path("intern/klassen/neu/", staff_views.klasse_bearbeiten, name="klasse_neu"),
+    path("intern/klassen/<int:pk>/", staff_views.klasse_bearbeiten, name="klasse_bearbeiten"),
+    path("intern/klassen/<int:pk>/loeschen/", staff_views.klasse_loeschen, name="klasse_loeschen"),
     path("intern/einstellungen/", staff_views.einstellungen, name="einstellungen"),
     path(
         "intern/einstellungen/kalender-abo/",

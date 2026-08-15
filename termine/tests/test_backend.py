@@ -547,3 +547,49 @@ class Randfaelle(BackendBasis):
         self.assertEqual(termin1.status, Termin.Status.FREI)
         self.assertEqual(termin2.status, Termin.Status.GEBUCHT)
 
+    def test_fuehrerscheinklassen_crud(self):
+        from termine.models import Fuehrerscheinklasse
+        from termine.forms import BuchungsForm
+
+        # 1. Listen-Ansicht
+        antwort = self.client.get(reverse("termine:klassen"))
+        self.assertEqual(antwort.status_code, 200)
+
+        # 2. Neue Klasse B78 anlegen
+        antwort = self.client.post(
+            reverse("termine:klasse_neu"),
+            {
+                "code": "B78",
+                "name": "PKW reine Automatik",
+                "aktiv": True,
+                "reihenfolge": 5,
+            },
+        )
+        self.assertEqual(antwort.status_code, 302)
+        klasse = Fuehrerscheinklasse.objects.get(code="B78")
+        self.assertEqual(klasse.name, "PKW reine Automatik")
+
+        # 3. Im Buchungsformular verfügbar
+        form = BuchungsForm()
+        choices_keys = [c[0] for c in form.fields["fuehrerscheinklasse"].choices]
+        self.assertIn("B78", choices_keys)
+
+        # 4. Bearbeiten
+        antwort = self.client.post(
+            reverse("termine:klasse_bearbeiten", args=[klasse.pk]),
+            {
+                "code": "B78",
+                "name": "PKW Automatik (Schlüsselzahl 78)",
+                "aktiv": True,
+                "reihenfolge": 5,
+            },
+        )
+        self.assertEqual(antwort.status_code, 302)
+        klasse.refresh_from_db()
+        self.assertEqual(klasse.name, "PKW Automatik (Schlüsselzahl 78)")
+
+        # 5. Löschen
+        antwort = self.client.post(reverse("termine:klasse_loeschen", args=[klasse.pk]))
+        self.assertEqual(antwort.status_code, 302)
+        self.assertFalse(Fuehrerscheinklasse.objects.filter(code="B78").exists())
+

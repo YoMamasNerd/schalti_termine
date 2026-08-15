@@ -1,0 +1,42 @@
+{% extends "staff/base_staff.html" %}
+
+{% block titel %}
+  {% if klasse %}Klasse „{{ klasse.code }}“ bearbeiten{% else %}Neue Führerscheinklasse anlegen{% endif %} – {{ SITE_NAME }}
+{% endblock %}
+
+{% block inhalt %}
+  <div class="huelle-schmal">
+    <div style="margin-bottom:1rem">
+      <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:klassen' %}">
+        &larr; Zurück zur Klassenübersicht
+      </a>
+    </div>
+
+    <form class="karte" method="post" novalidate>
+      {% csrf_token %}
+      <h1>{% if klasse %}Klasse „{{ klasse.code }}“ bearbeiten{% else %}Neue Führerscheinklasse{% endif %}</h1>
+
+      {% if form.non_field_errors %}
+        <div class="hinweis hinweis--fehler">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      {% for feld in form %}
+        {% include "termine/_feld.html" with feld=feld %}
+      {% endfor %}
+
+      <div class="knopfreihe" style="margin-top:1.5rem">
+        <button class="knopf" type="submit">Speichern</button>
+        <a class="knopf knopf--leise" href="{% url 'termine:klassen' %}">Abbrechen</a>
+
+        {% if klasse %}
+          <button type="submit"
+                  formaction="{% url 'termine:klasse_loeschen' klasse.pk %}"
+                  class="knopf knopf--gefahr knopf--rechts"
+                  onclick="return confirm('Klasse „{{ klasse.code }}“ wirklich löschen?');">
+            Löschen
+          </button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+{% endblock %}

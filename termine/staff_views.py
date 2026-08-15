@@ -34,6 +34,7 @@ from django.views.decorators.http import require_POST
 
 from .forms import (
     FahrlehrerEinstellungenForm,
+    FuehrerscheinklasseForm,
     GlobaleEinstellungenForm,
     RhythmusRegelForm,
     SperrzeitForm,
@@ -41,10 +42,12 @@ from .forms import (
     TerminartForm,
 )
 from .models import (
+    FUEHRERSCHEINKLASSEN,
     WOCHENTAG_KURZ,
     Buchung,
     FahrschulEinstellungen,
     Fahrlehrer,
+    Fuehrerscheinklasse,
     RhythmusRegel,
     Sperrzeit,
     Termin,
@@ -866,6 +869,57 @@ def terminart_loeschen(request, pk: int):
     terminart.delete()
     messages.success(request, f"Terminart „{name}“ gelöscht.")
     return redirect("termine:terminarten")
+
+
+# --- Führerscheinklassen (FEK) ---------------------------------------------
+
+
+@mitarbeiter
+def klassenliste(request):
+    """Übersicht aller Führerscheinklassen mit Bearbeitungs- und Löschmöglichkeiten."""
+    klassen = Fuehrerscheinklasse.objects.all().order_by("reihenfolge", "code")
+    if not klassen.exists():
+        for i, (code, full_name) in enumerate(FUEHRERSCHEINKLASSEN):
+            name_teil = full_name.split("–", 1)[-1].strip() if "–" in full_name else full_name
+            Fuehrerscheinklasse.objects.create(
+                code=code,
+                name=name_teil,
+                aktiv=True,
+                reihenfolge=i,
+            )
+        klassen = Fuehrerscheinklasse.objects.all().order_by("reihenfolge", "code")
+
+    return render(request, "staff/klassen.html", {"klassen": klassen})
+
+
+@mitarbeiter
+def klasse_bearbeiten(request, pk: int | None = None):
+    klasse = get_object_or_404(Fuehrerscheinklasse, pk=pk) if pk else None
+
+    if request.method == "POST":
+        form = FuehrerscheinklasseForm(request.POST, instance=klasse)
+        if form.is_valid():
+            klasse = form.save()
+            messages.success(request, f"Führerscheinklasse „{klasse.code}“ gespeichert.")
+            return redirect("termine:klassen")
+    else:
+        form = FuehrerscheinklasseForm(instance=klasse)
+
+    return render(
+        request,
+        "staff/klasse_formular.html",
+        {"form": form, "klasse": klasse},
+    )
+
+
+@mitarbeiter
+@require_POST
+def klasse_loeschen(request, pk: int):
+    klasse = get_object_or_404(Fuehrerscheinklasse, pk=pk)
+    code = klasse.code
+    klasse.delete()
+    messages.success(request, f"Führerscheinklasse „{code}“ gelöscht.")
+    return redirect("termine:klassen")
 
 
 # --- Einstellungen ---------------------------------------------------------

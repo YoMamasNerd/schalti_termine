@@ -62,12 +62,16 @@ class BuchungsForm(forms.Form):
         if terminart is not None and not terminart.fuehrerscheinklasse_abfragen:
             self.fields.pop("fuehrerscheinklasse", None)
         elif "fuehrerscheinklasse" in self.fields:
-            from .models import FahrschulEinstellungen
+            from .models import FahrschulEinstellungen, Fuehrerscheinklasse
+
             einst = FahrschulEinstellungen.get_solo()
-            aktive_klassen = einst.aktive_fuehrerscheinklassen
-            if aktive_klassen:
-                auswahl = [c for c in FUEHRERSCHEINKLASSEN if c[0] in aktive_klassen]
-                self.fields["fuehrerscheinklasse"].choices = [("", "Bitte wählen …")] + auswahl
+            aktive_filter = set(einst.aktive_fuehrerscheinklassen or [])
+            alle_aktiven = Fuehrerscheinklasse.choices_fuer_auswahl()
+            if aktive_filter:
+                auswahl = [c for c in alle_aktiven if c[0] in aktive_filter]
+            else:
+                auswahl = alle_aktiven
+            self.fields["fuehrerscheinklasse"].choices = [("", "Bitte wählen …")] + auswahl
 
     def clean_website(self):
         if self.cleaned_data.get("website"):
@@ -292,3 +296,30 @@ class FahrlehrerEinstellungenForm(forms.ModelForm):
         if not inhaber:
             for name in self.NUR_INHABER:
                 self.fields.pop(name)
+
+
+class FuehrerscheinklasseForm(forms.ModelForm):
+    """Formular zum Anlegen und Bearbeiten von Führerscheinklassen."""
+
+    class Meta:
+        from .models import Fuehrerscheinklasse
+
+        model = Fuehrerscheinklasse
+        fields = ["code", "name", "aktiv", "reihenfolge"]
+        widgets = {
+            "code": forms.TextInput(attrs={"placeholder": "z. B. B197"}),
+            "name": forms.TextInput(attrs={"placeholder": "z. B. PKW (Automatik-Regelung)"}),
+        }
+
+    def clean_code(self):
+        from .models import Fuehrerscheinklasse
+
+        code = self.cleaned_data["code"].strip().upper()
+        if not code:
+            raise forms.ValidationError("Bitte ein Kürzel angeben.")
+        doppelt = Fuehrerscheinklasse.objects.filter(code__iexact=code).exclude(
+            pk=self.instance.pk
+        )
+        if doppelt.exists():
+            raise forms.ValidationError("Eine Klasse mit diesem Kürzel existiert bereits.")
+        return code
