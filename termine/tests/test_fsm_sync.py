@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 from django.core.management import call_command
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from termine.models import Buchung, Fahrlehrer, Sperrzeit, Termin, Terminart
@@ -273,3 +274,70 @@ class FsmSyncTests(TestCase):
 
             call_command("fsm_sync", stdout=out)
             self.assertIn("Fertig:", out.getvalue())
+
+
+class FsmEinstellungenViewTests(TestCase):
+    def setUp(self):
+        super().setUp()
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        self.user = User.objects.create_superuser("admin", "admin@example.com", "pass")
+        self.client.force_login(self.user)
+        self.fahrlehrer = Fahrlehrer.objects.create(
+            name="Jonas Eisele",
+            slug="jonas-eisele",
+            email="jonas@example.com",
+            benutzer=self.user,
+        )
+
+    @override_settings(FSM_SYNC_ENABLED=False)
+    def test_404_wenn_fsm_deaktiviert(self):
+        res = self.client.get(reverse("termine:fsm_einstellungen"))
+        self.assertEqual(res.status_code, 404)
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_laedt_wenn_fsm_aktiv(self):
+        with patch("termine.staff_views.FsmClient") as mock_cls:
+            mock_inst = MagicMock()
+            mock_inst.get_fahrlehrer.return_value = []
+            mock_cls.return_value = mock_inst
+
+            res = self.client.get(reverse("termine:fsm_einstellungen"))
+            self.assertEqual(res.status_code, 200)
+            self.assertContains(res, "Fahrschulmanager (FSM)")
+            self.assertContains(res, "Jonas Eisele")
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_speichert_fsm_zuordnungen(self):
+        with patch("termine.staff_views.FsmClient") as mock_cls:
+            mock_inst = MagicMock()
+            mock_inst.get_fahrlehrer.return_value = []
+            mock_cls.return_value = mock_inst
+
+            res = self.client.post(
+                reverse("termine:fsm_einstellungen"),
+                {
+                    f"fsm_id_{self.fahrlehrer.pk}": "658688b4-eb51-418a-9811-bc5445281319",
+                    f"fsm_sync_aktiv_{self.fahrlehrer.pk}": "on",
+                },
+            )
+            self.assertRedirects(res, reverse("termine:fsm_einstellungen"))
+
+            self.fahrlehrer.refresh_from_db()
+            self.assertEqual(self.fahrlehrer.fsm_id, "658688b4-eb51-418a-9811-bc5445281319")
+            self.assertTrue(self.fahrlehrer.fsm_sync_aktiv)
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_manueller_sync_button(self):
+        with patch("termine.staff_views.FsmClient") as mock_cls:
+            mock_inst = MagicMock()
+            mock_inst.get_termine.return_value = []
+            mock_cls.return_value = mock_inst
+
+            res = self.client.post(
+                reverse("termine:fsm_einstellungen"),
+                {"aktion": "sync"},
+            )
+            self.assertRedirects(res, reverse("termine:fsm_einstellungen"))
+

@@ -1,0 +1,126 @@
+{% extends "staff/base_staff.html" %}
+
+{% block titel %}Fahrschulmanager (FSM) – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+  <h1>Fahrschulmanager (FSM)</h1>
+  <p>
+    Verknüpfe die lokalen Fahrlehrer mit ihren Profilen im Fahrschulmanager.
+    Ist die Synchronisation aktiv, werden freie Beratungstermine automatisch
+    als Blocker im FSM-Kalender hinterlegt und gebuchte Termine mit den
+    Kundendaten aktualisiert.
+  </p>
+
+  <p class="knopfreihe">
+    <a class="knopf knopf--leise" href="{% url 'termine:einstellungen' %}">Zu den Einstellungen</a>
+    <a class="knopf knopf--leise" href="{% url 'termine:terminarten' %}">Terminarten verwalten</a>
+  </p>
+
+  <!-- FSM Status & Sofort-Sync -->
+  <div class="karte" style="margin-bottom: 1.5rem">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem">
+      <div>
+        <h2 style="margin:0 0 0.25rem">Verbindungsstatus</h2>
+        {% if fsm_fehler %}
+          <span class="marke-status status-gebucht" style="background:#fee2e2; color:#991b1b">
+            Verbindungsfehler zur FSM-API
+          </span>
+          <p class="leer" style="margin:0.5rem 0 0; color:#dc2626">
+            {{ fsm_fehler }}
+          </p>
+        {% else %}
+          <span class="marke-status status-frei" style="background:#dcfce7; color:#166534">
+            Verbunden mit Fahrschulmanager
+          </span>
+          <p class="leer" style="margin:0.5rem 0 0">
+            Hintergrund-Synchronisation läuft alle 15 Minuten.
+          </p>
+        {% endif %}
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="aktion" value="sync">
+        <button class="knopf knopf--leise" type="submit">
+          Jetzt manuell synchronisieren
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Zuordnungstabelle -->
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="karte">
+      <h2>Fahrlehrer-Zuordnung</h2>
+      <div class="tabelle-huelle">
+        <table class="liste">
+          <thead>
+            <tr>
+              <th>Fahrlehrer (Schalti)</th>
+              <th>FSM-Fahrlehrer</th>
+              <th>Sync aktiv</th>
+              <th>Aktive FSM-Sperren</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in fahrlehrer_daten %}
+              <tr>
+                <td>
+                  <strong>{{ item.fahrlehrer.name }}</strong>
+                  {% if not item.fahrlehrer.aktiv %}
+                    <br><span class="leer">(inaktiv)</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if fsm_lehrer_liste %}
+                    <select name="fsm_id_{{ item.fahrlehrer.pk }}" style="width:100%; max-width:320px">
+                      <option value="">– Nicht verknüpft –</option>
+                      {% for fsm_l in fsm_lehrer_liste %}
+                        <option value="{{ fsm_l.id }}" {% if item.fahrlehrer.fsm_id == fsm_l.id %}selected{% endif %}>
+                          {{ fsm_l.name }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                  {% else %}
+                    <input type="text"
+                           name="fsm_id_{{ item.fahrlehrer.pk }}"
+                           value="{{ item.fahrlehrer.fsm_id }}"
+                           placeholder="FSM-UUID (z. B. 658688b4-...)"
+                           style="width:100%; max-width:320px">
+                  {% endif %}
+                </td>
+                <td>
+                  <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer">
+                    <input type="checkbox"
+                           name="fsm_sync_aktiv_{{ item.fahrlehrer.pk }}"
+                           {% if item.fahrlehrer.fsm_sync_aktiv %}checked{% endif %}>
+                    Aktiv
+                  </label>
+                </td>
+                <td>
+                  {% if item.fahrlehrer.fsm_id %}
+                    {{ item.fsm_sperren_count }} Belegung{{ item.fsm_sperren_count|pluralize:"en" }}
+                  {% else %}
+                    <span class="leer">–</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="4" class="leer">Noch keine Fahrlehrer angelegt.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="knopfreihe" style="margin-top:1.5rem">
+        <button class="knopf" type="submit">Zuordnungen speichern</button>
+        <button class="knopf knopf--leise" type="submit" name="sync_nach_speichern" value="1">
+          Speichern & Jetzt synchronisieren
+        </button>
+      </div>
+    </div>
+  </form>
+{% endblock %}
