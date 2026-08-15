@@ -12,6 +12,7 @@ from .models import (
     WOCHENTAGE,
     Fahrlehrer,
     RhythmusRegel,
+    Sperrzeit,
     Terminart,
 )
 
@@ -134,7 +135,14 @@ class SperrzeitForm(forms.Form):
     bis_tag = forms.DateField(
         label="Bis (Tag)", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
     )
-    grund = forms.CharField(label="Grund", max_length=200, required=False)
+    typ = forms.ChoiceField(
+        label="Art der Sperrzeit",
+        choices=Sperrzeit.Typ.choices,
+        initial=Sperrzeit.Typ.SONSTIGE,
+        required=False,
+        help_text="„Privat“ blockiert den Kalender ebenfalls, zählt aber in FSM nicht als Arbeitszeit.",
+    )
+    grund = forms.CharField(label="Grund (z. B. Urlaub, Kita, Arzt)", max_length=200, required=False)
 
     def clean(self):
         daten = super().clean()

@@ -400,12 +400,22 @@ class Sperrzeit(models.Model):
         MANUELL = "manuell", "Manuell"
         FSM = "fsm", "FSM-Import"
 
+    class Typ(models.TextChoices):
+        SONSTIGE = "sonstige", "Sonstige Tätigkeit / Urlaub (Arbeitszeit)"
+        PRIVAT = "privat", "Privat (keine Arbeitszeit)"
+
     fahrlehrer = models.ForeignKey(
         Fahrlehrer, on_delete=models.CASCADE, related_name="sperrzeiten", verbose_name="Fahrlehrer"
     )
     beginn = models.DateTimeField("Beginn")
     ende = models.DateTimeField("Ende")
     grund = models.CharField("Grund", max_length=200, blank=True)
+    typ = models.CharField(
+        "Art der Sperrzeit",
+        max_length=20,
+        choices=Typ.choices,
+        default=Typ.SONSTIGE,
+    )
     fsm_id = models.TextField(
         "FSM-ID",
         blank=True,

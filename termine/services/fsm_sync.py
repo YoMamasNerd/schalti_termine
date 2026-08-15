@@ -193,34 +193,58 @@ def zerlege_zeitraum_fuer_fsm(
     ende: dt.datetime,
     max_minuten: int = 600,
 ) -> list[tuple[dt.datetime, dt.datetime]]:
-    """Zerlegt einen Sperrzeit-Zeitraum in FSM-kompatible Abschnitte von maximal `max_minuten` (Default: 600 min / 10h).
+    """Zerlegt einen Sperrzeit-Zeitraum in FSM-kompatible Abschnitte.
 
-    Die Abschnitte werden tageweise und in Blöcken von höchstens 600 Minuten aufgeteilt.
+    Ganztägige Sperrzeiten (z. B. 00:00 bis 23:59:59 oder mehrtägige Urlaube)
+    werden pro Tag als genau ein 600-minütiger Block von 08:00 bis 18:00 Uhr
+    eingetragen, damit der gesamte Arbeitstag blockiert ist und keine Mehrfachblöcke entstehen.
     """
     if beginn >= ende:
         return []
 
+    beginn_local = timezone.localtime(beginn) if timezone.is_aware(beginn) else beginn
+    ende_local = timezone.localtime(ende) if timezone.is_aware(ende) else ende
+
+    # Ganztägige Sperrzeit prüfen (startet um Mitternacht / endet um 23:59)
+    ist_ganztaegig = (
+        beginn_local.hour == 0 and beginn_local.minute == 0 and
+        (ende_local.hour >= 23 and ende_local.minute >= 59 or (ende_local - beginn_local).total_seconds() >= 86300)
+    )
+
     abschnitte: list[tuple[dt.datetime, dt.datetime]] = []
-    curr = beginn
 
-    while curr < ende:
-        curr_local = timezone.localtime(curr) if timezone.is_aware(curr) else curr
-        naechster_tag_local = curr_local.replace(hour=0, minute=0, second=0, microsecond=0) + dt.timedelta(days=1)
-        naechster_tag = timezone.make_aware(naechster_tag_local) if timezone.is_naive(naechster_tag_local) else naechster_tag_local
+    if ist_ganztaegig:
+        tag_cursor = beginn_local.date()
+        letzter_tag = ende_local.date()
 
-        tages_ende = min(naechster_tag, ende)
-        if tages_ende <= curr:
-            curr = curr + dt.timedelta(seconds=1)
-            continue
+        while tag_cursor <= letzter_tag:
+            t_start_local = dt.datetime.combine(tag_cursor, dt.time(8, 0))
+            t_ende_local = dt.datetime.combine(tag_cursor, dt.time(18, 0))
+            t_start = timezone.make_aware(t_start_local) if timezone.is_aware(beginn) else t_start_local
+            t_ende = timezone.make_aware(t_ende_local) if timezone.is_aware(beginn) else t_ende_local
+            abschnitte.append((t_start, t_ende))
+            tag_cursor += dt.timedelta(days=1)
+    else:
+        # Konkrete Uhrzeiten: Tageweise Blöcke mit maximal max_minuten Länge
+        curr = beginn
+        while curr < ende:
+            curr_local = timezone.localtime(curr) if timezone.is_aware(curr) else curr
+            naechster_tag_local = curr_local.replace(hour=0, minute=0, second=0, microsecond=0) + dt.timedelta(days=1)
+            naechster_tag = timezone.make_aware(naechster_tag_local) if timezone.is_naive(naechster_tag_local) else naechster_tag_local
 
-        block_start = curr
-        while block_start < tages_ende:
-            block_ende = min(block_start + dt.timedelta(minutes=max_minuten), tages_ende)
-            if (block_ende - block_start).total_seconds() >= 60:
-                abschnitte.append((block_start, block_ende))
-            block_start = block_ende
+            tages_ende = min(naechster_tag, ende)
+            if tages_ende <= curr:
+                curr = curr + dt.timedelta(seconds=1)
+                continue
 
-        curr = tages_ende
+            block_start = curr
+            while block_start < tages_ende:
+                block_ende = min(block_start + dt.timedelta(minutes=max_minuten), tages_ende)
+                if (block_ende - block_start).total_seconds() >= 60:
+                    abschnitte.append((block_start, block_ende))
+                block_start = block_ende
+
+            curr = tages_ende
 
     return abschnitte
 
@@ -229,10 +253,13 @@ def exportiere_sperrzeit_nach_fsm(
     sperre: Sperrzeit,
     client: FsmClient | None = None,
 ) -> list[str]:
-    """Exportiert eine Sperrzeit (Urlaub/Abwesenheit) als 'Sonstige Tätigkeit' in FSM.
+    """Exportiert eine Sperrzeit (Urlaub/Abwesenheit oder Privat) nach FSM.
 
-    Erstellt FSM-Termine von maximal 600 Minuten Länge und speichert die IDs kommagetrennt
-    im Feld `fsm_id` der Sperrzeit. Gibt die Liste der erzeugten FSM-IDs zurück.
+    - Sperrzeit.Typ.PRIVAT -> FSM-Terminart 'PP' (blockiert Kalender, zählt NICHT als Arbeitszeit).
+    - Sperrzeit.Typ.SONSTIGE -> FSM-Terminart 'ST' (Sonstige Tätigkeit / Urlaub, zählt als Arbeitszeit).
+
+    Ganztägige Urlaube werden ab 08:00 bis 18:00 Uhr (10h = 600 min) pro Tag eingetragen.
+    Speichert die IDs kommagetrennt im Feld `fsm_id` der Sperrzeit.
     """
     if not is_fsm_aktiv_fuer_fahrlehrer(sperre.fahrlehrer):
         return []
@@ -242,8 +269,12 @@ def exportiere_sperrzeit_nach_fsm(
     if not abschnitte:
         return []
 
-    titel = f"Sonstige Tätigkeit: {sperre.grund}" if sperre.grund else "Sonstige Tätigkeit"
-    terminart = getattr(settings, "FSM_SONSTIGE_TAETIGKEIT_TERMINART", "ST")
+    if getattr(sperre, "typ", Sperrzeit.Typ.SONSTIGE) == Sperrzeit.Typ.PRIVAT:
+        terminart = getattr(settings, "FSM_PRIVAT_TERMINART", "PP")
+        titel = sperre.grund or "Privat"
+    else:
+        terminart = getattr(settings, "FSM_SONSTIGE_TAETIGKEIT_TERMINART", "ST")
+        titel = f"Sonstige Tätigkeit: {sperre.grund}" if sperre.grund else "Sonstige Tätigkeit"
 
     erstellte_ids: list[str] = []
     for von_dt, bis_dt in abschnitte:

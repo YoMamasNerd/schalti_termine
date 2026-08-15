@@ -537,6 +537,7 @@ def sperrzeit_anlegen(request):
             beginn=lokal(daten["von_tag"], dt.time.min),
             ende=lokal(daten["bis_tag"], dt.time.max),
             grund=daten.get("grund", ""),
+            typ=daten.get("typ", Sperrzeit.Typ.SONSTIGE),
         )
         # Freie Termine im gesperrten Zeitraum verschwinden sofort aus dem Angebot.
         geloescht, entfallen = termine_entfernen(
