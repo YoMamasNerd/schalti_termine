@@ -1201,18 +1201,27 @@ def fsm_einstellungen(request):
                 fahrlehrer.fsm_sync_aktiv = key_aktiv in request.POST
                 fahrlehrer.save(update_fields=["fsm_id", "fsm_sync_aktiv"])
 
-        messages.success(request, "FSM-Einstellungen gespeichert.")
-
-        if "sync_nach_speichern" in request.POST:
+        if "sync_nach_speichern" in request.POST or request.POST.get("sync_nach_speichern") == "1":
             from .services.fsm_sync import sync_alle_fahrlehrer
 
             ergebnisse = sync_alle_fahrlehrer(client=fsm_client)
             gesamt = sum(ergebnisse.values())
-            messages.success(
-                request,
-                f"Synchronisation durchgeführt: {gesamt} Sperrzeiten abgeglichen.",
-            )
+            nachricht = f"Einstellungen gespeichert & {gesamt} Sperrzeiten synchronisiert."
+            if is_ajax:
+                return JsonResponse({"ok": True, "nachricht": nachricht, "gesamt": gesamt})
+            messages.success(request, nachricht)
+            return redirect("termine:fsm_einstellungen")
 
+        if is_ajax:
+            intervall_txt = f"alle {globale_einst.fsm_sync_intervall_minuten} Minuten" if globale_einst.fsm_sync_intervall_minuten > 0 else "deaktiviert (nur manuell)"
+            return JsonResponse({
+                "ok": True,
+                "nachricht": "Einstellungen automatisch gespeichert.",
+                "intervall": globale_einst.fsm_sync_intervall_minuten,
+                "intervall_text": intervall_txt,
+            })
+
+        messages.success(request, "FSM-Einstellungen gespeichert.")
         return redirect("termine:fsm_einstellungen")
 
     jetzt = timezone.now()
