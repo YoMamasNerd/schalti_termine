@@ -955,7 +955,7 @@ def einstellungen(request):
                 messages.success(request, "Buchungsfenster (global) gespeichert.")
                 if globale_einst.horizont_wochen != alter_horizont:
                     _globaler_horizont_nachziehen(request, alter_horizont)
-                return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}")
+                return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}#tab-buchung")
             form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
         else:
             globale_form = GlobaleEinstellungenForm(instance=globale_einst)
@@ -965,7 +965,7 @@ def einstellungen(request):
             if form.is_valid():
                 fahrlehrer = form.save()
                 messages.success(request, "Einstellungen gespeichert.")
-                return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}")
+                return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}#tab-profil")
     else:
         form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
         globale_form = GlobaleEinstellungenForm(instance=globale_einst)
@@ -1022,7 +1022,7 @@ def feed_token_neu(request):
         "Neue Abo-URL erzeugt. Das alte Abo liefert ab sofort nichts mehr – "
         "bitte in allen Kalenderprogrammen austauschen.",
     )
-    return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}")
+    return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}#tab-profil")
 
 
 @mitarbeiter
