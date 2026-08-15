@@ -604,5 +604,25 @@ class FsmEinstellungenViewTests(TestCase):
         # Annas eigener Blocker bleibt
         self.assertTrue(Sperrzeit.objects.filter(fahrlehrer=fl_anna, fsm_id="fsm-th-101").exists())
 
+    def test_aktualisiere_fsm_schedule(self):
+        from django_q.models import Schedule
+        from termine.services.fsm_sync import aktualisiere_fsm_schedule
+
+        # 1. Auf 30 Minuten setzen
+        aktualisiere_fsm_schedule(30)
+        sch = Schedule.objects.get(name="FSM synchronisieren")
+        self.assertEqual(sch.minutes, 30)
+        self.assertEqual(sch.repeats, -1)
+
+        # 2. Auf 60 Minuten setzen
+        aktualisiere_fsm_schedule(60)
+        sch.refresh_from_db()
+        self.assertEqual(sch.minutes, 60)
+
+        # 3. Deaktivieren (0)
+        aktualisiere_fsm_schedule(0)
+        sch.refresh_from_db()
+        self.assertEqual(sch.repeats, 0)
+
 
 

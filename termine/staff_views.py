@@ -1181,7 +1181,15 @@ def fsm_einstellungen(request):
         # Globale FSM-Optionen speichern
         globale_einst = FahrschulEinstellungen.get_solo()
         globale_einst.fsm_theorie_blockiert_beratung = "fsm_theorie_blockiert_beratung" in request.POST
-        globale_einst.save(update_fields=["fsm_theorie_blockiert_beratung"])
+        if "fsm_sync_intervall_minuten" in request.POST:
+            try:
+                globale_einst.fsm_sync_intervall_minuten = int(request.POST.get("fsm_sync_intervall_minuten", 15))
+            except ValueError:
+                globale_einst.fsm_sync_intervall_minuten = 15
+        globale_einst.save(update_fields=["fsm_theorie_blockiert_beratung", "fsm_sync_intervall_minuten"])
+
+        from .services.fsm_sync import aktualisiere_fsm_schedule
+        aktualisiere_fsm_schedule(globale_einst.fsm_sync_intervall_minuten)
 
         # Zuordnungen speichern
         for fahrlehrer in fahrlehrer_liste:

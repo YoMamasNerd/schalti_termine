@@ -33,7 +33,7 @@
             Verbunden mit Fahrschulmanager
           </span>
           <p class="leer" style="margin:0.5rem 0 0">
-            Hintergrund-Synchronisation läuft alle 15 Minuten.
+            Hintergrund-Synchronisation: {% if globale_einst.fsm_sync_intervall_minuten > 0 %}alle {{ globale_einst.fsm_sync_intervall_minuten }} Minuten{% else %}deaktiviert (nur manuell){% endif %}.
           </p>
         {% endif %}
       </div>
@@ -65,6 +65,36 @@
   <!-- Zuordnungstabelle & Token -->
   <form method="post" novalidate>
     {% csrf_token %}
+
+    <div class="karte" style="margin-bottom: 1.5rem">
+      <h2>Automatische Synchronisation</h2>
+      <p class="leer">
+        Bestimmt, wie oft Schalti Termine im Hintergrund selbstständig Belegungen, Fahrstunden
+        und Sperrzeiten mit dem Fahrschulmanager abgleicht.
+      </p>
+      <div style="margin-top: 0.75rem; max-width: 320px">
+        <label for="fsm_sync_intervall_minuten" style="display:block; font-weight:600; margin-bottom:0.25rem">
+          Sync-Intervall
+        </label>
+        <select name="fsm_sync_intervall_minuten" id="fsm_sync_intervall_minuten" style="width:100%">
+          <option value="15" {% if globale_einst.fsm_sync_intervall_minuten == 15 %}selected{% endif %}>
+            Alle 15 Minuten (Standard)
+          </option>
+          <option value="30" {% if globale_einst.fsm_sync_intervall_minuten == 30 %}selected{% endif %}>
+            Alle 30 Minuten
+          </option>
+          <option value="60" {% if globale_einst.fsm_sync_intervall_minuten == 60 %}selected{% endif %}>
+            Stündlich (60 Minuten)
+          </option>
+          <option value="120" {% if globale_einst.fsm_sync_intervall_minuten == 120 %}selected{% endif %}>
+            Alle 2 Stunden (120 Minuten)
+          </option>
+          <option value="0" {% if globale_einst.fsm_sync_intervall_minuten == 0 %}selected{% endif %}>
+            Deaktiviert (nur manueller Sync)
+          </option>
+        </select>
+      </div>
+    </div>
 
     <div class="karte" style="margin-bottom: 1.5rem">
       <h2>FSM Authentifizierung</h2>

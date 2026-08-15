@@ -107,10 +107,24 @@ class FahrschulEinstellungen(models.Model):
         blank=True,
         help_text="Welche Führerscheinklassen die Fahrschule anbietet. Leer = alle Klassen stehen zur Auswahl.",
     )
+    FSM_INTERVALL_CHOICES = (
+        (15, "Alle 15 Minuten (Standard)"),
+        (30, "Alle 30 Minuten"),
+        (60, "Stündlich (60 Minuten)"),
+        (120, "Alle 2 Stunden (120 Minuten)"),
+        (0, "Deaktiviert (nur manueller Sync)"),
+    )
+
     fsm_theorie_blockiert_beratung = models.BooleanField(
         "Theorieunterricht blockiert Beratungen",
         default=True,
         help_text="Wenn ein Fahrlehrer Theorieunterricht (FSM-Terminart PT / Theorie) hat, werden in dieser Zeit für alle Fahrlehrer keine Beratungen angeboten (gemeinsamer Raum).",
+    )
+    fsm_sync_intervall_minuten = models.PositiveIntegerField(
+        "FSM Sync-Intervall",
+        choices=FSM_INTERVALL_CHOICES,
+        default=15,
+        help_text="Wie oft die Belegungszeiten (Sperren) im Hintergrund automatisch mit dem Fahrschulmanager abgeglichen werden.",
     )
 
     class Meta:

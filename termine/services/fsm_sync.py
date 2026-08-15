@@ -608,6 +608,32 @@ def sync_alle_fahrlehrer(client: FsmClient | None = None) -> dict[int, int]:
     return ergebnisse
 
 
+def aktualisiere_fsm_schedule(intervall_minuten: int | None = None) -> None:
+    """Passt den django-q Schedule für den FSM-Hintergrundsync dynamisch an."""
+    if intervall_minuten is None:
+        from ..models import FahrschulEinstellungen
+
+        intervall_minuten = FahrschulEinstellungen.get_solo().fsm_sync_intervall_minuten
+
+    try:
+        from django_q.models import Schedule
+
+        if intervall_minuten <= 0:
+            Schedule.objects.filter(name="FSM synchronisieren").update(repeats=0)
+        else:
+            Schedule.objects.update_or_create(
+                name="FSM synchronisieren",
+                defaults={
+                    "func": "termine.jobs.fsm_synchronisieren",
+                    "schedule_type": Schedule.MINUTES,
+                    "minutes": intervall_minuten,
+                    "repeats": -1,
+                },
+            )
+    except Exception as exc:
+        logger.warning("Konnte FSM Schedule nicht anpassen: %s", exc)
+
+
 # --- Asynchrone Task-Handler (django-q) --------------------------------------
 
 
