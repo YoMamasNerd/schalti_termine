@@ -1,6 +1,6 @@
 Hallo {{ buchung.name }},
 
-Ihr Beratungstermin (ursprünglich am {{ alter_beginn|date:"l, j. F Y um H:i" }} Uhr) wurde verschoben.
+Ihr Beratungstermin (ursprünglich am {{ alter_beginn|date:"l, j. F Y" }} um {{ alter_beginn|date:"H:i" }} Uhr) wurde verschoben.
 Hier sind Ihre neuen Termindetails:
 
   Wann:      {{ beginn|date:"l, j. F Y" }}, {{ beginn|date:"H:i" }} bis {{ ende|date:"H:i" }} Uhr
