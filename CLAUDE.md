@@ -56,8 +56,18 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
   Strich (`body.oeffentlich`). Interner Bereich (`body.intern`) ohne das.
 - Kopfzeile klebt beim Scrollen, milchig über dem Inhalt; Navigationspunkte als
   Pillen mit eingefärbtem aktivem Bereich (`aria-current="page"`).
-- Unter 760 px klappt die Navigation hinter einen Schalter – als `<details>`,
-  **ohne JavaScript**. Kein Skript für Aufklappmenüs nachrüsten.
+- Unter 960 px klappt die Navigation hinter einen Schalter – als `<details>`,
+  **ohne JavaScript**. Kein Skript für Aufklappmenüs nachrüsten. Die Grenze
+  richtet sich nach der ausgeklappten Leiste: Marke, sechs Punkte und die
+  Abmeldung stehen auf einer Zeile und brechen nicht um. Kommt ein Punkt
+  hinzu, muss die Zahl mitwachsen – sonst schiebt der klebende Kopf die ganze
+  Seite seitlich hinaus.
+- **Nichts darf die Seite breiter machen als das Fenster.** Grid-Elemente
+  schrumpfen von sich aus nicht unter ihren Inhalt: `.raster-zwei` benutzt
+  deshalb `minmax(0, …)` in beiden Fassungen und setzt `min-width: 0` an den
+  Spalten. Ohne das zieht ein einziges nicht umbrechendes Wort – die
+  Abo-Adresse des Kalenders – die Seite auf Schreibtischbreite. Ein
+  `overflow-x` am Kasten selbst greift dagegen nicht.
 - Der Kopf darf breiter spannen (1240 px) als der Inhalt (1040 px); sonst passt
   der Name der Fahrschule nicht neben die fünf Punkte.
 - Die öffentliche Seite ist auf das Handy optimiert, der interne Bereich auf den
