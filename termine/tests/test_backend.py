@@ -370,7 +370,7 @@ class Randfaelle(BackendBasis):
         heute = timezone.localdate()
         self.assertEqual(antwort.status_code, 200)
         self.assertEqual(
-            antwort.context["montag"], heute - dt.timedelta(days=heute.weekday())
+            antwort.context["start_tag"], heute
         )
 
     def test_tagesplanung_ohne_fahrlehrer_leitet_zum_anlegen(self):

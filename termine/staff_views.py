@@ -348,19 +348,19 @@ def tagesplanung(request):
         messages.warning(request, "Bitte legen Sie zuerst einen Fahrlehrer an.")
         return redirect("termine:fahrlehrer_neu")
 
+    heute = timezone.localdate()
     roh_woche = request.GET.get("woche")
     try:
-        bezug = dt.date.fromisoformat(roh_woche) if roh_woche else timezone.localdate()
+        start_tag = dt.date.fromisoformat(roh_woche) if roh_woche else heute
     except ValueError:
-        bezug = timezone.localdate()
-    montag = _montag(bezug)
-    sonntag = montag + dt.timedelta(days=6)
+        start_tag = heute
+    end_tag = start_tag + dt.timedelta(days=6)
 
     termine = (
         Termin.objects.filter(
             fahrlehrer=fahrlehrer,
-            beginn__gte=lokal(montag, dt.time.min),
-            beginn__lte=lokal(sonntag, dt.time.max),
+            beginn__gte=lokal(start_tag, dt.time.min),
+            beginn__lte=lokal(end_tag, dt.time.max),
         )
         # Entfallene Termine stehen nur noch als Beleg in der Datenbank; in der
         # Wochenansicht wären sie eine Zeile, an der es nichts zu tun gibt.
@@ -371,22 +371,21 @@ def tagesplanung(request):
     )
 
     nach_tag: dict[dt.date, list[Termin]] = {
-        montag + dt.timedelta(days=i): [] for i in range(7)
+        start_tag + dt.timedelta(days=i): [] for i in range(7)
     }
     for termin in termine:
         nach_tag.setdefault(termin.tag, []).append(termin)
 
-    feiertage = feiertage_im_zeitraum(fahrlehrer.bundesland, montag, sonntag)
+    feiertage = feiertage_im_zeitraum(fahrlehrer.bundesland, start_tag, end_tag)
     sperren = Sperrzeit.objects.filter(
         fahrlehrer=fahrlehrer,
-        beginn__lt=lokal(sonntag, dt.time.max),
-        ende__gt=lokal(montag, dt.time.min),
+        beginn__lt=lokal(end_tag, dt.time.max),
+        ende__gt=lokal(start_tag, dt.time.min),
     )
 
-    heute = timezone.localdate()
     tage = []
     for i in range(7):
-        tag = montag + dt.timedelta(days=i)
+        tag = start_tag + dt.timedelta(days=i)
         tag_start = lokal(tag, dt.time.min)
         tag_ende = lokal(tag, dt.time.max)
         tages_termine = nach_tag.get(tag, [])
@@ -451,7 +450,7 @@ def tagesplanung(request):
         )
 
     planungs_form = TagesplanungForm(
-        initial={"fahrlehrer": fahrlehrer, "tag": max(heute, montag)}
+        initial={"fahrlehrer": fahrlehrer, "tag": max(heute, start_tag)}
     )
     planungs_form.fields["fahrlehrer"].queryset = erlaubt
     sperr_form = SperrzeitForm(initial={"fahrlehrer": fahrlehrer})
@@ -463,11 +462,14 @@ def tagesplanung(request):
         {
             "fahrlehrer": fahrlehrer,
             "alle_fahrlehrer": erlaubt,
-            "montag": montag,
-            "sonntag": sonntag,
-            "vorherige_woche": montag - dt.timedelta(days=7),
-            "naechste_woche": montag + dt.timedelta(days=7),
-            "diese_woche": _montag(heute),
+            "start_tag": start_tag,
+            "end_tag": end_tag,
+            "montag": start_tag,
+            "sonntag": end_tag,
+            "vorherige_woche": start_tag - dt.timedelta(days=7),
+            "naechste_woche": start_tag + dt.timedelta(days=7),
+            "heute": heute,
+            "diese_woche": heute,
             "tage": tage,
             "sperrzeiten": sperren,
             "planungs_form": planungs_form,

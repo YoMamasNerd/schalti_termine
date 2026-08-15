@@ -17,10 +17,10 @@
           {% endfor %}
         </select>
       {% endif %}
-      <a class="knopf knopf--leise knopf--klein" href="?woche={{ vorherige_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}">&larr; Woche</a>
-      <a class="knopf knopf--leise knopf--klein" href="?woche={{ diese_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}">Heute</a>
-      <a class="knopf knopf--leise knopf--klein" href="?woche={{ naechste_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}">Woche &rarr;</a>
-      <strong style="margin-left:0.5rem">{{ montag|date:"j. F" }} – {{ sonntag|date:"j. F Y" }}</strong>
+      <a class="knopf knopf--leise knopf--klein" href="?woche={{ vorherige_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}">&larr; 7 Tage</a>
+      <a class="knopf knopf--leise knopf--klein" href="?woche={{ heute|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}">Ab heute</a>
+      <a class="knopf knopf--leise knopf--klein" href="?woche={{ naechste_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}">7 Tage &rarr;</a>
+      <strong style="margin-left:0.5rem">{{ start_tag|date:"j. F" }} – {{ end_tag|date:"j. F Y" }}</strong>
       <noscript><button class="knopf knopf--klein" type="submit">Wechseln</button></noscript>
     </div>
   </form>
