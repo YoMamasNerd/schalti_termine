@@ -89,3 +89,20 @@ class KoerperKlasse(TestCase):
         self.client.force_login(chef)
         antwort = self.client.get(reverse("termine:dashboard"))
         self.assertContains(antwort, '<body class="intern">')
+
+
+class StammdatenSichtbarkeit(TestCase):
+    def setUp(self):
+        self.superuser = get_user_model().objects.create_superuser("chef", password="geheim123")
+        self.staff_user = get_user_model().objects.create_user("mitarbeiter", password="geheim123", is_staff=True)
+        Fahrlehrer.objects.create(name="Mitarbeiter", benutzer=self.staff_user)
+
+    def test_stammdaten_fuer_superuser_sichtbar(self):
+        self.client.force_login(self.superuser)
+        antwort = self.client.get(reverse("termine:dashboard"))
+        self.assertContains(antwort, "Stammdaten")
+
+    def test_stammdaten_fuer_normalen_staff_unsichtbar(self):
+        self.client.force_login(self.staff_user)
+        antwort = self.client.get(reverse("termine:dashboard"))
+        self.assertNotContains(antwort, "Stammdaten")

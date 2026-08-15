@@ -282,15 +282,17 @@
           <div class="karte">
             <h2>👥 Team &amp; Zugangsrechte</h2>
             <p class="leer" style="line-height:1.55; margin-bottom:1rem">
-              Jeder Fahrlehrer erhält einen eigenen Login, eigene Regeln und ein eigenes Kalender-Abo. Neue Benutzerkonten und detaillierte Berechtigungen werden über den Administrationsbereich vergeben.
+              Jeder Fahrlehrer erhält einen eigenen Login, eigene Regeln und ein eigenes Kalender-Abo.
             </p>
             <div class="knopfreihe">
               <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:fahrlehrer_neu' %}">
                 + Neuen Fahrlehrer anlegen
               </a>
-              <a class="knopf knopf--leise knopf--klein" href="/django-admin/">
-                Stammdaten &amp; Benutzer (Admin)
-              </a>
+              {% if user.is_superuser %}
+                <a class="knopf knopf--leise knopf--klein" href="/django-admin/">
+                  Stammdaten &amp; Benutzer (Admin)
+                </a>
+              {% endif %}
             </div>
           </div>
         {% endif %}
