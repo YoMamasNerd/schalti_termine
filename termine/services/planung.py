@@ -86,6 +86,8 @@ def slots_einer_regel(regel: RhythmusRegel, tag: dt.date) -> list[tuple[dt.datet
     Es wird nur ein Termin erzeugt, wenn er komplett in das Fenster passt – ein
     angebrochener Rest am Ende fällt weg.
     """
+    if not regel.terminart:
+        return []
     art = regel.terminart
     dauer = dt.timedelta(minutes=art.dauer_minuten)
     schritt = dt.timedelta(minutes=art.schrittweite_minuten)
@@ -101,6 +103,72 @@ def slots_einer_regel(regel: RhythmusRegel, tag: dt.date) -> list[tuple[dt.datet
     return slots
 
 
+def generiere_regel_sperren(
+    fahrlehrer: Fahrlehrer, von: dt.date, bis: dt.date, jetzt: dt.datetime
+) -> list[int]:
+    """Erzeugt für alle aktiven Sperrzeit-Regeln konkrete Sperrzeiten im Horizont."""
+    sperr_regeln = list(
+        RhythmusRegel.objects.filter(
+            fahrlehrer=fahrlehrer,
+            aktiv=True,
+            regel_art=RhythmusRegel.RegelArt.SPERRE,
+        )
+    )
+    if not sperr_regeln:
+        return []
+
+    feiertage = feiertage_im_zeitraum(fahrlehrer.bundesland, von, bis)
+    erzeugte_pks: list[int] = []
+
+    tag = von
+    while tag <= bis:
+        ist_feiertag = tag in feiertage
+        for regel in sperr_regeln:
+            if not regel.gilt_am(tag):
+                continue
+            if ist_feiertag and regel.feiertage_auslassen:
+                continue
+
+            sperr_start = lokal(tag, regel.beginn)
+            sperr_ende = lokal(tag, regel.ende)
+
+            if sperr_ende <= jetzt:
+                continue
+
+            sperre, created = Sperrzeit.objects.update_or_create(
+                fahrlehrer=fahrlehrer,
+                regel=regel,
+                beginn=sperr_start,
+                defaults={
+                    "ende": sperr_ende,
+                    "grund": regel.grund or regel.bezeichnung or "Regel-Blocker",
+                    "typ": regel.sperrzeit_typ or Sperrzeit.Typ.PRIVAT,
+                    "herkunft": Sperrzeit.Herkunft.MANUELL,
+                },
+            )
+            erzeugte_pks.append(sperre.pk)
+
+            if created:
+                # Freie Termine im gesperrten Zeitraum entfernen
+                termine_entfernen(
+                    Termin.objects.filter(
+                        fahrlehrer=fahrlehrer,
+                        status=Termin.Status.FREI,
+                        beginn__lt=sperr_ende,
+                        ende__gt=sperr_start,
+                    )
+                )
+
+                if getattr(settings, "FSM_SYNC_ENABLED", False) and fahrlehrer.fsm_sync_aktiv and fahrlehrer.fsm_id:
+                    from . import fsm_sync
+
+                    transaction.on_commit(lambda s=sperre: fsm_sync.async_buche_sperrzeit_in_fsm(s))
+
+        tag += dt.timedelta(days=1)
+
+    return erzeugte_pks
+
+
 def _ueberschneidet(a_beginn, a_ende, b_beginn, b_ende) -> bool:
     return a_beginn < b_ende and b_beginn < a_ende
 
@@ -108,9 +176,13 @@ def _ueberschneidet(a_beginn, a_ende, b_beginn, b_ende) -> bool:
 def gewuenschte_termine(
     fahrlehrer: Fahrlehrer, von: dt.date, bis: dt.date, bericht: Bericht
 ) -> dict[dt.datetime, tuple[dt.datetime, Terminart, RhythmusRegel]]:
-    """Der Soll-Zustand: welche Termine die Regeln in diesem Zeitraum ergeben."""
+    """Der Soll-Zustand: welche Termine die Angebots-Regeln in diesem Zeitraum ergeben."""
     regeln = list(
-        RhythmusRegel.objects.filter(fahrlehrer=fahrlehrer, aktiv=True).select_related("terminart")
+        RhythmusRegel.objects.filter(
+            fahrlehrer=fahrlehrer,
+            aktiv=True,
+            regel_art=RhythmusRegel.RegelArt.ANGEBOT,
+        ).select_related("terminart")
     )
     if not regeln:
         return {}
@@ -220,6 +292,16 @@ def generiere_termine(
     # Der Generator arbeitet ausschließlich in der Zukunft.
     fenster_start = max(lokal(von, dt.time.min), jetzt)
     fenster_ende = lokal(bis, dt.time.max)
+
+    # 0. Sperrzeiten aus Blocker-Regeln erzeugen & veraltete aufräumen
+    erzeugte_sperren = generiere_regel_sperren(fahrlehrer, von, bis, jetzt)
+    if aufraeumen:
+        Sperrzeit.objects.filter(
+            fahrlehrer=fahrlehrer,
+            regel__isnull=False,
+            beginn__gte=fenster_start,
+            beginn__lte=fenster_ende,
+        ).exclude(pk__in=erzeugte_sperren).delete()
 
     soll = gewuenschte_termine(fahrlehrer, von, bis, bericht)
     soll = {beginn: wert for beginn, wert in soll.items() if beginn >= fenster_start}

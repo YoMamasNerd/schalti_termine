@@ -20,6 +20,18 @@
             {{ feld }}
             {% for fehler in feld.errors %}<div class="fehler">{{ fehler }}</div>{% endfor %}
           </div>
+        {% elif feld.name == "terminart" %}
+          <div id="feld-terminart-wrap">
+            {% include "termine/_feld.html" with feld=feld %}
+          </div>
+        {% elif feld.name == "sperrzeit_typ" %}
+          <div id="feld-sperrzeit-typ-wrap">
+            {% include "termine/_feld.html" with feld=feld %}
+          </div>
+        {% elif feld.name == "grund" %}
+          <div id="feld-grund-wrap">
+            {% include "termine/_feld.html" with feld=feld %}
+          </div>
         {% else %}
           {% include "termine/_feld.html" with feld=feld %}
         {% endif %}
@@ -27,7 +39,7 @@
 
       <div class="knopfreihe">
         <button class="knopf" type="submit" name="speichern_und_generieren" value="1">
-          Speichern und Termine erzeugen
+          Speichern und Termine / Blocker erzeugen
         </button>
         <button class="knopf knopf--leise" type="submit">Nur speichern</button>
       </div>
@@ -37,6 +49,11 @@
       <div class="karte">
         <h2>So funktioniert der Rhythmus</h2>
         <dl style="font-size:0.9rem">
+          <dt><strong>Art der Regel</strong></dt>
+          <dd style="margin:0 0 0.7rem">
+            <strong>Beratungstermine:</strong> Erzeugt freie Kundenslots.<br>
+            <strong>Sperrzeit / Blocker:</strong> Blockiert feste wiederkehrende Zeiten (z. B. Kita, Pause, Pflege) und überträgt sie bei Bedarf an FSM.
+          </dd>
           <dt><strong>Wochentage</strong></dt>
           <dd style="margin:0 0 0.7rem">An welchen Tagen die Regel greift.</dd>
           <dt><strong>Rhythmus</strong></dt>
@@ -49,10 +66,9 @@
             Überspringt die gesetzlichen Feiertage des Bundeslands, das beim
             Fahrlehrer hinterlegt ist.
           </dd>
-          <dt><strong>Zeitfenster</strong></dt>
+          <dt><strong>Gültigkeitszeitraum</strong></dt>
           <dd style="margin:0">
-            Wird in Termine der gewählten Terminart zerlegt. Ein angebrochener
-            Rest am Ende fällt weg.
+            Mit „Gültig ab“ und „Gültig bis“ können Sie wiederkehrende Blocker z. B. exakt auf ein Quartal oder ein Semester begrenzen.
           </dd>
         </dl>
       </div>
@@ -61,10 +77,10 @@
         <div class="karte">
           <h2>Vorschau</h2>
           {% if vorschau_tage %}
-            <p class="leer">Diese Regel würde im aktuellen Planungshorizont folgende Termine erzeugen:</p>
+            <p class="leer">Diese Regel würde im aktuellen Planungshorizont folgende Termine / Blocker erzeugen:</p>
             <div class="tabelle-huelle">
               <table class="liste">
-                <thead><tr><th>Tag</th><th>Termine</th></tr></thead>
+                <thead><tr><th>Tag</th><th>Einträge</th></tr></thead>
                 <tbody>
                   {% for tag, anzahl in vorschau_tage %}
                     <tr><td>{{ tag|date:"D, j. F Y" }}</td><td>{{ anzahl }}</td></tr>
@@ -74,14 +90,14 @@
             </div>
           {% else %}
             <p class="leer">
-              Diese Regel erzeugt im aktuellen Horizont keine Termine – prüfen Sie
+              Diese Regel erzeugt im aktuellen Horizont keine Einträge – prüfen Sie
               Wochentage, Gültigkeitszeitraum und Rhythmus.
             </p>
           {% endif %}
 
           <form method="post" action="{% url 'termine:regel_loeschen' regel.pk %}"
                 style="margin-top:1rem"
-                onsubmit="return confirm('Regel wirklich löschen? Freie Termine aus dieser Regel werden mitgelöscht, gebuchte bleiben bestehen.');">
+                onsubmit="return confirm('Regel wirklich löschen? Freie Termine / Blocker aus dieser Regel werden mitgelöscht, gebuchte bleiben bestehen.');">
             {% csrf_token %}
             <button class="knopf knopf--gefahr knopf--klein" type="submit">Regel löschen</button>
           </form>
@@ -89,4 +105,26 @@
       {% endif %}
     </div>
   </div>
+
+  <script>
+    (function() {
+      const artSelect = document.querySelector('select[name="regel_art"]');
+      const terminartWrap = document.getElementById('feld-terminart-wrap');
+      const sperrzeitTypWrap = document.getElementById('feld-sperrzeit-typ-wrap');
+      const grundWrap = document.getElementById('feld-grund-wrap');
+
+      function updateSichtbarkeit() {
+        if (!artSelect) return;
+        const istSperre = artSelect.value === 'sperre';
+        if (terminartWrap) terminartWrap.style.display = istSperre ? 'none' : 'block';
+        if (sperrzeitTypWrap) sperrzeitTypWrap.style.display = istSperre ? 'block' : 'none';
+        if (grundWrap) grundWrap.style.display = istSperre ? 'block' : 'none';
+      }
+
+      if (artSelect) {
+        artSelect.addEventListener('change', updateSichtbarkeit);
+        updateSichtbarkeit();
+      }
+    })();
+  </script>
 {% endblock %}

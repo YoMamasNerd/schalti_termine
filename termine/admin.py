@@ -26,7 +26,10 @@ class RhythmusRegelInline(admin.TabularInline):
     form = RhythmusRegelForm
     extra = 0
     fields = (
+        "regel_art",
         "terminart",
+        "sperrzeit_typ",
+        "grund",
         "wochentage",
         "beginn",
         "ende",
@@ -118,14 +121,16 @@ class RhythmusRegelAdmin(admin.ModelAdmin):
     list_display = (
         "__str__",
         "fahrlehrer",
+        "regel_art",
         "terminart",
+        "sperrzeit_typ",
         "rhythmus",
         "gueltig_ab",
         "gueltig_bis",
         "feiertage_auslassen",
         "aktiv",
     )
-    list_filter = ("aktiv", "fahrlehrer", "terminart", "feiertage_auslassen")
+    list_filter = ("aktiv", "regel_art", "sperrzeit_typ", "fahrlehrer", "terminart", "feiertage_auslassen")
     actions = ["termine_generieren"]
 
     @admin.display(description="Rhythmus")

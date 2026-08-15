@@ -313,6 +313,11 @@ class Terminart(models.Model):
         return self.dauer_minuten + self.puffer_minuten
 
 
+class SperrzeitTyp(models.TextChoices):
+    SONSTIGE = "sonstige", "Sonstige Tätigkeit / Urlaub (Arbeitszeit)"
+    PRIVAT = "privat", "Privat (keine Arbeitszeit)"
+
+
 class RhythmusRegel(models.Model):
     """Wiederkehrende Verfügbarkeit, aus der Termine im Voraus erzeugt werden.
 
@@ -320,11 +325,40 @@ class RhythmusRegel(models.Model):
     „freitags 09:00–12:00, jede 2. Woche“.
     """
 
+    class RegelArt(models.TextChoices):
+        ANGEBOT = "angebot", "Beratungstermine anbieten"
+        SPERRE = "sperre", "Sperrzeit / Blocker"
+
     fahrlehrer = models.ForeignKey(
         Fahrlehrer, on_delete=models.CASCADE, related_name="regeln", verbose_name="Fahrlehrer"
     )
+    regel_art = models.CharField(
+        "Art der Regel",
+        max_length=10,
+        choices=RegelArt.choices,
+        default=RegelArt.ANGEBOT,
+    )
     terminart = models.ForeignKey(
-        Terminart, on_delete=models.PROTECT, related_name="regeln", verbose_name="Terminart"
+        Terminart,
+        on_delete=models.PROTECT,
+        related_name="regeln",
+        verbose_name="Terminart",
+        null=True,
+        blank=True,
+    )
+    sperrzeit_typ = models.CharField(
+        "Sperrzeit-Typ",
+        max_length=10,
+        choices=SperrzeitTyp.choices,
+        default=SperrzeitTyp.PRIVAT,
+        blank=True,
+        help_text="„Privat“ blockiert den Kalender, zählt aber in FSM nicht als Arbeitszeit.",
+    )
+    grund = models.CharField(
+        "Grund / Notiz",
+        max_length=200,
+        blank=True,
+        help_text="z. B. Kinder aus Kita abholen, Pause, Arzt",
     )
     bezeichnung = models.CharField(
         "Bezeichnung", max_length=120, blank=True, help_text="Nur zur Orientierung im Backend."
@@ -367,12 +401,17 @@ class RhythmusRegel(models.Model):
     def __str__(self) -> str:
         if self.bezeichnung:
             return self.bezeichnung
+        if self.regel_art == self.RegelArt.SPERRE:
+            typ_lbl = self.get_sperrzeit_typ_display()
+            return f"Blocker ({typ_lbl}): {self.wochentage_kurz} {self.beginn:%H:%M}–{self.ende:%H:%M}"
         return f"{self.wochentage_kurz} {self.beginn:%H:%M}–{self.ende:%H:%M}"
 
     def clean(self):
         fehler = {}
         if self.beginn >= self.ende:
             fehler["ende"] = "Das Ende muss nach dem Beginn liegen."
+        if self.regel_art == self.RegelArt.ANGEBOT and not self.terminart_id:
+            fehler["terminart"] = "Für Terminangebote ist eine Terminart erforderlich."
         if not isinstance(self.wochentage, list) or not self.wochentage:
             fehler["wochentage"] = "Mindestens ein Wochentag muss ausgewählt sein."
         else:
@@ -419,12 +458,18 @@ class Sperrzeit(models.Model):
         MANUELL = "manuell", "Manuell"
         FSM = "fsm", "FSM-Import"
 
-    class Typ(models.TextChoices):
-        SONSTIGE = "sonstige", "Sonstige Tätigkeit / Urlaub (Arbeitszeit)"
-        PRIVAT = "privat", "Privat (keine Arbeitszeit)"
+    Typ = SperrzeitTyp
 
     fahrlehrer = models.ForeignKey(
         Fahrlehrer, on_delete=models.CASCADE, related_name="sperrzeiten", verbose_name="Fahrlehrer"
+    )
+    regel = models.ForeignKey(
+        RhythmusRegel,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="generierte_sperrzeiten",
+        verbose_name="Erzeugt aus Regel",
     )
     beginn = models.DateTimeField("Beginn")
     ende = models.DateTimeField("Ende")

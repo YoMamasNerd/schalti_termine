@@ -770,17 +770,29 @@ def regel_bearbeiten(request, pk: int | None = None):
         form = RhythmusRegelForm(instance=regel)
         form.fields["fahrlehrer"].queryset = erlaubt
 
-    # Vorschau: welche Termine würde diese Regelkonstellation erzeugen?
+    # Vorschau: welche Termine / Blocker würde diese Regelkonstellation erzeugen?
     vorschau_tage = []
     if regel is not None:
-        soll, bericht = vorschau(regel.fahrlehrer)
-        nach_tag: dict[dt.date, int] = {}
-        for beginn, (_, _, quelle) in soll.items():
-            if quelle.pk == regel.pk:
-                nach_tag[timezone.localtime(beginn).date()] = (
-                    nach_tag.get(timezone.localtime(beginn).date(), 0) + 1
-                )
-        vorschau_tage = sorted(nach_tag.items())
+        if regel.regel_art == RhythmusRegel.RegelArt.SPERRE:
+            wochen = FahrschulEinstellungen.get_solo().horizont_wochen or 4
+            von = timezone.localdate()
+            bis = von + dt.timedelta(days=wochen * 7 - 1)
+            feiertage = feiertage_im_zeitraum(regel.fahrlehrer.bundesland, von, bis)
+            tag = von
+            while tag <= bis:
+                if regel.gilt_am(tag):
+                    if not (tag in feiertage and regel.feiertage_auslassen):
+                        vorschau_tage.append((tag, 1))
+                tag += dt.timedelta(days=1)
+        else:
+            soll, bericht = vorschau(regel.fahrlehrer)
+            nach_tag: dict[dt.date, int] = {}
+            for beginn, (_, _, quelle) in soll.items():
+                if quelle.pk == regel.pk:
+                    nach_tag[timezone.localtime(beginn).date()] = (
+                        nach_tag.get(timezone.localtime(beginn).date(), 0) + 1
+                    )
+            vorschau_tage = sorted(nach_tag.items())
 
     return render(
         request,
@@ -798,6 +810,18 @@ def regel_loeschen(request, pk: int):
     fahrlehrer = regel.fahrlehrer
     # Freie Termine aus dieser Regel mit entfernen, gebuchte bleiben bestehen.
     termine_entfernen(Termin.objects.filter(regel=regel, status=Termin.Status.FREI))
+    # Generierte Sperrzeiten aus dieser Regel ebenfalls löschen
+    sperren = list(Sperrzeit.objects.filter(regel=regel))
+    fsm_ids = []
+    for s in sperren:
+        if s.fsm_id:
+            fsm_ids.extend([fid.strip() for fid in s.fsm_id.split(",") if fid.strip()])
+    if fsm_ids:
+        from .services import fsm_sync
+
+        transaction.on_commit(lambda: fsm_sync.async_loesche_fsm_termine(fsm_ids))
+    Sperrzeit.objects.filter(regel=regel).delete()
+
     regel.delete()
     messages.success(
         request,

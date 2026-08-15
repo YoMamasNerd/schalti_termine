@@ -22,7 +22,7 @@
         <thead>
           <tr>
             <th>Fahrlehrer</th><th>Wochentage</th><th>Zeit</th><th>Rhythmus</th>
-            <th>Terminart</th><th>Gültig</th><th>Feiertage</th><th>Status</th><th></th>
+            <th>Art / Zweck</th><th>Gültig</th><th>Feiertage</th><th>Status</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -35,7 +35,16 @@
                 {% if regel.intervall_wochen == 1 %}wöchentlich
                 {% else %}alle {{ regel.intervall_wochen }} Wochen{% endif %}
               </td>
-              <td>{{ regel.terminart.name }}<br><span class="leer">{{ regel.terminart.dauer_minuten }} Min.</span></td>
+              <td>
+                {% if regel.regel_art == "sperre" %}
+                  <span class="marke-status" style="background:#fee2e2; color:#991b1b; font-size:0.75rem">Blocker</span>
+                  {% if regel.grund %}<br><strong>{{ regel.grund }}</strong>{% endif %}
+                  <br><span class="leer">{{ regel.get_sperrzeit_typ_display }}</span>
+                {% else %}
+                  <span class="marke-status" style="background:#dcfce7; color:#166534; font-size:0.75rem">Termine</span>
+                  {% if regel.terminart %}<br><strong>{{ regel.terminart.name }}</strong><br><span class="leer">{{ regel.terminart.dauer_minuten }} Min.</span>{% endif %}
+                {% endif %}
+              </td>
               <td>
                 ab {{ regel.gueltig_ab|date:"SHORT_DATE_FORMAT" }}
                 {% if regel.gueltig_bis %}<br>bis {{ regel.gueltig_bis|date:"SHORT_DATE_FORMAT" }}{% endif %}

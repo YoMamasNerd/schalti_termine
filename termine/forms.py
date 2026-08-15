@@ -167,7 +167,10 @@ class RhythmusRegelForm(forms.ModelForm):
         model = RhythmusRegel
         fields = [
             "fahrlehrer",
+            "regel_art",
             "terminart",
+            "sperrzeit_typ",
+            "grund",
             "bezeichnung",
             "wochentage",
             "beginn",
@@ -189,15 +192,30 @@ class RhythmusRegelForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if "terminart" in self.fields:
+            self.fields["terminart"].required = False
+        if "sperrzeit_typ" in self.fields:
+            self.fields["sperrzeit_typ"].required = False
+        if "regel_art" in self.fields:
+            self.fields["regel_art"].required = False
         if not self.instance.pk:
             self.initial.setdefault("beginn", dt.time(15, 30))
             self.initial.setdefault("ende", dt.time(17, 0))
+            self.initial.setdefault("regel_art", RhythmusRegel.RegelArt.ANGEBOT)
         vorhanden = self.initial.get("wochentage") or []
         if vorhanden:
             self.initial["wochentage"] = [str(tag) for tag in vorhanden]
 
     def clean_wochentage(self):
         return sorted(int(tag) for tag in self.cleaned_data["wochentage"])
+
+    def clean(self):
+        daten = super().clean()
+        art = daten.get("regel_art") or RhythmusRegel.RegelArt.ANGEBOT
+        daten["regel_art"] = art
+        if art == RhythmusRegel.RegelArt.ANGEBOT and not daten.get("terminart"):
+            self.add_error("terminart", "Für Terminangebote ist eine Terminart erforderlich.")
+        return daten
 
 
 class TerminartForm(forms.ModelForm):

@@ -348,3 +348,53 @@ class ManuelleTagesplanung(BasisDaten):
         self.assertEqual(len(neue), 2)      # 15:00 und 15:30
         self.assertEqual(uebersprungen, 2)  # 14:00 und 14:30 waren schon belegt
         self.assertEqual(Termin.objects.count(), 4)
+
+
+class SperrzeitRegelnTests(BasisDaten):
+    def test_sperrzeit_regel_erzeugt_sperren_und_blockiert_angebot(self):
+        # 1. Angebots-Regel 14:00 - 18:00
+        self.regel(
+            wochentage=[self.montag.weekday()],
+            beginn=dt.time(14, 0),
+            ende=dt.time(18, 0),
+        )
+        # 2. Blocker-Regel (z.B. Kita) 15:00 - 16:30
+        RhythmusRegel.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            regel_art=RhythmusRegel.RegelArt.SPERRE,
+            sperrzeit_typ=Sperrzeit.Typ.PRIVAT,
+            grund="Kita abholen",
+            beginn=dt.time(15, 0),
+            ende=dt.time(16, 30),
+            wochentage=[self.montag.weekday()],
+            gueltig_ab=self.montag,
+            intervall_wochen=1,
+            aktiv=True,
+        )
+
+        bericht = generiere_termine(self.fahrlehrer, wochen=2, ab=self.montag)
+
+        # Sperrzeit muss existieren
+        sperre = Sperrzeit.objects.filter(
+            fahrlehrer=self.fahrlehrer,
+            regel__isnull=False,
+            typ=Sperrzeit.Typ.PRIVAT,
+            grund="Kita abholen",
+            beginn__date=self.montag,
+        ).first()
+        self.assertIsNotNone(sperre)
+        self.assertEqual(sperre.beginn, lokal(self.montag, dt.time(15, 0)))
+        self.assertEqual(sperre.ende, lokal(self.montag, dt.time(16, 30)))
+
+        # Termine am Montag: 14:00, 14:30, (15:00-16:30 geblockt), 16:30, 17:00, 17:30
+        termine = termine_am(self.montag)
+        uhrzeiten = [timezone.localtime(t.beginn).strftime("%H:%M") for t in termine]
+        self.assertIn("14:00", uhrzeiten)
+        self.assertIn("14:30", uhrzeiten)
+        self.assertNotIn("15:00", uhrzeiten)
+        self.assertNotIn("15:30", uhrzeiten)
+        self.assertNotIn("16:00", uhrzeiten)
+        self.assertIn("16:30", uhrzeiten)
+        self.assertIn("17:00", uhrzeiten)
+        self.assertIn("17:30", uhrzeiten)
+
