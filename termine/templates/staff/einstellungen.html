@@ -3,24 +3,8 @@
 {% block titel %}Einstellungen – {{ SITE_NAME }}{% endblock %}
 
 {% block inhalt %}
-  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem">
+  <div style="margin-bottom:1.5rem">
     <h1>Einstellungen</h1>
-
-    {% if alle_fahrlehrer.count > 1 %}
-      <form method="get" style="margin:0">
-        <div style="display:flex; align-items:center; gap:0.5rem">
-          <label for="fahrlehrer" style="font-weight:600; font-size:0.9rem; color:var(--text-leise)">Fahrlehrer:</label>
-          <select name="fahrlehrer" id="fahrlehrer" style="width:auto; padding:0.35rem 0.6rem; font-size:0.9rem" onchange="this.form.submit()">
-            {% for person in alle_fahrlehrer %}
-              <option value="{{ person.slug }}" {% if person.pk == fahrlehrer.pk %}selected{% endif %}>
-                {{ person.name }}{% if not person.aktiv %} (inaktiv){% endif %}
-              </option>
-            {% endfor %}
-          </select>
-          <noscript><button class="knopf knopf--klein" type="submit">Wechseln</button></noscript>
-        </div>
-      </form>
-    {% endif %}
   </div>
 
   {% if not fahrlehrer %}
@@ -56,6 +40,25 @@
 
     {# --- TAB 1: Fahrlehrer & Profil --- #}
     <div id="tab-profil" class="tab-inhalt">
+      {% if alle_fahrlehrer.count > 1 %}
+        <div class="karte" style="margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; background:var(--flaeche-dunkel)">
+          <div style="display:flex; align-items:center; gap:0.6rem">
+            <span style="font-size:1.1rem">👤</span>
+            <label for="fahrlehrer_select" style="font-weight:600; font-size:0.95rem">Ausgewählter Fahrlehrer:</label>
+          </div>
+          <form method="get" style="margin:0; display:flex; align-items:center; gap:0.5rem">
+            <select name="fahrlehrer" id="fahrlehrer_select" style="width:auto; padding:0.4rem 0.75rem; font-size:0.95rem; font-weight:600" onchange="this.form.submit()">
+              {% for person in alle_fahrlehrer %}
+                <option value="{{ person.slug }}" {% if person.pk == fahrlehrer.pk %}selected{% endif %}>
+                  {{ person.name }}{% if not person.aktiv %} (inaktiv){% endif %}
+                </option>
+              {% endfor %}
+            </select>
+            <noscript><button class="knopf knopf--klein" type="submit">Wechseln</button></noscript>
+          </form>
+        </div>
+      {% endif %}
+
       <div class="raster-zwei">
         <form class="karte" method="post"
               action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}" novalidate>
