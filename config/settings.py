@@ -56,6 +56,18 @@ DATENSCHUTZ_URL = os.environ.get("DATENSCHUTZ_URL", "")
 # Liste: Wer beliebige Einbettung zulässt, lädt zum Klickfang ein.
 EMBED_ORIGINS = env_list("EMBED_ORIGINS")
 
+# --- Fahrschulmanager (FSM) Integration ------------------------------------
+# Ermöglicht die optionale Synchronisation von Beratungsterminen und Belegungszeiten.
+FSM_SYNC_ENABLED = env_bool("FSM_SYNC_ENABLED", default=False)
+FSM_EMAIL = os.environ.get("FSM_EMAIL", "")
+FSM_PASSWORD = os.environ.get("FSM_PASSWORD", "")
+FSM_BASE_URL = os.environ.get("FSM_BASE_URL", "https://api.fahrschulmanager.de/v1").rstrip("/")
+FSM_API_KEY = os.environ.get(
+    "FSM_API_KEY",
+    "04TapXakdwXWUDVJyNEE8.W3t83Y3FhNryQABM0cMUq10JBH6Wv7X2k1iassfBsXOJpgyUHlYm2nUfCk6vdgVl10NadmfI8KnSmqefUlOJjv.8gCXHwujMBoT0TY2gGQ",
+)
+FSM_LEISTUNGSART_ID = os.environ.get("FSM_LEISTUNGSART_ID", "4330ec51-91b9-45f1-a3fb-88179db000ce")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",

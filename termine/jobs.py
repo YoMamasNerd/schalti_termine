@@ -33,3 +33,11 @@ def erinnerungen() -> str:
 def datenpflege() -> str:
     """Täglich: personenbezogene Daten alter Buchungen löschen."""
     return f"{alte_buchungen_anonymisieren()} Buchungen anonymisiert"
+
+
+def fsm_synchronisieren() -> str:
+    """Regelmäßig: Belegungszeiten (Sperren) aus dem Fahrschulmanager abgleichen."""
+    from .services.fsm_sync import sync_alle_fahrlehrer
+
+    ergebnisse = sync_alle_fahrlehrer()
+    return f"FSM-Sync: {sum(ergebnisse.values())} Sperrzeiten für {len(ergebnisse)} Fahrlehrer abgeglichen"

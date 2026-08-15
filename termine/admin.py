@@ -57,6 +57,7 @@ class FahrlehrerAdmin(admin.ModelAdmin):
             },
         ),
         ("Kalender-Abo", {"fields": ("kalender_abo",)}),
+        ("Fahrschulmanager (FSM)", {"fields": ("fsm_id", "fsm_sync_aktiv")}),
     )
 
     @admin.display(description="Abo-URL für Outlook/Google/Apple")

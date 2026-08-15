@@ -106,6 +106,17 @@ class Fahrlehrer(models.Model):
         help_text="Geheimer Teil der Kalender-Abo-URL. Beim Zurücksetzen wird das "
         "alte Abo ungültig.",
     )
+    fsm_id = models.CharField(
+        "FSM-Fahrlehrer-ID",
+        max_length=64,
+        blank=True,
+        help_text="Optionale ID des Fahrlehrers im Fahrschulmanager für automatische Synchronisation.",
+    )
+    fsm_sync_aktiv = models.BooleanField(
+        "FSM-Sync aktiv",
+        default=True,
+        help_text="Termine und Belegungszeiten automatisch mit dem Fahrschulmanager synchronisieren.",
+    )
     aktiv = models.BooleanField("Aktiv", default=True)
     reihenfolge = models.IntegerField("Reihenfolge", default=0)
 
@@ -327,6 +338,12 @@ class Sperrzeit(models.Model):
     beginn = models.DateTimeField("Beginn")
     ende = models.DateTimeField("Ende")
     grund = models.CharField("Grund", max_length=200, blank=True)
+    fsm_id = models.CharField(
+        "FSM-ID",
+        max_length=64,
+        blank=True,
+        help_text="Optionale FSM-Termin-ID, wenn die Sperrzeit aus dem Fahrschulmanager stammt.",
+    )
 
     class Meta:
         verbose_name = "Sperrzeit"
@@ -439,6 +456,12 @@ class Termin(models.Model):
         blank=True,
         related_name="termine",
         verbose_name="Erzeugt durch Regel",
+    )
+    fsm_termin_id = models.CharField(
+        "FSM-Termin-ID",
+        max_length=64,
+        blank=True,
+        help_text="ID des synchronisierten Termins im Fahrschulmanager.",
     )
     notiz = models.CharField("Interne Notiz", max_length=200, blank=True)
     erstellt_am = models.DateTimeField(auto_now_add=True)
