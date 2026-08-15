@@ -148,6 +148,20 @@
           </p>
         </div>
 
+        {% if FSM_SYNC_ENABLED %}
+          <div class="karte">
+            <h2>Fahrschulmanager (FSM)</h2>
+            <p class="leer">
+              Kalender-Synchronisation und Vorab-Blockierung mit dem Fahrschulmanager.
+            </p>
+            <p class="knopfreihe">
+              <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:fsm_einstellungen' %}">
+                FSM-Verknüpfung verwalten
+              </a>
+            </p>
+          </div>
+        {% endif %}
+
         {% if ist_inhaber %}
           <div class="karte">
             <h2>Fahrschule</h2>

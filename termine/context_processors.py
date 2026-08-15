@@ -9,4 +9,5 @@ def site(request):
         "RESERVATION_MINUTES": settings.RESERVATION_MINUTES,
         "IMPRESSUM_URL": settings.IMPRESSUM_URL,
         "DATENSCHUTZ_URL": settings.DATENSCHUTZ_URL,
+        "FSM_SYNC_ENABLED": getattr(settings, "FSM_SYNC_ENABLED", False),
     }

@@ -17,10 +17,12 @@ from __future__ import annotations
 import datetime as dt
 from functools import wraps
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count, Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -47,6 +49,7 @@ from .models import (
 )
 from .services import buchung as buchungs_service
 from .services.feiertage import feiertage_im_zeitraum
+from .services.fsm_client import FsmClient, FsmError
 from .services.planung import (
     generiere_termine,
     lokal,
@@ -730,3 +733,85 @@ def fahrlehrer_neu(request):
     else:
         form = FahrlehrerEinstellungenForm(inhaber=True)
     return render(request, "staff/fahrlehrer_formular.html", {"form": form})
+
+
+@mitarbeiter
+def fsm_einstellungen(request):
+    """Verwaltung der Verknüpfungen zwischen lokalen Fahrlehrern und dem Fahrschulmanager (FSM)."""
+    if not getattr(settings, "FSM_SYNC_ENABLED", False):
+        raise Http404("FSM-Integration ist in dieser Installation nicht aktiviert.")
+
+    ist_inhaber = request.user.is_staff
+    fahrlehrer_liste = Fahrlehrer.objects.all().order_by("reihenfolge", "name")
+
+    fsm_client = FsmClient()
+    fsm_lehrer_liste = []
+    fsm_fehler = None
+    try:
+        fsm_lehrer_liste = fsm_client.get_fahrlehrer()
+    except FsmError as exc:
+        fsm_fehler = str(exc)
+
+    if request.method == "POST":
+        aktion = request.POST.get("aktion")
+
+        if aktion == "sync":
+            from .services.fsm_sync import sync_alle_fahrlehrer
+
+            ergebnisse = sync_alle_fahrlehrer(client=fsm_client)
+            gesamt = sum(ergebnisse.values())
+            messages.success(
+                request,
+                f"Synchronisation erfolgreich: {gesamt} Sperrzeiten für {len(ergebnisse)} Fahrlehrer abgeglichen.",
+            )
+            return redirect("termine:fsm_einstellungen")
+
+        # Zuordnungen speichern
+        for fahrlehrer in fahrlehrer_liste:
+            key_id = f"fsm_id_{fahrlehrer.pk}"
+            key_aktiv = f"fsm_sync_aktiv_{fahrlehrer.pk}"
+
+            if key_id in request.POST:
+                fahrlehrer.fsm_id = request.POST.get(key_id, "").strip()
+                fahrlehrer.fsm_sync_aktiv = key_aktiv in request.POST
+                fahrlehrer.save(update_fields=["fsm_id", "fsm_sync_aktiv"])
+
+        messages.success(request, "FSM-Verknüpfungen gespeichert.")
+
+        if "sync_nach_speichern" in request.POST:
+            from .services.fsm_sync import sync_alle_fahrlehrer
+
+            ergebnisse = sync_alle_fahrlehrer(client=fsm_client)
+            gesamt = sum(ergebnisse.values())
+            messages.success(
+                request,
+                f"Synchronisation durchgeführt: {gesamt} Sperrzeiten abgeglichen.",
+            )
+
+        return redirect("termine:fsm_einstellungen")
+
+    jetzt = timezone.now()
+    fahrlehrer_daten = []
+    for fl in fahrlehrer_liste:
+        anzahl_sperren = (
+            Sperrzeit.objects.filter(fahrlehrer=fl, beginn__gte=jetzt)
+            .exclude(fsm_id="")
+            .count()
+        )
+        fahrlehrer_daten.append(
+            {
+                "fahrlehrer": fl,
+                "fsm_sperren_count": anzahl_sperren,
+            }
+        )
+
+    return render(
+        request,
+        "staff/fsm_einstellungen.html",
+        {
+            "fahrlehrer_daten": fahrlehrer_daten,
+            "fsm_lehrer_liste": fsm_lehrer_liste,
+            "fsm_fehler": fsm_fehler,
+            "ist_inhaber": ist_inhaber,
+        },
+    )

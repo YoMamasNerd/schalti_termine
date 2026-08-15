@@ -68,4 +68,5 @@ urlpatterns = [
         name="sperrzeit_loeschen",
     ),
     path("intern/einstellungen/fahrlehrer/neu/", staff_views.fahrlehrer_neu, name="fahrlehrer_neu"),
+    path("intern/einstellungen/fsm/", staff_views.fsm_einstellungen, name="fsm_einstellungen"),
 ]
