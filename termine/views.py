@@ -362,3 +362,13 @@ def healthz(request):
     )
     antwort["Cache-Control"] = "no-store"
     return antwort
+
+
+def impressum(request):
+    """Öffentliches Impressum der Fahrschule Schaltwerk."""
+    return render(request, "impressum.html")
+
+
+def datenschutz(request):
+    """Öffentliche Datenschutzerklärung der Fahrschule Schaltwerk."""
+    return render(request, "datenschutz.html")

@@ -15,6 +15,8 @@ urlpatterns = [
     path("termin/<str:token>/stornieren/", views.buchung_stornieren, name="buchung_stornieren"),
     path("termin/<str:token>/loeschen/", views.buchung_loeschen, name="buchung_loeschen"),
     path("kalender/<str:token>.ics", views.ics_feed, name="ics_feed"),
+    path("impressum/", views.impressum, name="impressum"),
+    path("datenschutz/", views.datenschutz, name="datenschutz"),
     # Nur die Terminauswahl, ohne Kopf und Fuß – für den Rahmen in einer
     # fremden Seite. Siehe docs/EINBETTEN.md.
     path("einbetten/", views.einbetten, name="einbetten"),

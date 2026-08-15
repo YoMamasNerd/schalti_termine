@@ -47,8 +47,8 @@ SITE_NAME = os.environ.get("SITE_NAME", "Fahrschule – Beratungstermine")
 # Rechtliche Links. Sie stehen im Seitenfuß und im Fuß jeder HTML-Mail – und
 # Mails entstehen ohne Request, kommen also nicht an den Kontextprozessor.
 # Deshalb liegen sie hier und nicht dort.
-IMPRESSUM_URL = os.environ.get("IMPRESSUM_URL", "")
-DATENSCHUTZ_URL = os.environ.get("DATENSCHUTZ_URL", "")
+IMPRESSUM_URL = os.environ.get("IMPRESSUM_URL", "/impressum/")
+DATENSCHUTZ_URL = os.environ.get("DATENSCHUTZ_URL", "/datenschutz/")
 
 # Seiten, die die Terminauswahl unter /einbetten/ in einen Rahmen setzen
 # dürfen, z. B. https://fahrschule-schaltwerk.de. Leer = niemand; die

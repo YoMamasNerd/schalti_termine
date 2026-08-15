@@ -43,8 +43,16 @@ def _kontext(buchung, **extra) -> dict:
         "buchungen_url": settings.SITE_BASE_URL + reverse("termine:buchungen"),
         # Mails entstehen ohne Request, also auch ohne Kontextprozessor: Die
         # rechtlichen Links für den Fuß müssen hier von Hand dazu.
-        "impressum_url": settings.IMPRESSUM_URL,
-        "datenschutz_url": settings.DATENSCHUTZ_URL,
+        "impressum_url": (
+            f"{settings.SITE_BASE_URL}{settings.IMPRESSUM_URL}"
+            if settings.IMPRESSUM_URL.startswith("/")
+            else settings.IMPRESSUM_URL
+        ) if settings.IMPRESSUM_URL else "",
+        "datenschutz_url": (
+            f"{settings.SITE_BASE_URL}{settings.DATENSCHUTZ_URL}"
+            if settings.DATENSCHUTZ_URL.startswith("/")
+            else settings.DATENSCHUTZ_URL
+        ) if settings.DATENSCHUTZ_URL else "",
         **extra,
     }
 

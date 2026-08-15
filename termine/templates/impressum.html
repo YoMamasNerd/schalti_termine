@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block titel %}Impressum – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+<div class="huelle-schmal">
+  <div style="margin-bottom:1.5rem">
+    <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:start' %}">&larr; Zurück zur Terminbuchung</a>
+  </div>
+
+  <div class="karte">
+    <h1 style="margin-top:0; margin-bottom:1.5rem">Impressum</h1>
+
+    <h2 style="font-size:1.15rem; margin-top:1.5rem; margin-bottom:0.5rem">Angaben gemäß § 5 TMG</h2>
+    <p style="margin:0 0 1rem; line-height:1.6">
+      <strong>Fahrschule Schaltwerk</strong><br>
+      Inhaber: Marten Hampel<br>
+      Chemnitzer Straße 213<br>
+      12621 Berlin
+    </p>
+
+    <h2 style="font-size:1.15rem; margin-top:1.5rem; margin-bottom:0.5rem">Kontakt</h2>
+    <p style="margin:0 0 1rem; line-height:1.6">
+      Telefon: <a href="tel:03056591237">030 · 565 9 123 7</a><br>
+      E-Mail: <a href="mailto:{{ KONTAKT_EMAIL }}">{{ KONTAKT_EMAIL }}</a><br>
+      Web: <a href="https://www.fahrschule-schaltwerk.de" target="_blank" rel="noopener">www.fahrschule-schaltwerk.de</a>
+    </p>
+
+    <h2 style="font-size:1.15rem; margin-top:1.5rem; margin-bottom:0.5rem">Register & Steuernummer</h2>
+    <p style="margin:0 0 1rem; line-height:1.6">
+      Fahrschulnummer: 1972<br>
+      Umsatzsteuer-ID / Steuernummer: 33/329/00368
+    </p>
+
+    <h2 style="font-size:1.15rem; margin-top:1.5rem; margin-bottom:0.5rem">Zuständige Aufsichtsbehörde</h2>
+    <p style="margin:0 0 1rem; line-height:1.6">
+      Landesamt für Bürger- und Ordnungsangelegenheiten Berlin (LABO)<br>
+      Puttkamer Straße 16–18<br>
+      10958 Berlin
+    </p>
+
+    <h2 style="font-size:1.15rem; margin-top:1.5rem; margin-bottom:0.5rem">Inhaltlich verantwortlich</h2>
+    <p style="margin:0 0 1rem; line-height:1.6">
+      Marten Hampel (Anschrift wie oben)
+    </p>
+
+    <h2 style="font-size:1.15rem; margin-top:1.5rem; margin-bottom:0.5rem">Haftung für Inhalte und Links</h2>
+    <p style="margin:0 0 1rem; line-height:1.6; color:var(--text-leise); font-size:0.9rem">
+      Als Diensteanbieter sind wir gemäß § 7 Abs.1 TMG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen. Unser Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte wir keinen Einfluss haben. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten verantwortlich.
+    </p>
+  </div>
+</div>
+{% endblock %}

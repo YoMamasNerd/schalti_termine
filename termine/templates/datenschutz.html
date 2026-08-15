@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block titel %}Datenschutzerklärung – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+<div class="huelle-schmal">
+  <div style="margin-bottom:1.5rem">
+    <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:start' %}">&larr; Zurück zur Terminbuchung</a>
+  </div>
+
+  <div class="karte">
+    <h1 style="margin-top:0; margin-bottom:1.5rem">Datenschutzerklärung</h1>
+
+    <h2 style="font-size:1.15rem; margin-top:1.5rem; margin-bottom:0.5rem">1. Verantwortlicher</h2>
+    <p style="margin:0 0 1rem; line-height:1.6">
+      <strong>Fahrschule Schaltwerk</strong><br>
+      Inhaber: Marten Hampel<br>
+      Chemnitzer Straße 213<br>
+      12621 Berlin<br>
+      Telefon: <a href="tel:03056591237">030 · 565 9 123 7</a><br>
+      E-Mail: <a href="mailto:{{ KONTAKT_EMAIL }}">{{ KONTAKT_EMAIL }}</a>
+    </p>
+
+    <h2 style="font-size:1.15rem; margin-top:1.5rem; margin-bottom:0.5rem">2. Zweck und Rechtsgrundlage der Datenverarbeitung</h2>
+    <p style="margin:0 0 1rem; line-height:1.6">
+      Wir verarbeiten personenbezogene Daten unserer Nutzer grundsätzlich nur, soweit dies zur Bereitstellung einer funktionsfähigen Website sowie unserer Inhalte und Leistungen erforderlich ist. Die Verarbeitung erfolgt auf Grundlage der Datenschutz-Grundverordnung (DSGVO):
+    </p>
+    <ul style="margin:0 0 1rem 1.2rem; line-height:1.6">
+      <li><strong>Art. 6 Abs. 1 lit. a DSGVO (Einwilligung):</strong> Bei ausdrücklicher Zustimmung zur Verarbeitung personenbezogener Daten.</li>
+      <li><strong>Art. 6 Abs. 1 lit. b DSGVO (Vertrag / Vorvertragliche Maßnahmen):</strong> Zur Durchführung und Organisation von Beratungsterminen und Ausbildungsanfragen.</li>
+      <li><strong>Art. 6 Abs. 1 lit. f DSGVO (Berechtigtes Interesse):</strong> Für den sicheren und zuverlässigen Betrieb unseres Online-Buchungssystems.</li>
+    </ul>
+
+    <h2 style="font-size:1.15rem; margin-top:1.5rem; margin-bottom:0.5rem">3. Online-Terminbuchung & Double-Opt-In</h2>
+    <p style="margin:0 0 1rem; line-height:1.6">
+      Wenn Sie über unser System einen Beratungstermin vereinbaren, erheben wir folgende Daten:
+    </p>
+    <ul style="margin:0 0 1rem 1.2rem; line-height:1.6">
+      <li>Vor- und Nachname</li>
+      <li>E-Mail-Adresse</li>
+      <li>Telefonnummer (optional)</li>
+      <li>Gewünschte Führerscheinklasse (optional)</li>
+      <li>Ihre persönliche Nachricht oder Notiz (optional)</li>
+    </ul>
+    <p style="margin:0 0 1rem; line-height:1.6">
+      <strong>Verifizierungsverfahren (Double-Opt-In):</strong> Nach Absenden des Buchungsformulars senden wir Ihnen eine E-Mail mit einem Bestätigungslink. Erst durch das Anklicken dieses Links wird der Termin verbindlich gebucht. Wird der Link nicht innerhalb der Reservierungsfrist geklickt, wird die Reservierung automatisch verworfen und der Termin wieder freigegeben.
+    </p>
+    <p style="margin:0 0 1rem; line-height:1.6">
+      <strong>Erinnerungs- und Aktualisierungs-Mails:</strong> Im Rahmen der Terminabwicklung erhalten Sie Bestätigungs-, Erinnerungs- und ggf. Storno- oder Verschiebungs-E-Mails inklusive einer Kalenderdatei (.ics).
+    </p>
+
+    <h2 style="font-size:1.15rem; margin-top:1.5rem; margin-bottom:0.5rem">4. Speicherdauer & Anonymisierung</h2>
+    <p style="margin:0 0 1rem; line-height:1.6">
+      Personenbezogene Daten aus Beratungsterminen werden nach Ablauf der gesetzlichen und betrieblichen Aufbewahrungsfristen (automatisch nach Fristablauf) vollständig und unwiederbringlich anonymisiert (Name, Telefon, E-Mail und Nachricht werden gelöscht).
+    </p>
+    <p style="margin:0 0 1rem; line-height:1.6">
+      <strong>Recht auf vorzeitige Löschung:</strong> In jeder Buchungsbestätigung erhalten Sie einen persönlichen Verwaltungslink, über den Sie Ihre personenbezogenen Daten jederzeit mit sofortiger Wirkung selbstständig löschen können.
+    </p>
+
+    <h2 style="font-size:1.15rem; margin-top:1.5rem; margin-bottom:0.5rem">5. Server-Logfiles</h2>
+    <p style="margin:0 0 1rem; line-height:1.6">
+      Beim Aufruf unserer Seiten erfasst der Webserver automatisch technische Informationen (z. B. Browsertyp, Betriebssystem, Datum und Uhrzeit des Zugriffs, IP-Adresse). Diese Daten dienen ausschließlich der Sicherstellung eines störungsfreien Betriebs und der Systemsicherheit und werden nicht mit anderen Datenquellen zusammengeführt.
+    </p>
+
+    <h2 style="font-size:1.15rem; margin-top:1.5rem; margin-bottom:0.5rem">6. Ihre Rechte</h2>
+    <p style="margin:0 0 1rem; line-height:1.6">
+      Sie haben nach der DSGVO jederzeit das Recht auf:
+    </p>
+    <ul style="margin:0 0 1rem 1.2rem; line-height:1.6">
+      <li><strong>Auskunft (Art. 15 DSGVO)</strong> über Ihre bei uns gespeicherten personenbezogenen Daten.</li>
+      <li><strong>Berichtigung (Art. 16 DSGVO)</strong> unrichtiger oder unvollständiger Daten.</li>
+      <li><strong>Löschung (Art. 17 DSGVO)</strong> Ihrer bei uns gespeicherten Daten.</li>
+      <li><strong>Einschränkung der Verarbeitung (Art. 18 DSGVO)</strong> und <strong>Datenübertragbarkeit (Art. 20 DSGVO)</strong>.</li>
+      <li><strong>Widerspruch (Art. 21 DSGVO)</strong> gegen die Verarbeitung Ihrer Daten.</li>
+      <li><strong>Beschwerde bei einer Datenschutz-Aufsichtsbehörde (Art. 77 DSGVO)</strong>, z. B. bei der Berliner Beauftragten für Datenschutz und Informationsfreiheit.</li>
+    </ul>
+
+    <p style="margin:1rem 0 0; line-height:1.6; color:var(--text-leise); font-size:0.9rem">
+      Wenden Sie sich zur Ausübung Ihrer Rechte gerne jederzeit per E-Mail an <a href="mailto:{{ KONTAKT_EMAIL }}">{{ KONTAKT_EMAIL }}</a>.
+    </p>
+  </div>
+</div>
+{% endblock %}
