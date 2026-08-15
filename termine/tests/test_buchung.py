@@ -14,6 +14,12 @@ from termine.services.ics import buchung_als_ics, fahrlehrer_feed
 
 class BuchungsBasis(TestCase):
     def setUp(self):
+        from termine.models import FahrschulEinstellungen
+
+        einst = FahrschulEinstellungen.get_solo()
+        einst.vorlauf_stunden = 1
+        einst.save()
+
         self.art = Terminart.objects.create(
             name="Erstberatung", dauer_minuten=30, ort="Hauptstraße 1"
         )
@@ -21,7 +27,6 @@ class BuchungsBasis(TestCase):
             name="Anna Berger",
             email="anna@example.org",
             bundesland="BW",
-            vorlauf_stunden=1,
         )
         self.termin = self.neuer_termin()
 

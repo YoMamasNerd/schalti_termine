@@ -54,6 +54,34 @@ def neuer_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+class FahrschulEinstellungen(models.Model):
+    """Zentrale Einstellungen der Fahrschule (Mindest-Vorlauf, Planungshorizont)."""
+
+    vorlauf_stunden = models.PositiveIntegerField(
+        "Mindest-Vorlauf (Stunden)",
+        default=24,
+        help_text="Termine, die früher als dieser Vorlauf beginnen, sind nicht mehr buchbar.",
+    )
+    horizont_wochen = models.PositiveIntegerField(
+        "Planungshorizont (Wochen)",
+        default=4,
+        validators=[MinValueValidator(1), MaxValueValidator(52)],
+        help_text="Wie viele Wochen im Voraus aus den Rhythmus-Regeln Termine erzeugt und angeboten werden.",
+    )
+
+    class Meta:
+        verbose_name = "Fahrschul-Einstellungen"
+        verbose_name_plural = "Fahrschul-Einstellungen"
+
+    def __str__(self) -> str:
+        return f"Globale Einstellungen ({self.vorlauf_stunden}h Vorlauf, {self.horizont_wochen}w Horizont)"
+
+    @classmethod
+    def get_solo(cls) -> "FahrschulEinstellungen":
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 class Fahrlehrer(models.Model):
     """Eine Person, die Beratungstermine anbietet."""
 
@@ -150,22 +178,13 @@ class Fahrlehrer(models.Model):
     def fruehester_start(self, jetzt: dt.datetime | None = None) -> dt.datetime:
         """Ab wann ein Termin frühestens buchbar ist (Mindest-Vorlauf)."""
         jetzt = jetzt or timezone.now()
-        return jetzt + dt.timedelta(hours=self.vorlauf_stunden)
+        vorlauf = FahrschulEinstellungen.get_solo().vorlauf_stunden
+        return jetzt + dt.timedelta(hours=vorlauf)
 
     def spaetester_start(self, heute: dt.date | None = None) -> dt.datetime:
-        """Bis wann ein Termin höchstens buchbar ist (Planungshorizont).
-
-        Dieselbe Rechnung wie im Generator: Er plant von heute an
-        `wochen * 7` Tage, heute eingeschlossen – der letzte Tag ist also
-        `wochen * 7 - 1` Tage entfernt, und zwar bis zu seinem Ende.
-
-        Die Grenze gilt auch für von Hand angelegte Termine. Wer sie als
-        Fahrlehrer überschreiten will, stellt den Horizont hoch – sonst wäre
-        die Einstellung nur eine Empfehlung an den Generator und nicht das,
-        was sie verspricht: wie weit im Voraus Kunden buchen können.
-        """
+        """Bis wann ein Termin höchstens buchbar ist (Planungshorizont)."""
         heute = heute or timezone.localdate()
-        wochen = self.horizont_wochen or settings.DEFAULT_HORIZON_WEEKS
+        wochen = FahrschulEinstellungen.get_solo().horizont_wochen or settings.DEFAULT_HORIZON_WEEKS
         letzter_tag = heute + dt.timedelta(days=wochen * 7 - 1)
         return timezone.make_aware(dt.datetime.combine(letzter_tag, dt.time.max))
 

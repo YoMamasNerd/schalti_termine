@@ -212,7 +212,9 @@ def generiere_termine(
     aufraeumen: bool = True,
 ) -> Bericht:
     """Rollt die Rhythmus-Regeln eines Fahrlehrers in konkrete Termine aus."""
-    wochen = wochen or fahrlehrer.horizont_wochen or settings.DEFAULT_HORIZON_WEEKS
+    from ..models import FahrschulEinstellungen
+
+    wochen = wochen or FahrschulEinstellungen.get_solo().horizont_wochen or settings.DEFAULT_HORIZON_WEEKS
     jetzt = timezone.now()
     von = ab or timezone.localdate(jetzt)
     bis = von + dt.timedelta(days=wochen * 7 - 1)
@@ -326,7 +328,9 @@ def vorschau(
     fahrlehrer: Fahrlehrer, *, wochen: int | None = None, ab: dt.date | None = None
 ) -> tuple[dict[dt.datetime, tuple], Bericht]:
     """Wie `generiere_termine`, aber ohne zu schreiben – für die Regel-Vorschau."""
-    wochen = wochen or fahrlehrer.horizont_wochen
+    from ..models import FahrschulEinstellungen
+
+    wochen = wochen or FahrschulEinstellungen.get_solo().horizont_wochen or settings.DEFAULT_HORIZON_WEEKS
     von = ab or timezone.localdate()
     bis = von + dt.timedelta(days=wochen * 7 - 1)
     bericht = Bericht(fahrlehrer=fahrlehrer.name, von=von, bis=bis)

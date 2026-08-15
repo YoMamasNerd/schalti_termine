@@ -212,6 +212,20 @@ class TerminartForm(forms.ModelForm):
         return name
 
 
+class GlobaleEinstellungenForm(forms.ModelForm):
+    """Fahrschulweite Einstellungen für Buchungsfenster und Planungshorizont."""
+
+    class Meta:
+        from .models import FahrschulEinstellungen
+
+        model = FahrschulEinstellungen
+        fields = ["vorlauf_stunden", "horizont_wochen"]
+        help_texts = {
+            "vorlauf_stunden": "Termine, die früher als dieser Vorlauf beginnen, sind nicht mehr buchbar.",
+            "horizont_wochen": "Wie weit im Voraus Kunden buchen können und der Generator Termine anlegt.",
+        }
+
+
 class FahrlehrerEinstellungenForm(forms.ModelForm):
     """Die Stammdaten eines Fahrlehrers, soweit er sie selbst pflegen darf.
 
@@ -231,17 +245,10 @@ class FahrlehrerEinstellungenForm(forms.ModelForm):
             "telefon",
             "beschreibung",
             "bundesland",
-            "vorlauf_stunden",
-            "horizont_wochen",
             "aktiv",
             "reihenfolge",
         ]
         widgets = {"beschreibung": forms.Textarea(attrs={"rows": 4})}
-        help_texts = {
-            "horizont_wochen": "Wie weit im Voraus Kunden buchen können. Die "
-            "automatische Planung reicht genauso weit – was dahinter liegt, "
-            "wird nicht angeboten.",
-        }
 
     def __init__(self, *args, inhaber: bool = False, **kwargs):
         super().__init__(*args, **kwargs)

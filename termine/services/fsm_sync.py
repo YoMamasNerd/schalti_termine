@@ -242,8 +242,11 @@ def sync_fahrlehrer_termine(
     if not is_fsm_aktiv_fuer_fahrlehrer(fahrlehrer):
         return 0
 
+    from ..models import FahrschulEinstellungen
+
     client = client or FsmClient()
-    tage = tage_voraus or (fahrlehrer.horizont_wochen * 7)
+    wochen = FahrschulEinstellungen.get_solo().horizont_wochen or 4
+    tage = tage_voraus or (wochen * 7)
     jetzt = timezone.now()
     ende = jetzt + dt.timedelta(days=tage)
 
@@ -277,8 +280,11 @@ def sync_blocker_fuer_fahrlehrer(
     if not is_fsm_aktiv_fuer_fahrlehrer(fahrlehrer):
         return 0
 
+    from ..models import FahrschulEinstellungen
+
     client = client or FsmClient()
-    tage = tage_voraus or (fahrlehrer.horizont_wochen * 7)
+    wochen = FahrschulEinstellungen.get_solo().horizont_wochen or 4
+    tage = tage_voraus or (wochen * 7)
 
     jetzt = timezone.now()
     ende = jetzt + dt.timedelta(days=tage)

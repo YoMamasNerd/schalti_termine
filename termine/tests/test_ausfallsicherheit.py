@@ -22,9 +22,15 @@ from termine.services.feiertage import feiertage_im_zeitraum, ist_feiertag
 
 class AusfallBasis(TestCase):
     def setUp(self):
+        from termine.models import FahrschulEinstellungen
+
+        einst = FahrschulEinstellungen.get_solo()
+        einst.vorlauf_stunden = 1
+        einst.save()
+
         self.art = Terminart.objects.create(name="Beratung", dauer_minuten=30)
         self.fahrlehrer = Fahrlehrer.objects.create(
-            name="Anna Berger", email="anna@example.org", bundesland="BW", vorlauf_stunden=1
+            name="Anna Berger", email="anna@example.org", bundesland="BW"
         )
         self.termin = self.neuer_termin()
 

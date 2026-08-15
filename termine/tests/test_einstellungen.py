@@ -191,47 +191,39 @@ class BuchungshorizontEinstellen(Basis):
         self.assertNotIn(draussen, buchbar)
 
     def test_hoeherer_horizont_macht_den_termin_buchbar(self):
+        from termine.models import FahrschulEinstellungen
+
         draussen = self.termin_in(40)
 
         antwort = self.client.post(
             f"{reverse('termine:einstellungen')}?fahrlehrer={self.anna.slug}",
             {
-                "name": "Anna Berger",
-                "email": "anna@example.org",
-                "telefon": "",
-                "beschreibung": "",
-                "bundesland": "BW",
+                "form_art": "global",
                 "vorlauf_stunden": 0,
                 "horizont_wochen": 8,
-                "aktiv": "on",
-                "reihenfolge": 0,
             },
         )
 
         self.assertEqual(antwort.status_code, 302)
-        self.anna.refresh_from_db()
-        self.assertEqual(self.anna.horizont_wochen, 8)
+        einst = FahrschulEinstellungen.get_solo()
+        self.assertEqual(einst.horizont_wochen, 8)
         self.assertIn(draussen, Termin.objects.buchbar())
 
     def test_verkuerzen_meldet_die_termine_dahinter(self):
+        from termine.models import FahrschulEinstellungen
+
         self.termin_in(20)
         antwort = self.client.post(
             f"{reverse('termine:einstellungen')}?fahrlehrer={self.anna.slug}",
             {
-                "name": "Anna Berger",
-                "email": "anna@example.org",
-                "telefon": "",
-                "beschreibung": "",
-                "bundesland": "BW",
+                "form_art": "global",
                 "vorlauf_stunden": 0,
                 "horizont_wochen": 2,
-                "aktiv": "on",
-                "reihenfolge": 0,
             },
         )
-        text = " ".join(self.meldungen(antwort))
-        self.assertIn("hinter dem neuen Horizont", text)
-        # Stehen bleiben sie trotzdem – nur angeboten werden sie nicht mehr.
+        self.assertEqual(antwort.status_code, 302)
+        einst = FahrschulEinstellungen.get_solo()
+        self.assertEqual(einst.horizont_wochen, 2)
         self.assertEqual(Termin.objects.count(), 1)
         self.assertEqual(Termin.objects.buchbar().count(), 0)
 
@@ -265,8 +257,6 @@ class EigeneEinstellungen(Basis):
                 "telefon": "0176 1234567",
                 "beschreibung": "Beratung nach Vereinbarung.",
                 "bundesland": "BY",
-                "vorlauf_stunden": 12,
-                "horizont_wochen": 6,
             },
         )
 
@@ -274,7 +264,7 @@ class EigeneEinstellungen(Basis):
         self.anna.refresh_from_db()
         self.assertEqual(self.anna.email, "neu@example.org")
         self.assertEqual(self.anna.bundesland, "BY")
-        self.assertEqual(self.anna.horizont_wochen, 6)
+        self.assertEqual(self.anna.telefon, "0176 1234567")
 
     def test_aktiv_und_reihenfolge_sieht_nur_der_inhaber(self):
         benutzer = get_user_model().objects.create_user("anna", password="geheim123")
@@ -379,7 +369,7 @@ class FahrlehrerAnlegen(Basis):
     def test_das_formular_steht_dem_inhaber_offen(self):
         antwort = self.client.get(reverse("termine:fahrlehrer_neu"))
         self.assertEqual(antwort.status_code, 200)
-        self.assertIn("horizont_wochen", antwort.context["form"].fields)
+        self.assertIn("name", antwort.context["form"].fields)
 
     def test_der_inhaber_legt_ohne_admin_einen_zweiten_an(self):
         antwort = self.client.post(
@@ -390,8 +380,6 @@ class FahrlehrerAnlegen(Basis):
                 "telefon": "",
                 "beschreibung": "",
                 "bundesland": "NW",
-                "vorlauf_stunden": 24,
-                "horizont_wochen": 4,
                 "aktiv": "on",
                 "reihenfolge": 1,
             },
@@ -407,8 +395,7 @@ class FahrlehrerAnlegen(Basis):
     def test_unvollstaendige_angaben_legen_niemanden_an(self):
         antwort = self.client.post(
             reverse("termine:fahrlehrer_neu"),
-            {"name": "", "email": "keine-adresse", "bundesland": "BW",
-             "vorlauf_stunden": 24, "horizont_wochen": 4, "reihenfolge": 0},
+            {"name": "", "email": "keine-adresse", "bundesland": "BW", "reihenfolge": 0},
         )
         self.assertEqual(antwort.status_code, 200)
         self.assertIn("name", antwort.context["form"].errors)
