@@ -554,6 +554,12 @@ def sperrzeit_anlegen(request):
             termin__ende__gt=sperre.beginn,
             status__in=Buchung.AKTIVE_STATUS,
         ).count()
+
+        if getattr(settings, "FSM_SYNC_ENABLED", False) and sperre.fahrlehrer.fsm_sync_aktiv and sperre.fahrlehrer.fsm_id:
+            from .services import fsm_sync
+
+            transaction.on_commit(lambda: fsm_sync.async_buche_sperrzeit_in_fsm(sperre))
+
         messages.success(request, f"Sperrzeit eingetragen, {entfernt} freie Termine entfernt.")
         if betroffen:
             messages.warning(
@@ -1043,6 +1049,12 @@ def sperrzeit_loeschen(request, pk: int):
     sperre = get_object_or_404(
         Sperrzeit, pk=pk, fahrlehrer__in=_erlaubte_fahrlehrer(request.user, auch_inaktive=True)
     )
+    if sperre.fsm_id:
+        from .services import fsm_sync
+
+        fsm_ids = [fid.strip() for fid in sperre.fsm_id.split(",") if fid.strip()]
+        transaction.on_commit(lambda: fsm_sync.async_loesche_fsm_termine(fsm_ids))
+
     sperre.delete()
     messages.success(
         request,

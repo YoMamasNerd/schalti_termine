@@ -396,17 +396,26 @@ class RhythmusRegel(models.Model):
 class Sperrzeit(models.Model):
     """Urlaub, Fahrstunde, Krankheit – blockiert einen Zeitraum komplett."""
 
+    class Herkunft(models.TextChoices):
+        MANUELL = "manuell", "Manuell"
+        FSM = "fsm", "FSM-Import"
+
     fahrlehrer = models.ForeignKey(
         Fahrlehrer, on_delete=models.CASCADE, related_name="sperrzeiten", verbose_name="Fahrlehrer"
     )
     beginn = models.DateTimeField("Beginn")
     ende = models.DateTimeField("Ende")
     grund = models.CharField("Grund", max_length=200, blank=True)
-    fsm_id = models.CharField(
+    fsm_id = models.TextField(
         "FSM-ID",
-        max_length=64,
         blank=True,
-        help_text="Optionale FSM-Termin-ID, wenn die Sperrzeit aus dem Fahrschulmanager stammt.",
+        help_text="Optionale FSM-Termin-ID(s), wenn die Sperrzeit mit dem Fahrschulmanager verknüpft ist.",
+    )
+    herkunft = models.CharField(
+        "Herkunft",
+        max_length=20,
+        choices=Herkunft.choices,
+        default=Herkunft.MANUELL,
     )
 
     class Meta:

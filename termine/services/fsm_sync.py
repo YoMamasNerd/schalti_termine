@@ -188,6 +188,93 @@ def exportiere_termin_nach_fsm(
         return None
 
 
+def zerlege_zeitraum_fuer_fsm(
+    beginn: dt.datetime,
+    ende: dt.datetime,
+    max_minuten: int = 600,
+) -> list[tuple[dt.datetime, dt.datetime]]:
+    """Zerlegt einen Sperrzeit-Zeitraum in FSM-kompatible Abschnitte von maximal `max_minuten` (Default: 600 min / 10h).
+
+    Die Abschnitte werden tageweise und in Blöcken von höchstens 600 Minuten aufgeteilt.
+    """
+    if beginn >= ende:
+        return []
+
+    abschnitte: list[tuple[dt.datetime, dt.datetime]] = []
+    curr = beginn
+
+    while curr < ende:
+        curr_local = timezone.localtime(curr) if timezone.is_aware(curr) else curr
+        naechster_tag_local = curr_local.replace(hour=0, minute=0, second=0, microsecond=0) + dt.timedelta(days=1)
+        naechster_tag = timezone.make_aware(naechster_tag_local) if timezone.is_naive(naechster_tag_local) else naechster_tag_local
+
+        tages_ende = min(naechster_tag, ende)
+        if tages_ende <= curr:
+            curr = curr + dt.timedelta(seconds=1)
+            continue
+
+        block_start = curr
+        while block_start < tages_ende:
+            block_ende = min(block_start + dt.timedelta(minutes=max_minuten), tages_ende)
+            if (block_ende - block_start).total_seconds() >= 60:
+                abschnitte.append((block_start, block_ende))
+            block_start = block_ende
+
+        curr = tages_ende
+
+    return abschnitte
+
+
+def exportiere_sperrzeit_nach_fsm(
+    sperre: Sperrzeit,
+    client: FsmClient | None = None,
+) -> list[str]:
+    """Exportiert eine Sperrzeit (Urlaub/Abwesenheit) als 'Sonstige Tätigkeit' in FSM.
+
+    Erstellt FSM-Termine von maximal 600 Minuten Länge und speichert die IDs kommagetrennt
+    im Feld `fsm_id` der Sperrzeit. Gibt die Liste der erzeugten FSM-IDs zurück.
+    """
+    if not is_fsm_aktiv_fuer_fahrlehrer(sperre.fahrlehrer):
+        return []
+
+    client = client or FsmClient()
+    abschnitte = zerlege_zeitraum_fuer_fsm(sperre.beginn, sperre.ende, max_minuten=600)
+    if not abschnitte:
+        return []
+
+    titel = f"Sonstige Tätigkeit: {sperre.grund}" if sperre.grund else "Sonstige Tätigkeit"
+    terminart = getattr(settings, "FSM_SONSTIGE_TAETIGKEIT_TERMINART", "ST")
+
+    erstellte_ids: list[str] = []
+    for von_dt, bis_dt in abschnitte:
+        try:
+            fsm_id = client.termin_anlegen(
+                fahrlehrer_fsm_id=sperre.fahrlehrer.fsm_id,
+                von=von_dt,
+                bis=bis_dt,
+                titel=titel,
+                terminart=terminart,
+            )
+            if fsm_id:
+                erstellte_ids.append(fsm_id)
+        except FsmError as exc:
+            logger.warning(
+                "FSM-Sync: Konnte Sperrzeit (%s - %s) für %s nicht in FSM eintragen: %s",
+                von_dt,
+                bis_dt,
+                sperre.fahrlehrer,
+                exc,
+            )
+
+    if erstellte_ids:
+        bisherige = [fid.strip() for fid in sperre.fsm_id.split(",") if fid.strip()]
+        kombiniert = list(dict.fromkeys(bisherige + erstellte_ids))
+        sperre.fsm_id = ",".join(kombiniert)
+        sperre.save(update_fields=["fsm_id"])
+
+    return erstellte_ids
+
+
 def loesche_fsm_termin_by_id(fsm_termin_id: str, client: FsmClient | None = None) -> bool:
     """Löscht einen Termin anhand seiner FSM-Termin-UUID aus dem FSM-Kalender."""
     if not fsm_termin_id:
@@ -325,12 +412,33 @@ def sync_blocker_fuer_fahrlehrer(
             # Hat noch keinen FSM-Blocker -> in FSM anlegen
             exportiere_termin_nach_fsm(termin, client=client)
 
-    # Bereits von Schalti erzeugte FSM-IDs
+    # Bereits von Schalti erzeugte FSM-IDs (Beratungstermine und eigene Sperrzeiten)
     eigene_fsm_ids = set(
         Termin.objects.filter(fahrlehrer=fahrlehrer)
         .exclude(fsm_termin_id="")
         .values_list("fsm_termin_id", flat=True)
     )
+    for raw_fsm_id in (
+        Sperrzeit.objects.filter(fahrlehrer=fahrlehrer, herkunft=Sperrzeit.Herkunft.MANUELL)
+        .exclude(fsm_id="")
+        .values_list("fsm_id", flat=True)
+    ):
+        for fid in raw_fsm_id.split(","):
+            fid_clean = fid.strip()
+            if fid_clean:
+                eigene_fsm_ids.add(fid_clean)
+
+    # Eigene manuelle Sperrzeiten ohne FSM-ID nach FSM exportieren
+    manuelle_sperren = Sperrzeit.objects.filter(
+        fahrlehrer=fahrlehrer,
+        herkunft=Sperrzeit.Herkunft.MANUELL,
+        beginn__gte=jetzt,
+        beginn__lte=ende,
+        fsm_id="",
+    )
+    for s in manuelle_sperren:
+        created_ids = exportiere_sperrzeit_nach_fsm(s, client=client)
+        eigene_fsm_ids.update(created_ids)
 
     gueltige_fsm_sperren: set[str] = set()
 
@@ -360,13 +468,15 @@ def sync_blocker_fuer_fahrlehrer(
                     "beginn": beginn,
                     "ende": termin_ende,
                     "grund": grund,
+                    "herkunft": Sperrzeit.Herkunft.FSM,
                 },
             )
             gueltige_fsm_sperren.add(fsm_id)
 
-        # Nicht mehr vorhandene Sperrzeiten bereinigen
+        # Nicht mehr vorhandene fremde Sperrzeiten bereinigen
         Sperrzeit.objects.filter(
             fahrlehrer=fahrlehrer,
+            herkunft=Sperrzeit.Herkunft.FSM,
             beginn__gte=jetzt,
             beginn__lte=ende,
         ).exclude(fsm_id="").exclude(fsm_id__in=gueltige_fsm_sperren).delete()
@@ -402,6 +512,15 @@ def _fsm_sync_termin_task(termin_id: int):
     return exportiere_termin_nach_fsm(termin)
 
 
+def _fsm_sync_sperrzeit_task(sperrzeit_id: int) -> list[str]:
+    """Hintergrund-Task zum Exportieren einer Sperrzeit in FSM als 'Sonstige Tätigkeit'."""
+    try:
+        sperre = Sperrzeit.objects.select_related("fahrlehrer").get(pk=sperrzeit_id)
+    except Sperrzeit.DoesNotExist:
+        return []
+    return exportiere_sperrzeit_nach_fsm(sperre)
+
+
 def _fsm_storno_task(termin_id: int):
     """Hintergrund-Task nach einer Stornierung."""
     try:
@@ -428,6 +547,21 @@ def _fsm_loesche_termine_task(fsm_ids: list[str]):
     for fid in fsm_ids:
         if fid:
             loesche_fsm_termin_by_id(fid, client=client)
+
+
+def async_buche_sperrzeit_in_fsm(sperre: Sperrzeit):
+    """Startet den FSM-Export einer Sperrzeit asynchron über django-q."""
+    if not is_fsm_aktiv_fuer_fahrlehrer(sperre.fahrlehrer):
+        return None
+    if getattr(settings, "IM_TESTLAUF", False):
+        return exportiere_sperrzeit_nach_fsm(sperre)
+    try:
+        from django_q.tasks import async_task
+
+        return async_task("termine.services.fsm_sync._fsm_sync_sperrzeit_task", sperre.pk)
+    except Exception:
+        logger.exception("Fehler beim Einreihen der FSM-Sperrzeit-Aufgabe – führe synchron aus")
+        return exportiere_sperrzeit_nach_fsm(sperre)
 
 
 def async_buche_in_fsm(buchung: Buchung):

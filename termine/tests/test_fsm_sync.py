@@ -143,6 +143,7 @@ class FsmSyncTests(TestCase):
             beginn=jetzt + dt.timedelta(days=2, hours=10),
             ende=jetzt + dt.timedelta(days=2, hours=11),
             grund="FSM: Alt",
+            herkunft=Sperrzeit.Herkunft.FSM,
         )
 
         mock_client = MagicMock()
@@ -417,6 +418,85 @@ class FsmEinstellungenViewTests(TestCase):
             neuer_fl = Fahrlehrer.objects.get(fsm_id="fsm-lehrer-neu-123")
             self.assertEqual(neuer_fl.name, "Stefan Richter")
             self.assertTrue(neuer_fl.fsm_sync_aktiv)
+
+    def test_zerlege_zeitraum_fuer_fsm(self):
+        from termine.services.fsm_sync import zerlege_zeitraum_fuer_fsm
+        from termine.services.planung import lokal
+
+        tag = timezone.localdate()
+
+        # 1. Zeitraum < 600 min an einem Tag (z.B. 4 Stunden = 240 min)
+        t1 = lokal(tag, dt.time(10, 0))
+        t2 = lokal(tag, dt.time(14, 0))
+        chunks = zerlege_zeitraum_fuer_fsm(t1, t2, max_minuten=600)
+        self.assertEqual(len(chunks), 1)
+        self.assertEqual(chunks[0], (t1, t2))
+
+        # 2. Zeitraum an einem Tag > 600 min (ganzer Tag 00:00 bis 23:59:59)
+        tag_start = lokal(tag, dt.time.min)
+        tag_ende = lokal(tag, dt.time.max)
+        chunks = zerlege_zeitraum_fuer_fsm(tag_start, tag_ende, max_minuten=600)
+        # 1440 min / 600 min = 3 chunks (600, 600, 240 min)
+        self.assertEqual(len(chunks), 3)
+        for start, ende in chunks:
+            dauer = (ende - start).total_seconds() / 60
+            self.assertLessEqual(dauer, 600)
+
+        # 3. Mehrtägiger Zeitraum (3 volle Tage)
+        ende_3_tage = lokal(tag + dt.timedelta(days=2), dt.time.max)
+        chunks_3_tage = zerlege_zeitraum_fuer_fsm(tag_start, ende_3_tage, max_minuten=600)
+        # 3 Tage * 3 Chunks = 9 Chunks
+        self.assertEqual(len(chunks_3_tage), 9)
+        for start, ende in chunks_3_tage:
+            dauer = (ende - start).total_seconds() / 60
+            self.assertLessEqual(dauer, 600)
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_exportiere_sperrzeit_nach_fsm(self):
+        from termine.services.fsm_sync import exportiere_sperrzeit_nach_fsm
+
+        self.fahrlehrer.fsm_id = "fsm-lehrer-uuid-1"
+        self.fahrlehrer.fsm_sync_aktiv = True
+        self.fahrlehrer.save()
+
+        jetzt = timezone.now()
+        sperre = Sperrzeit.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            beginn=jetzt + dt.timedelta(days=5, hours=8),
+            ende=jetzt + dt.timedelta(days=5, hours=16),
+            grund="Urlaub",
+        )
+
+        mock_client = MagicMock()
+        mock_client.termin_anlegen.return_value = "fsm-sperre-id-123"
+
+        ids = exportiere_sperrzeit_nach_fsm(sperre, client=mock_client)
+        self.assertEqual(ids, ["fsm-sperre-id-123"])
+        mock_client.termin_anlegen.assert_called_once()
+        _, kwargs = mock_client.termin_anlegen.call_args
+        self.assertEqual(kwargs["terminart"], "ST")
+        self.assertIn("Sonstige Tätigkeit", kwargs["titel"])
+        self.assertIn("Urlaub", kwargs["titel"])
+
+        sperre.refresh_from_db()
+        self.assertEqual(sperre.fsm_id, "fsm-sperre-id-123")
+
+    @override_settings(FSM_SYNC_ENABLED=False)
+    def test_sperrzeit_sync_ignoriert_wenn_fsm_deaktiviert(self):
+        from termine.services.fsm_sync import exportiere_sperrzeit_nach_fsm
+
+        jetzt = timezone.now()
+        sperre = Sperrzeit.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            beginn=jetzt + dt.timedelta(days=5),
+            ende=jetzt + dt.timedelta(days=6),
+            grund="Urlaub",
+        )
+
+        mock_client = MagicMock()
+        ids = exportiere_sperrzeit_nach_fsm(sperre, client=mock_client)
+        self.assertEqual(ids, [])
+        mock_client.termin_anlegen.assert_not_called()
 
 
 
