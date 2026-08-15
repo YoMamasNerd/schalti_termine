@@ -410,3 +410,129 @@ def termine_manuell_anlegen(
             transaction.on_commit(_sync_manuelle)
 
     return neue, uebersprungen + vergangen
+
+
+@dataclass
+class RhythmusKollision:
+    fahrlehrer: Fahrlehrer
+    tag: dt.date
+    beginn: dt.datetime
+    ende: dt.datetime
+    terminart: Terminart
+    regel: RhythmusRegel
+    grund: str
+    alternative_fahrlehrer: list[Fahrlehrer] = field(default_factory=list)
+
+
+def finde_kollisionen_rhythmus_regeln(
+    fahrlehrer_liste,
+    *,
+    von: dt.date | None = None,
+    bis: dt.date | None = None,
+) -> list[RhythmusKollision]:
+    """Findet alle Zeitfenster von aktiven Rhythmus-Regeln, die wegen Sperrzeiten
+
+    oder FSM-Blockern nicht als Beratungstermin angeboten werden können.
+    """
+    from ..models import FahrschulEinstellungen
+
+    jetzt = timezone.now()
+    von = von or timezone.localdate(jetzt)
+    if bis is None:
+        wochen = (
+            FahrschulEinstellungen.get_solo().horizont_wochen
+            or settings.DEFAULT_HORIZON_WEEKS
+        )
+        bis = von + dt.timedelta(days=wochen * 7 - 1)
+
+    fenster_start = max(lokal(von, dt.time.min), jetzt)
+    fenster_ende = lokal(bis, dt.time.max)
+
+    alle_aktiven_fl = list(Fahrlehrer.objects.filter(aktiv=True))
+
+    # Sperrzeiten aller aktiven Fahrlehrer im Zeitraum laden
+    alle_sperren = list(
+        Sperrzeit.objects.filter(
+            fahrlehrer__in=alle_aktiven_fl,
+            beginn__lt=fenster_ende,
+            ende__gt=fenster_start,
+        ).select_related("fahrlehrer")
+    )
+    # Termine aller aktiven Fahrlehrer im Zeitraum laden (um Alternativen zu prüfen)
+    alle_termine = list(
+        Termin.objects.filter(
+            fahrlehrer__in=alle_aktiven_fl,
+            beginn__lt=fenster_ende,
+            ende__gt=fenster_start,
+            status__in=[Termin.Status.FREI, Termin.Status.RESERVIERT, Termin.Status.GEBUCHT],
+        ).select_related("fahrlehrer")
+    )
+
+    kollisionen: list[RhythmusKollision] = []
+
+    for fl in fahrlehrer_liste:
+        regeln = list(
+            RhythmusRegel.objects.filter(fahrlehrer=fl, aktiv=True).select_related("terminart")
+        )
+        if not regeln:
+            continue
+
+        feiertage = feiertage_im_zeitraum(fl.bundesland, von, bis)
+        fl_sperren = [s for s in alle_sperren if s.fahrlehrer_id == fl.pk]
+
+        tag = von
+        while tag <= bis:
+            ist_feiertag = tag in feiertage
+            for regel in regeln:
+                if not regel.gilt_am(tag):
+                    continue
+                if ist_feiertag and regel.feiertage_auslassen:
+                    continue
+
+                for slot_beginn, slot_ende in slots_einer_regel(regel, tag):
+                    if slot_beginn < jetzt:
+                        continue
+
+                    # Prüfen, ob eine Sperrzeit überlappt
+                    kollidierende_sperre = None
+                    for s in fl_sperren:
+                        if _ueberschneidet(slot_beginn, slot_ende, s.beginn, s.ende):
+                            kollidierende_sperre = s
+                            break
+
+                    if kollidierende_sperre:
+                        # Alternative Fahrlehrer suchen: Wer hat zu dieser Zeit weder Sperrzeit noch Termin?
+                        alternativen = []
+                        for anderer_fl in alle_aktiven_fl:
+                            if anderer_fl.pk == fl.pk:
+                                continue
+                            hat_sperre = any(
+                                s.fahrlehrer_id == anderer_fl.pk
+                                and _ueberschneidet(slot_beginn, slot_ende, s.beginn, s.ende)
+                                for s in alle_sperren
+                            )
+                            hat_termin = any(
+                                t.fahrlehrer_id == anderer_fl.pk
+                                and _ueberschneidet(slot_beginn, slot_ende, t.beginn, t.ende)
+                                for t in alle_termine
+                            )
+                            if not hat_sperre and not hat_termin:
+                                alternativen.append(anderer_fl)
+
+                        grund = kollidierende_sperre.grund or "Blockiert"
+                        kollisionen.append(
+                            RhythmusKollision(
+                                fahrlehrer=fl,
+                                tag=tag,
+                                beginn=slot_beginn,
+                                ende=slot_ende,
+                                terminart=regel.terminart,
+                                regel=regel,
+                                grund=grund,
+                                alternative_fahrlehrer=alternativen,
+                            )
+                        )
+            tag += dt.timedelta(days=1)
+
+    kollisionen.sort(key=lambda k: k.beginn)
+    return kollisionen

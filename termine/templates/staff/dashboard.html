@@ -57,6 +57,61 @@
     {% endif %}
   </div>
 
+  <!-- Warnungen bei Rhythmus-Kollisionen -->
+  {% if kollisionen %}
+    <div class="karte" style="border-left:4px solid var(--rot); margin-bottom:1.5rem">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem">
+        <h2 style="margin:0; font-size:1.1rem; color:var(--rot); display:flex; align-items:center; gap:0.5rem">
+          ⚠️ Kollisionen bei Rhythmus-Terminen ({{ kollisionen|length }})
+        </h2>
+        <span class="leer" style="font-size:0.85rem">Durch Sperrzeiten oder Blocker nicht angelegt</span>
+      </div>
+      <p style="margin-bottom:0.75rem; font-size:0.9rem">
+        Folgende regelmäßige Termine konnten nicht im Kalender freigegeben werden, da der jeweilige Fahrlehrer blockiert ist. Sie können diese Termine manuell bei einem anderen verfügbaren Fahrlehrer einplanen:
+      </p>
+      <div class="tabelle-huelle">
+        <table class="liste" style="font-size:0.9rem">
+          <thead>
+            <tr>
+              <th>Wann</th>
+              <th>Fahrlehrer</th>
+              <th>Terminart</th>
+              <th>Grund / Blocker</th>
+              <th>Verfügbare Alternativen</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for kol in kollisionen %}
+              <tr>
+                <td><strong>{{ kol.beginn|date:"D, j. M Y, H:i" }}–{{ kol.ende|date:"H:i" }} Uhr</strong></td>
+                <td>{{ kol.fahrlehrer.name }}</td>
+                <td>{{ kol.terminart.name }}</td>
+                <td><span class="abzeichen" style="background:var(--rot-hell); color:var(--rot); padding:2px 6px; border-radius:3px; font-size:0.8rem">{{ kol.grund }}</span></td>
+                <td>
+                  {% if kol.alternative_fahrlehrer %}
+                    {% for alt in kol.alternative_fahrlehrer %}
+                      <span class="abzeichen" style="background:var(--gruen-hell); color:var(--gruen-dunkel); padding:2px 6px; border-radius:3px; font-size:0.8rem; margin-right:4px">
+                        ✓ {{ alt.name }}
+                      </span>
+                    {% endfor %}
+                  {% else %}
+                    <span class="leer">Kein anderer Fahrlehrer frei</span>
+                  {% endif %}
+                </td>
+                <td style="text-align:right">
+                  <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:tagesplanung' %}?woche={{ kol.tag|date:'Y-m-d' }}{% if kol.alternative_fahrlehrer %}&fahrlehrer={{ kol.alternative_fahrlehrer.0.slug }}{% else %}&fahrlehrer={{ kol.fahrlehrer.slug }}{% endif %}">
+                    In Tagesplanung öffnen &rarr;
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+
   <!-- Gespiegelter Kalender & Tagesdetails -->
   <div class="raster-zwei" id="dashboard-kalender" style="margin-bottom:1.5rem">
     <!-- Linke Spalte: Monatskalender -->

@@ -55,6 +55,7 @@ from .services import buchung as buchungs_service
 from .services.feiertage import feiertage_im_zeitraum
 from .services.fsm_client import FsmClient, FsmError
 from .services.planung import (
+    finde_kollisionen_rhythmus_regeln,
     generiere_alle,
     generiere_termine,
     lokal,
@@ -309,6 +310,8 @@ def dashboard(request):
         termin__beginn__gte=jetzt,
     ).count()
 
+    kollisionen = finde_kollisionen_rhythmus_regeln(ziel_fahrlehrer)
+
     querystring = f"fahrlehrer={gewaehlter_slug}" if gewaehlter_slug else ""
 
     return render(
@@ -332,6 +335,7 @@ def dashboard(request):
             "kpi_frei": kpi_frei,
             "kpi_gebucht": kpi_gebucht,
             "kpi_offen": kpi_offen,
+            "kollisionen": kollisionen,
         },
     )
 
