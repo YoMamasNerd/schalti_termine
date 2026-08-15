@@ -269,6 +269,43 @@ class FsmClient:
 
         raise FsmApiError(500, "Keine Termin-ID in der FSM-Antwort enthalten.", response_body=res)
 
+    def termin_aktualisieren(
+        self,
+        fsm_termin_id: str,
+        fahrlehrer_fsm_id: str,
+        von: dt.datetime,
+        bis: dt.datetime,
+        titel: str,
+        leistungsart_id: str | None = None,
+        terminart: str = "PX",
+    ) -> bool:
+        """Aktualisiert einen bestehenden Termin (z. B. Beschreibung oder Status) in FSM per PUT."""
+        fid_leistung = leistungsart_id or getattr(
+            settings,
+            "FSM_LEISTUNGSART_ID",
+            "4330ec51-91b9-45f1-a3fb-88179db000ce",
+        )
+
+        von_iso = von.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        bis_iso = bis.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+        payload = {
+            "viewModel": {
+                "id": fsm_termin_id,
+                "von": von_iso,
+                "bis": bis_iso,
+                "fidFahrlehrer": [fahrlehrer_fsm_id],
+                "fidTerminart": terminart,
+                "gebucht": False,
+                "fidFahrzeug": None,
+                "fidLeistungsart": fid_leistung,
+                "texte": titel,
+            }
+        }
+
+        res = self._request("PUT", "termine", data=payload)
+        return res is not None
+
     def termin_loeschen(self, fsm_termin_id: str) -> bool:
         """Löscht einen Termin anhand seiner FSM-Termin-UUID."""
         payload = {

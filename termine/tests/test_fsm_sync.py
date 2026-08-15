@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 from io import StringIO
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -202,9 +202,67 @@ class FsmSyncTests(TestCase):
         erfolg = storniere_in_fsm(buchung, client=mock_client)
         self.assertTrue(erfolg)
 
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_exportiere_termin_nach_fsm_frei(self):
+        jetzt = timezone.now()
+        termin = Termin.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            terminart=self.terminart,
+            beginn=jetzt + dt.timedelta(days=2, hours=10),
+            ende=jetzt + dt.timedelta(days=2, hours=10, minutes=30),
+            status=Termin.Status.FREI,
+        )
+
+        mock_client = MagicMock()
+        mock_client.termin_anlegen.return_value = "fsm-placeholder-123"
+
+        from termine.services.fsm_sync import exportiere_termin_nach_fsm
+
+        fsm_id = exportiere_termin_nach_fsm(termin, client=mock_client)
+        self.assertEqual(fsm_id, "fsm-placeholder-123")
         termin.refresh_from_db()
-        self.assertEqual(termin.fsm_termin_id, "")
-        mock_client.termin_loeschen.assert_called_once_with("zu-loeschende-fsm-id")
+        self.assertEqual(termin.fsm_termin_id, "fsm-placeholder-123")
+        self.assertIn("(frei)", mock_client.termin_anlegen.call_args[1]["titel"])
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_termine_entfernen_loescht_fsm_termin(self):
+        from termine.services.planung import termine_entfernen
+
+        jetzt = timezone.now()
+        termin = Termin.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            terminart=self.terminart,
+            beginn=jetzt + dt.timedelta(days=2, hours=10),
+            ende=jetzt + dt.timedelta(days=2, hours=10, minutes=30),
+            status=Termin.Status.FREI,
+            fsm_termin_id="zu-loeschen-in-fsm",
+        )
+
+        mock_client = MagicMock()
+        mock_client.termin_loeschen.return_value = True
+
+        with patch("termine.services.fsm_sync.FsmClient", return_value=mock_client):
+            termine_entfernen(Termin.objects.filter(pk=termin.pk))
+
+        self.assertFalse(Termin.objects.filter(pk=termin.pk).exists())
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_sync_entfernt_freien_termin_wenn_in_fsm_geloescht(self):
+        jetzt = timezone.now()
+        termin = Termin.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            terminart=self.terminart,
+            beginn=jetzt + dt.timedelta(days=2, hours=10),
+            ende=jetzt + dt.timedelta(days=2, hours=10, minutes=30),
+            status=Termin.Status.FREI,
+            fsm_termin_id="in-fsm-nicht-mehr-da",
+        )
+
+        mock_client = MagicMock()
+        mock_client.get_termine.return_value = []  # FSM liefert diesen Termin nicht mehr
+
+        sync_blocker_fuer_fahrlehrer(self.fahrlehrer, client=mock_client)
+        self.assertFalse(Termin.objects.filter(pk=termin.pk).exists())
 
     @override_settings(FSM_SYNC_ENABLED=True)
     def test_management_command_fsm_sync(self):
