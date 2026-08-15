@@ -275,6 +275,57 @@ class FsmSyncTests(TestCase):
             call_command("fsm_sync", stdout=out)
             self.assertIn("Fertig:", out.getvalue())
 
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_stornierung_setzt_fsm_eintrag_auf_frei_zurueck(self):
+        termin = Termin.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            terminart=self.terminart,
+            beginn=timezone.now() + dt.timedelta(days=2, hours=14),
+            ende=timezone.now() + dt.timedelta(days=2, hours=14, minutes=30),
+            status=Termin.Status.FREI,
+            fsm_termin_id="fsm-blocker-123",
+        )
+        buchung = Buchung.objects.create(
+            termin=termin,
+            name="Max Mustermann",
+            email="max@example.com",
+            status=Buchung.Status.STORNIERT,
+        )
+        mock_client = MagicMock()
+        mock_client.termin_aktualisieren.return_value = True
+
+        storniere_in_fsm(buchung, client=mock_client)
+
+        mock_client.termin_aktualisieren.assert_called_once_with(
+            fsm_termin_id="fsm-blocker-123",
+            fahrlehrer_fsm_id="fsm-lehrer-uuid-1",
+            von=termin.beginn,
+            bis=termin.ende,
+            titel="Beratung: Beratung (frei)",
+        )
+        mock_client.termin_loeschen.assert_not_called()
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_strip_html_tags_in_fsm_sperrzeiten(self):
+        jetzt = timezone.now()
+        fsm_termine = [
+            FsmTermin(
+                id="fsm-html-1",
+                von=jetzt + dt.timedelta(days=2, hours=10),
+                bis=jetzt + dt.timedelta(days=2, hours=11),
+                fahrlehrer_id="fsm-lehrer-uuid-1",
+                terminart="PS",
+                titel='<a href="schueler?id=123"><span class="alt-key">S -B Max Mustermann</span></a>',
+            ),
+        ]
+        mock_client = MagicMock()
+        mock_client.get_termine.return_value = fsm_termine
+
+        sync_blocker_fuer_fahrlehrer(self.fahrlehrer, client=mock_client)
+
+        sperre = Sperrzeit.objects.get(fsm_id="fsm-html-1")
+        self.assertEqual(sperre.grund, "FSM: S -B Max Mustermann")
+
 
 class FsmEinstellungenViewTests(TestCase):
     def setUp(self):
@@ -340,4 +391,5 @@ class FsmEinstellungenViewTests(TestCase):
                 {"aktion": "sync"},
             )
             self.assertRedirects(res, reverse("termine:fsm_einstellungen"))
+
 

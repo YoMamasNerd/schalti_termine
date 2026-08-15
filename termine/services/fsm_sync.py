@@ -60,20 +60,28 @@ def exportiere_termin_nach_fsm(
     try:
         if termin.fsm_termin_id:
             # Bestehenden FSM-Eintrag aktualisieren
-            erfolg = client.termin_aktualisieren(
-                fsm_termin_id=termin.fsm_termin_id,
-                fahrlehrer_fsm_id=fahrlehrer.fsm_id,
-                von=termin.beginn,
-                bis=termin.ende,
-                titel=titel,
-            )
-            if erfolg:
+            try:
+                erfolg = client.termin_aktualisieren(
+                    fsm_termin_id=termin.fsm_termin_id,
+                    fahrlehrer_fsm_id=fahrlehrer.fsm_id,
+                    von=termin.beginn,
+                    bis=termin.ende,
+                    titel=titel,
+                )
+                if erfolg:
+                    logger.info(
+                        "FSM-Sync: Termin %s in FSM aktualisiert (%s)",
+                        termin.pk,
+                        termin.fsm_termin_id,
+                    )
+                    return termin.fsm_termin_id
+            except FsmError as update_exc:
                 logger.info(
-                    "FSM-Sync: Termin %s in FSM aktualisiert (%s)",
+                    "FSM-Sync: Aktualisierung von Termin %s (FSM-ID %s) fehlgeschlagen (%s) -> erstelle neuen Eintrag",
                     termin.pk,
                     termin.fsm_termin_id,
+                    update_exc,
                 )
-                return termin.fsm_termin_id
 
         # Neu in FSM anlegen
         fsm_id = client.termin_anlegen(
@@ -144,6 +152,34 @@ def storniere_in_fsm(buchung: Buchung, client: FsmClient | None = None) -> bool:
     return loesche_termin_aus_fsm(termin, client=client)
 
 
+def sync_fahrlehrer_termine(
+    fahrlehrer: Fahrlehrer,
+    tage_voraus: int | None = None,
+    client: FsmClient | None = None,
+) -> int:
+    """Exportiert alle noch nicht in FSM vorhandenen freien Beratungstermine."""
+    if not is_fsm_aktiv_fuer_fahrlehrer(fahrlehrer):
+        return 0
+
+    client = client or FsmClient()
+    tage = tage_voraus or (fahrlehrer.horizont_wochen * 7)
+    jetzt = timezone.now()
+    ende = jetzt + dt.timedelta(days=tage)
+
+    termine = Termin.objects.filter(
+        fahrlehrer=fahrlehrer,
+        beginn__gte=jetzt,
+        beginn__lte=ende,
+        status__in=[Termin.Status.FREI, Termin.Status.GEBUCHT],
+    )
+    count = 0
+    for termin in termine:
+        fsm_id = exportiere_termin_nach_fsm(termin, client=client)
+        if fsm_id:
+            count += 1
+    return count
+
+
 def sync_blocker_fuer_fahrlehrer(
     fahrlehrer: Fahrlehrer,
     tage_voraus: int | None = None,
@@ -194,7 +230,9 @@ def sync_blocker_fuer_fahrlehrer(
                         "FSM-Sync: Freier Termin %s wurde in FSM gelöscht -> wird in Schalti entfernt",
                         termin.pk,
                     )
-                    termin.delete()
+                    from .planung import termine_entfernen
+
+                    termine_entfernen(Termin.objects.filter(pk=termin.pk))
                     continue
         else:
             # Hat noch keinen FSM-Blocker -> in FSM anlegen
@@ -210,6 +248,8 @@ def sync_blocker_fuer_fahrlehrer(
     gueltige_fsm_sperren: set[str] = set()
 
     # 2. Fremde FSM-Events als Sperrzeiten hinterlegen
+    from django.utils.html import strip_tags
+
     with transaction.atomic():
         for fsm_id, termin in fsm_termin_dict.items():
             if fsm_id in eigene_fsm_ids:
@@ -223,7 +263,8 @@ def sync_blocker_fuer_fahrlehrer(
 
             grund = f"FSM: {termin.terminart}"
             if termin.titel:
-                grund = f"FSM: {termin.titel[:150]}"
+                bereinigt = " ".join(strip_tags(termin.titel).split())
+                grund = f"FSM: {bereinigt[:150]}"
 
             Sperrzeit.objects.update_or_create(
                 fahrlehrer=fahrlehrer,
