@@ -60,7 +60,14 @@ class BuchungsForm(forms.Form):
     def __init__(self, *args, terminart: Terminart | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         if terminart is not None and not terminart.fuehrerscheinklasse_abfragen:
-            self.fields.pop("fuehrerscheinklasse")
+            self.fields.pop("fuehrerscheinklasse", None)
+        elif "fuehrerscheinklasse" in self.fields:
+            from .models import FahrschulEinstellungen
+            einst = FahrschulEinstellungen.get_solo()
+            aktive_klassen = einst.aktive_fuehrerscheinklassen
+            if aktive_klassen:
+                auswahl = [c for c in FUEHRERSCHEINKLASSEN if c[0] in aktive_klassen]
+                self.fields["fuehrerscheinklasse"].choices = [("", "Bitte wählen …")] + auswahl
 
     def clean_website(self):
         if self.cleaned_data.get("website"):
@@ -212,13 +219,26 @@ class TerminartForm(forms.ModelForm):
 
 
 class GlobaleEinstellungenForm(forms.ModelForm):
-    """Fahrschulweite Einstellungen für Buchungsfenster, Planungshorizont und Bundesland."""
+    """Fahrschulweite Einstellungen für Buchungsfenster, Planungshorizont, Bundesland und Klassen."""
+
+    aktive_fuehrerscheinklassen = forms.MultipleChoiceField(
+        label="Verfügbare Führerscheinklassen",
+        choices=FUEHRERSCHEINKLASSEN,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "klassen-auswahl"}),
+        required=False,
+        help_text="Ausgewählte Klassen stehen Kunden im Buchungsformular zur Auswahl. Ist keine Klasse ausgewählt, sind alle Klassen wählbar.",
+    )
 
     class Meta:
         from .models import FahrschulEinstellungen
 
         model = FahrschulEinstellungen
-        fields = ["bundesland", "vorlauf_stunden", "horizont_wochen"]
+        fields = [
+            "bundesland",
+            "vorlauf_stunden",
+            "horizont_wochen",
+            "aktive_fuehrerscheinklassen",
+        ]
         help_texts = {
             "bundesland": "Bestimmt die gesetzlichen Feiertage der Fahrschule (z. B. Berlin).",
             "vorlauf_stunden": "Termine, die früher als dieser Vorlauf beginnen, sind nicht mehr buchbar.",
@@ -229,12 +249,18 @@ class GlobaleEinstellungenForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if "bundesland" in self.fields:
             self.fields["bundesland"].required = False
+        if self.instance and self.instance.pk:
+            vorhanden = self.instance.aktive_fuehrerscheinklassen or []
+            self.initial.setdefault("aktive_fuehrerscheinklassen", vorhanden)
 
     def clean_bundesland(self):
         val = self.cleaned_data.get("bundesland")
         if not val and self.instance and self.instance.pk:
             return self.instance.bundesland or "BE"
         return val or "BE"
+
+    def clean_aktive_fuehrerscheinklassen(self):
+        return self.cleaned_data.get("aktive_fuehrerscheinklassen") or []
 
 
 class FahrlehrerEinstellungenForm(forms.ModelForm):

@@ -75,6 +75,12 @@ class FahrschulEinstellungen(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(52)],
         help_text="Wie viele Wochen im Voraus aus den Rhythmus-Regeln Termine erzeugt und angeboten werden.",
     )
+    aktive_fuehrerscheinklassen = models.JSONField(
+        "Verfügbare Führerscheinklassen",
+        default=list,
+        blank=True,
+        help_text="Welche Führerscheinklassen die Fahrschule anbietet. Leer = alle Klassen stehen zur Auswahl.",
+    )
 
     class Meta:
         verbose_name = "Fahrschul-Einstellungen"

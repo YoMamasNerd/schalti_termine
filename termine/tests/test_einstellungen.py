@@ -241,6 +241,29 @@ class BuchungshorizontEinstellen(Basis):
             )
         self.assertFalse(Buchung.objects.exists())
 
+    def test_verfuegbare_fuehrerscheinklassen_filtern(self):
+        from termine.forms import BuchungsForm
+        from termine.models import FahrschulEinstellungen
+
+        # Speichern von aktiven Klassen: nur B und B197
+        antwort = self.client.post(
+            f"{reverse('termine:einstellungen')}?fahrlehrer={self.anna.slug}",
+            {
+                "form_art": "global",
+                "vorlauf_stunden": 24,
+                "horizont_wochen": 4,
+                "bundesland": "BE",
+                "aktive_fuehrerscheinklassen": ["B", "B197"],
+            },
+        )
+        self.assertEqual(antwort.status_code, 302)
+        einst = FahrschulEinstellungen.get_solo()
+        self.assertEqual(einst.aktive_fuehrerscheinklassen, ["B", "B197"])
+
+        form = BuchungsForm()
+        choice_keys = [c[0] for c in form.fields["fuehrerscheinklasse"].choices]
+        self.assertEqual(choice_keys, ["", "B", "B197"])
+
 
 class EigeneEinstellungen(Basis):
     def test_fahrlehrer_darf_die_eigenen_daten_aendern(self):
