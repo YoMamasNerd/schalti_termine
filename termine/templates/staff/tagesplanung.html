@@ -106,13 +106,16 @@
       <h2>Termine für einen Tag anlegen</h2>
       <p class="leer">
         Das ist die schnelle Einzelplanung: Tag, Zeitfenster und Terminart wählen –
-        die App zerlegt das Fenster automatisch in einzelne Termine.
+        die App zerlegt das Fenster automatisch in einzelne Termine für <strong>{{ fahrlehrer.name }}</strong>.
       </p>
       <form method="post" action="{% url 'termine:termine_anlegen' %}">
         {% csrf_token %}
+        <input type="hidden" name="fahrlehrer" value="{{ fahrlehrer.pk }}">
         <input type="hidden" name="fahrlehrer_slug" value="{{ fahrlehrer.slug }}">
         {% for feld in planungs_form %}
-          {% include "termine/_feld.html" with feld=feld %}
+          {% if feld.name != "fahrlehrer" %}
+            {% include "termine/_feld.html" with feld=feld %}
+          {% endif %}
         {% endfor %}
         <button class="knopf" type="submit">Termine anlegen</button>
       </form>
@@ -140,34 +143,20 @@
       <div class="karte">
         <h2>Urlaub / Abwesenheit</h2>
         <p class="leer">
-          Sperrt einen Zeitraum komplett. Freie Termine darin werden gelöscht,
+          Sperrt einen Zeitraum komplett für <strong>{{ fahrlehrer.name }}</strong>. Freie Termine darin werden gelöscht,
           und die automatische Planung lässt den Zeitraum aus.
         </p>
         <form method="post" action="{% url 'termine:sperrzeit_anlegen' %}">
           {% csrf_token %}
+          <input type="hidden" name="fahrlehrer" value="{{ fahrlehrer.pk }}">
+          <input type="hidden" name="fahrlehrer_slug" value="{{ fahrlehrer.slug }}">
           {% for feld in sperr_form %}
-            {% include "termine/_feld.html" with feld=feld %}
+            {% if feld.name != "fahrlehrer" %}
+              {% include "termine/_feld.html" with feld=feld %}
+            {% endif %}
           {% endfor %}
           <button class="knopf knopf--leise" type="submit">Sperrzeit eintragen</button>
         </form>
-
-        {% if sperrzeiten %}
-          <h3 style="margin-top:1rem">In dieser Woche</h3>
-          <ul>
-            {% for sperre in sperrzeiten %}
-              <li>
-                {{ sperre.beginn|date:"d.m." }}–{{ sperre.ende|date:"SHORT_DATE_FORMAT" }}
-                {% if sperre.grund %}({{ sperre.grund }}){% endif %}
-                <form method="post" action="{% url 'termine:sperrzeit_loeschen' sperre.pk %}"
-                      style="display:inline"
-                      onsubmit="return confirm('Sperrzeit wirklich aufheben?');">
-                  {% csrf_token %}
-                  <button class="knopf knopf--leise knopf--klein" type="submit">Aufheben</button>
-                </form>
-              </li>
-            {% endfor %}
-          </ul>
-        {% endif %}
       </div>
     </div>
   </div>

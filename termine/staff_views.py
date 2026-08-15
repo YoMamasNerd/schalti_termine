@@ -568,10 +568,16 @@ def sperrzeit_anlegen(request):
                 f"Achtung: In diesem Zeitraum liegen {betroffen} bereits gebuchte Termine. "
                 "Bitte sagen Sie diese von Hand ab.",
             )
+        ziel_fahrlehrer = daten["fahrlehrer"].slug
     else:
         for feld, fehler in form.errors.items():
             messages.error(request, f"{feld}: {'; '.join(fehler)}")
-    return redirect("termine:tagesplanung")
+        ziel_fahrlehrer = request.POST.get("fahrlehrer_slug", "")
+
+    ziel = reverse("termine:tagesplanung")
+    if ziel_fahrlehrer:
+        ziel += f"?fahrlehrer={ziel_fahrlehrer}"
+    return redirect(ziel)
 
 
 @mitarbeiter
