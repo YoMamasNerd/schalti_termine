@@ -6,12 +6,18 @@ Belegungszeiten mit dem externen Fahrschulmanager-Portal.
 
 from __future__ import annotations
 
+import base64
 import datetime as dt
+import hashlib
+import http.cookiejar
 import json
 import logging
+import re
+import secrets
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -79,11 +85,183 @@ class FsmClient:
         """Prüft, ob die FSM-Synchronisation global aktiv ist."""
         return getattr(settings, "FSM_SYNC_ENABLED", False)
 
+    def _pkce_pair(self) -> tuple[str, str]:
+        """Erzeugt ein PKCE Verifier/Challenge-Paar für den OAuth2-Login."""
+        verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b"=").decode("ascii")
+        challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode("ascii")).digest()).rstrip(b"=").decode("ascii")
+        return verifier, challenge
+
+    def auto_login(self, email: str | None = None, password: str | None = None) -> str:
+        """Führt einen vollautomatischen OAuth2-Login gegen FSM durch."""
+        email = email or getattr(settings, "FSM_EMAIL", "")
+        password = password or getattr(settings, "FSM_PASSWORD", "")
+
+        if not email or not password:
+            raise FsmConfigError("FSM_EMAIL und FSM_PASSWORD sind nicht konfiguriert.")
+
+        logger.info("FSM: Führe automatischen Login für %s durch...", email)
+
+        cj = http.cookiejar.CookieJar()
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+
+        state = base64.urlsafe_b64encode(secrets.token_bytes(24)).rstrip(b"=").decode("ascii")
+        verifier, challenge = self._pkce_pair()
+
+        # 1. Authorize GET
+        auth_params = {
+            "response_type": "code",
+            "client_id": "fsm",
+            "redirect_uri": "https://portal.fahrschulmanager.de/login",
+            "scope": "openid profile offline_access fsm_api",
+            "state": state,
+            "nonce": state,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+        }
+        auth_url = "https://login.fahren-lernen.de/connect/authorize?" + urllib.parse.urlencode(auth_params)
+
+        try:
+            resp = opener.open(auth_url, timeout=self.timeout)
+            login_url = resp.geturl()
+            html = resp.read().decode("utf-8")
+        except Exception as exc:
+            raise FsmAuthError(f"OAuth Authorize fehlgeschlagen: {exc}") from exc
+
+        xsrf_match = re.search(r"<meta\s+name=[\"']xsrf[\"']\s+content=[\"']([^\"']+)[\"']", html)
+        if not xsrf_match:
+            xsrf_match = re.search(r"content=[\"']([^\"']+)[\"']\s+name=[\"']xsrf[\"']", html)
+        if not xsrf_match:
+            raise FsmAuthError("XSRF-Token konnte auf der FSM-Loginseite nicht gefunden werden.")
+        xsrf = xsrf_match.group(1)
+
+        parsed = urllib.parse.urlparse(login_url)
+        qs = urllib.parse.parse_qs(parsed.query)
+        return_url = qs.get("ReturnUrl", ["/connect/authorize/callback"])[0]
+
+        # 2. Form POST
+        boundary = "----WebKitFormBoundary" + secrets.token_hex(16)
+        form_fields = [
+            ("password", password),
+            ("username", email),
+            ("__RequestVerificationToken", xsrf),
+            ("returnUrl", return_url),
+            ("rememberLogin", "false"),
+            ("button", "login"),
+        ]
+
+        body_parts = []
+        for k, v in form_fields:
+            body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode("utf-8"))
+        body_parts.append(f"--{boundary}--\r\n".encode("utf-8"))
+        multipart_body = b"".join(body_parts)
+
+        post_url = f"https://login.fahren-lernen.de/account/login?ReturnUrl={urllib.parse.quote(return_url)}"
+        post_req = urllib.request.Request(
+            post_url,
+            data=multipart_body,
+            headers={
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "Accept": "text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8",
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Referer": login_url,
+            },
+            method="POST",
+        )
+
+        try:
+            post_resp = opener.open(post_req, timeout=self.timeout)
+            callback_path = json.loads(post_resp.read().decode("utf-8"))
+            callback_url = urllib.parse.urljoin("https://login.fahren-lernen.de", callback_path)
+        except Exception as exc:
+            raise FsmAuthError(f"FSM Login fehlgeschlagen (Zugangsdaten falsch?): {exc}") from exc
+
+        # 3. Callback
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                return None
+
+        cb_opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj), NoRedirect)
+        code = None
+        try:
+            cb_opener.open(callback_url, timeout=self.timeout)
+        except urllib.error.HTTPError as e:
+            if e.code == 302:
+                loc = e.headers["Location"]
+                code = urllib.parse.parse_qs(urllib.parse.urlparse(loc).query).get("code", [None])[0]
+
+        if not code:
+            raise FsmAuthError("FSM OAuth-Callback lieferte keinen Authorization Code.")
+
+        # 4. Exchange code for access token
+        token_data = {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": "https://portal.fahrschulmanager.de/login",
+            "code_verifier": verifier,
+            "client_id": "fsm",
+        }
+        token_req = urllib.request.Request(
+            "https://login.fahren-lernen.de/connect/token",
+            data=urllib.parse.urlencode(token_data).encode("utf-8"),
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "Mozilla/5.0",
+            },
+        )
+        try:
+            with urllib.request.urlopen(token_req, timeout=self.timeout) as tr:
+                res = json.loads(tr.read().decode("utf-8"))
+                oauth_access_token = res["access_token"]
+        except Exception as exc:
+            raise FsmAuthError(f"Token-Austausch bei connect/token fehlgeschlagen: {exc}") from exc
+
+        # 5. Exchange via POST /v1/auth/sso
+        hardware_id = str(uuid.uuid4())
+        sso_payload = json.dumps({"viewModel": {"access_token": oauth_access_token}}).encode("utf-8")
+        sso_req = urllib.request.Request(
+            f"{self.base_url}/auth/sso?hardwareId={hardware_id}",
+            data=sso_payload,
+            headers={
+                "x-fsm-apikey": self.get_api_key(),
+                "Referer": "https://portal.fahrschulmanager.de/",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(sso_req, timeout=self.timeout) as sso_resp:
+                sso_data = json.loads(sso_resp.read().decode("utf-8"))
+                final_auth_token = sso_data["viewModel"]["authToken"]
+        except Exception as exc:
+            raise FsmAuthError(f"SSO-Authentifizierung an FSM-API fehlgeschlagen: {exc}") from exc
+
+        # Cache for 12 hours (43200 seconds)
+        self.set_auth_token(final_auth_token, timeout=43200)
+        logger.info("FSM: Automatischer Login erfolgreich. Neues Auth-Token hinterlegt.")
+        return final_auth_token
+
     def get_auth_token(self) -> str | None:
-        """Liefert das aktuelle Auth-Token aus Cache oder Konfiguration."""
+        """Liefert das aktuelle Auth-Token aus Cache, Konfiguration oder Auto-Login."""
         if self._auth_token:
             return self._auth_token
-        return cache.get(CACHE_KEY_TOKEN)
+        cached = cache.get(CACHE_KEY_TOKEN)
+        if cached:
+            return cached
+        token_env = getattr(settings, "FSM_AUTH_TOKEN", "")
+        if token_env:
+            return token_env
+
+        # Versuche Auto-Login falls Zugangsdaten konfiguriert sind
+        email = getattr(settings, "FSM_EMAIL", "")
+        password = getattr(settings, "FSM_PASSWORD", "")
+        if email and password:
+            try:
+                return self.auto_login(email, password)
+            except Exception as exc:
+                logger.warning("FSM Auto-Login fehlgeschlagen: %s", exc)
+                return None
+        return None
 
     def set_auth_token(self, token: str, timeout: int = 86400) -> None:
         """Speichert ein neues Auth-Token im Cache."""
@@ -122,6 +300,7 @@ class FsmClient:
         path: str,
         params: dict[str, Any] | None = None,
         data: dict[str, Any] | None = None,
+        retry_on_401: bool = True,
     ) -> Any:
         """Führt eine HTTP-Anfrage gegen die FSM-API aus."""
         url = f"{self.base_url}/{path.lstrip('/')}"
@@ -147,7 +326,13 @@ class FsmClient:
         except urllib.error.HTTPError as exc:
             err_body = exc.read().decode("utf-8", errors="ignore")
             if exc.code == 401:
-                logger.warning("FSM API: Nicht autorisiert (401). Token möglicherweise abgelaufen.")
+                logger.warning("FSM API: Nicht autorisiert (401). Prüfe Auto-Login...")
+                if retry_on_401 and getattr(settings, "FSM_EMAIL", "") and getattr(settings, "FSM_PASSWORD", ""):
+                    try:
+                        self.auto_login()
+                        return self._request(method, path, params=params, data=data, retry_on_401=False)
+                    except Exception as login_exc:
+                        logger.warning("FSM API: Re-Authentifizierung per Auto-Login fehlgeschlagen: %s", login_exc)
                 raise FsmAuthError("FSM Authentifizierung fehlgeschlagen (401).") from exc
             if exc.code == 400:
                 logger.warning("FSM API: Bad Request (400): %s", err_body[:200])
