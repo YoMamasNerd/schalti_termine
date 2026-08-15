@@ -221,7 +221,48 @@ def tagesplanung(request):
     tage = []
     for i in range(7):
         tag = montag + dt.timedelta(days=i)
+        tag_start = lokal(tag, dt.time.min)
+        tag_ende = lokal(tag, dt.time.max)
         tages_termine = nach_tag.get(tag, [])
+        tages_sperren = [s for s in sperren if s.beginn < tag_ende and s.ende > tag_start]
+
+        eintraege = []
+        for t in tages_termine:
+            buchung = t.aktive_buchung
+            eintraege.append(
+                {
+                    "art": "termin",
+                    "zeit": t.beginn,
+                    "beginn_uhrzeit": timezone.localtime(t.beginn).strftime("%H:%M"),
+                    "ende_uhrzeit": timezone.localtime(t.ende).strftime("%H:%M"),
+                    "status": t.status,
+                    "titel": t.terminart.name,
+                    "detail": buchung.name if buchung else "",
+                    "termin": t,
+                }
+            )
+
+        for s in tages_sperren:
+            s_beginn = timezone.localtime(s.beginn)
+            s_ende = timezone.localtime(s.ende)
+            ist_ganztaegig = (s.ende - s.beginn).total_seconds() >= 82800 or (
+                s.beginn.date() < tag < s.ende.date()
+            )
+            eintraege.append(
+                {
+                    "art": "sperre",
+                    "zeit": s.beginn,
+                    "beginn_uhrzeit": s_beginn.strftime("%H:%M") if not ist_ganztaegig else "",
+                    "ende_uhrzeit": s_ende.strftime("%H:%M") if not ist_ganztaegig else "",
+                    "ist_ganztaegig": ist_ganztaegig,
+                    "ist_fsm": bool(s.fsm_id),
+                    "titel": s.grund or ("FSM-Termin" if s.fsm_id else "Sperrzeit"),
+                    "sperre": s,
+                }
+            )
+
+        eintraege.sort(key=lambda x: (0 if x.get("ist_ganztaegig") else 1, x["zeit"]))
+
         tage.append(
             {
                 "datum": tag,
@@ -231,6 +272,8 @@ def tagesplanung(request):
                 "ist_vergangen": tag < heute,
                 "feiertag": feiertage.get(tag),
                 "termine": tages_termine,
+                "eintraege": eintraege,
+                "sperren_count": len(tages_sperren),
                 "frei": sum(1 for t in tages_termine if t.status == Termin.Status.FREI),
                 "gebucht": sum(
                     1
@@ -617,6 +660,12 @@ def einstellungen(request):
         form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
 
     jetzt = timezone.now()
+    alle_sperren = list(
+        Sperrzeit.objects.filter(fahrlehrer=fahrlehrer, ende__gte=jetzt).order_by("beginn")
+    )
+    manuelle_sperren = [s for s in alle_sperren if not s.fsm_id]
+    fsm_sperren_count = sum(1 for s in alle_sperren if s.fsm_id)
+
     return render(
         request,
         "staff/einstellungen.html",
@@ -626,9 +675,9 @@ def einstellungen(request):
             "ist_inhaber": ist_inhaber,
             "form": form,
             "buchbar_bis": timezone.localtime(fahrlehrer.spaetester_start()).date(),
-            "sperrzeiten": Sperrzeit.objects.filter(
-                fahrlehrer=fahrlehrer, ende__gte=jetzt
-            ).order_by("beginn"),
+            "sperrzeiten": manuelle_sperren,
+            "alle_sperrzeiten": alle_sperren,
+            "fsm_sperren_count": fsm_sperren_count,
             "terminarten": Terminart.objects.all(),
         },
     )

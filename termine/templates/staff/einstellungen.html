@@ -95,9 +95,9 @@
         </div>
 
         <div class="karte">
-          <h2>Sperrzeiten</h2>
+          <h2>Sperrzeiten & Urlaube</h2>
           {% if sperrzeiten %}
-            <p class="leer">Kommende Urlaube und Abwesenheiten von {{ fahrlehrer.name }}.</p>
+            <p class="leer">Kommende Urlaube und manuelle Abwesenheiten von {{ fahrlehrer.name }}.</p>
             <div class="tabelle-huelle">
               <table class="liste">
                 <thead><tr><th>Zeitraum</th><th>Grund</th><th></th></tr></thead>
@@ -105,7 +105,7 @@
                   {% for sperre in sperrzeiten %}
                     <tr>
                       <td>{{ sperre.beginn|date:"SHORT_DATE_FORMAT" }} – {{ sperre.ende|date:"SHORT_DATE_FORMAT" }}</td>
-                      <td>{{ sperre.grund|default:"–" }}</td>
+                      <td>{{ sperre.grund|default:"Urlaub" }}</td>
                       <td>
                         <form method="post"
                               action="{% url 'termine:sperrzeit_loeschen' sperre.pk %}?fahrlehrer={{ fahrlehrer.slug }}"
@@ -120,11 +120,24 @@
               </table>
             </div>
           {% else %}
-            <p class="leer">Zurzeit ist kein Zeitraum gesperrt.</p>
+            <p class="leer">Keine manuellen Urlaube eingetragen.</p>
           {% endif %}
+
+          {% if fsm_sperren_count %}
+            <div style="margin-top:1rem; padding:0.7rem 0.9rem; background:color-mix(in srgb, #3b82f6 8%, var(--grund)); border-left:3px solid #3b82f6; border-radius:4px; font-size:0.88rem">
+              <strong>{{ fsm_sperren_count }} FSM-Fahrstunden &amp; Termine synchronisiert.</strong>
+              <p style="margin:0.3rem 0 0.5rem; color:var(--text-leise); font-size:0.8rem">
+                Fahrstunden aus FSM blockieren automatisch die Beratungszeitfenster und werden direkt im Kalender dargestellt.
+              </p>
+              <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:tagesplanung' %}?fahrlehrer={{ fahrlehrer.slug }}">
+                Im Wochenkalender anzeigen &rarr;
+              </a>
+            </div>
+          {% endif %}
+
           <p class="knopfreihe" style="margin-top:1rem">
-            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:tagesplanung' %}">
-              Sperrzeit eintragen
+            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:tagesplanung' %}?fahrlehrer={{ fahrlehrer.slug }}">
+              Urlaub eintragen
             </a>
           </p>
         </div>
