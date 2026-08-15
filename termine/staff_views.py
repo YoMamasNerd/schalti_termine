@@ -952,6 +952,7 @@ def einstellungen(request):
         )
 
     globale_einst = FahrschulEinstellungen.get_solo()
+    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest" or "application/json" in request.headers.get("Accept", "")
 
     if request.method == "POST":
         if request.POST.get("form_art") == "global" and ist_inhaber:
@@ -959,10 +960,14 @@ def einstellungen(request):
             globale_form = GlobaleEinstellungenForm(request.POST, instance=globale_einst)
             if globale_form.is_valid():
                 globale_einst = globale_form.save()
-                messages.success(request, "Buchungsfenster (global) gespeichert.")
                 if globale_einst.horizont_wochen != alter_horizont:
                     _globaler_horizont_nachziehen(request, alter_horizont)
+                if is_ajax:
+                    return JsonResponse({"ok": True, "nachricht": "Globale Einstellungen automatisch gespeichert."})
+                messages.success(request, "Buchungsfenster (global) gespeichert.")
                 return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}#tab-buchung")
+            if is_ajax:
+                return JsonResponse({"ok": False, "fehler": globale_form.errors.as_text()}, status=400)
             form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
         else:
             globale_form = GlobaleEinstellungenForm(instance=globale_einst)
@@ -971,8 +976,12 @@ def einstellungen(request):
             )
             if form.is_valid():
                 fahrlehrer = form.save()
+                if is_ajax:
+                    return JsonResponse({"ok": True, "nachricht": "Profil-Einstellungen automatisch gespeichert."})
                 messages.success(request, "Einstellungen gespeichert.")
                 return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}#tab-profil")
+            if is_ajax:
+                return JsonResponse({"ok": False, "fehler": form.errors.as_text()}, status=400)
     else:
         form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
         globale_form = GlobaleEinstellungenForm(instance=globale_einst)

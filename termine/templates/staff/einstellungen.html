@@ -60,7 +60,7 @@
       {% endif %}
 
       <div class="raster-zwei">
-        <form class="karte" method="post"
+        <form class="karte js-auto-save-form" id="form-profil" method="post"
               action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-profil" novalidate>
           {% csrf_token %}
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
@@ -127,7 +127,7 @@
           </p>
 
           {% if ist_inhaber %}
-            <form method="post" action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-buchung" novalidate>
+            <form class="js-auto-save-form" id="form-global" method="post" action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-buchung" novalidate>
               {% csrf_token %}
               <input type="hidden" name="form_art" value="global">
               {% for feld in globale_form %}
@@ -397,6 +397,10 @@
       }
     </style>
 
+    <div id="settings-autosave-toast" style="display:none; position:fixed; bottom:1.5rem; right:1.5rem; z-index:999; background:#065f46; color:#fff; padding:0.6rem 1.2rem; border-radius:0.5rem; font-weight:600; font-size:0.9rem; box-shadow:0 4px 14px rgba(0,0,0,0.2); align-items:center; gap:0.5rem; transition:opacity 0.3s ease; opacity:0">
+      <span style="font-size:1.1rem">✓</span> <span id="settings-toast-text">Automatisch gespeichert</span>
+    </div>
+
     <script>
       (function() {
         const schalter = document.querySelectorAll('.tab-schalter');
@@ -437,6 +441,74 @@
             aktiviereTab(hashId);
           }
         }
+
+        // --- Live Auto-Save für alle Einstellungsformulare ---
+        const toast = document.getElementById('settings-autosave-toast');
+        const toastText = document.getElementById('settings-toast-text');
+        let toastTimeout = null;
+
+        function showToast(text, isError = false) {
+          if (toastTimeout) clearTimeout(toastTimeout);
+          toastText.textContent = text;
+          toast.style.background = isError ? '#991b1b' : '#065f46';
+          toast.style.display = 'inline-flex';
+          setTimeout(() => { toast.style.opacity = '1'; }, 10);
+          toastTimeout = setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => { toast.style.display = 'none'; }, 300);
+          }, 2500);
+        }
+
+        async function submitFormAsync(form) {
+          const formData = new FormData(form);
+          const actionUrl = form.getAttribute('action') || window.location.href;
+
+          try {
+            const response = await fetch(actionUrl, {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+              }
+            });
+            const data = await response.json();
+            if (data.ok) {
+              showToast(data.nachricht || 'Automatisch gespeichert');
+            } else {
+              showToast('Fehler: ' + (data.fehler || 'Ungültige Eingabe'), true);
+            }
+          } catch (err) {
+            showToast('Netzwerkfehler beim Speichern', true);
+          }
+        }
+
+        document.querySelectorAll('.js-auto-save-form').forEach(form => {
+          // Sofort speichern bei Select, Checkbox, Radio, Color
+          form.querySelectorAll('select, input[type="checkbox"], input[type="radio"], input[type="color"]').forEach(el => {
+            el.addEventListener('change', () => {
+              submitFormAsync(form);
+            });
+          });
+
+          // Debounced speichern bei Text, Email, Number, Textarea
+          const textInputs = form.querySelectorAll('input[type="text"], input[type="email"], input[type="number"], input[type="tel"], textarea');
+          let debounceTimer = null;
+          textInputs.forEach(el => {
+            el.addEventListener('input', () => {
+              clearTimeout(debounceTimer);
+              debounceTimer = setTimeout(() => {
+                submitFormAsync(form);
+              }, 700);
+            });
+          });
+
+          // Manueller Button-Klick: asynchron speichern ohne Neuladen
+          form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            submitFormAsync(form);
+          });
+        });
       })();
     </script>
   {% endif %}
