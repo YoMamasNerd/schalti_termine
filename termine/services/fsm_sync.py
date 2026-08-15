@@ -135,6 +135,7 @@ def buche_in_fsm(buchung: Buchung, client: FsmClient | None = None) -> str | Non
 def storniere_in_fsm(buchung: Buchung, client: FsmClient | None = None) -> bool:
     """Hook nach Stornierung: Setzt FSM-Termin auf frei zurück oder löscht ihn."""
     termin = buchung.termin
+    termin.refresh_from_db()
     if termin.beginn > timezone.now() and termin.status == Termin.Status.FREI:
         # Zukünftiger Termin bleibt frei im Angebot -> FSM-Eintrag auf frei zurücksetzen
         fsm_id = exportiere_termin_nach_fsm(termin, client=client)

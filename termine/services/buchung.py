@@ -147,6 +147,7 @@ def stornieren(buchung: Buchung, *, von: str = "kunde", benachrichtigen: bool = 
     # Der Termin wird nur dann wieder angeboten, wenn er noch in der Zukunft liegt.
     if buchung.termin.beginn > timezone.now():
         Termin.objects.filter(pk=buchung.termin_id).update(status=Termin.Status.FREI)
+        buchung.termin.status = Termin.Status.FREI
 
     if war_bestaetigt:
         def _nach_storno():
