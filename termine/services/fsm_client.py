@@ -359,6 +359,14 @@ class FsmClient:
         """Ruft alle aktiven Fahrlehrer aus FSM ab."""
         res = self._request("GET", "lehrer/fahrlehrer", params={"onlyActive": "true"})
         if isinstance(res, list):
+            for row in res:
+                vorname = (row.get("vorname") or "").strip()
+                nachname = (row.get("nachname") or "").strip()
+                voller_name = f"{vorname} {nachname}".strip()
+                if not voller_name:
+                    voller_name = row.get("displayName") or row.get("name") or "Unbekannt"
+                row["voller_name"] = voller_name
+                row["name"] = voller_name
             return res
         return []
 

@@ -134,7 +134,7 @@
                       {% for fl in fsm_lehrer_liste %}
                         <option value="{{ fl.id }}"
                                 {% if item.fahrlehrer.fsm_id == fl.id %}selected{% endif %}>
-                          {{ fl.name }}
+                          {{ fl.voller_name }}
                         </option>
                       {% endfor %}
                     </select>

@@ -1104,10 +1104,31 @@ def fsm_einstellungen(request):
     fsm_client = FsmClient()
     fsm_lehrer_liste = []
     fsm_fehler = None
-    try:
-        fsm_lehrer_liste = fsm_client.get_fahrlehrer()
-    except FsmError as exc:
-        fsm_fehler = str(exc)
+
+    from django.core.cache import cache
+
+    cache_key = "fsm_lehrer_liste"
+    fsm_lehrer_liste = cache.get(cache_key)
+    if fsm_lehrer_liste is None:
+        try:
+            fsm_lehrer_liste = fsm_client.get_fahrlehrer() or []
+            try:
+                cache.set(cache_key, fsm_lehrer_liste, timeout=300)
+            except Exception:
+                pass
+        except FsmError as exc:
+            fsm_fehler = str(exc)
+            fsm_lehrer_liste = []
+
+    # Namen einheitlich als voller_name und name bereitstellen
+    for fl_item in fsm_lehrer_liste:
+        if isinstance(fl_item, dict):
+            if "voller_name" not in fl_item:
+                v = str(fl_item.get("vorname") or "").strip()
+                n = str(fl_item.get("nachname") or "").strip()
+                fl_item["voller_name"] = f"{v} {n}".strip() or str(fl_item.get("displayName") or fl_item.get("name") or "Unbekannt")
+            if "name" not in fl_item:
+                fl_item["name"] = fl_item["voller_name"]
 
     if request.method == "POST":
         aktion = request.POST.get("aktion")
@@ -1117,6 +1138,7 @@ def fsm_einstellungen(request):
             from .services.fsm_sync import sync_alle_fahrlehrer
 
             try:
+                cache.delete(cache_key)
                 ergebnisse = sync_alle_fahrlehrer(client=fsm_client)
                 gesamt = sum(ergebnisse.values())
                 nachricht = f"Synchronisation erfolgreich: {gesamt} Sperrzeiten für {len(ergebnisse)} Fahrlehrer abgeglichen."
@@ -1133,6 +1155,7 @@ def fsm_einstellungen(request):
             from .services.fsm_sync import importiere_fahrlehrer_aus_fsm, sync_alle_fahrlehrer
 
             try:
+                cache.delete(cache_key)
                 neu, aktualisiert = importiere_fahrlehrer_aus_fsm(client=fsm_client)
                 sync_alle_fahrlehrer(client=fsm_client)
                 nachricht = f"Fahrlehrer-Import erfolgreich: {len(neu)} neu angelegt, {len(aktualisiert)} verknüpft/aktualisiert."
