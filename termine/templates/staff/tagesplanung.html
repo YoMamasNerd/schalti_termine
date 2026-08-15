@@ -114,8 +114,16 @@
           <h3 style="margin-top:1rem">In dieser Woche</h3>
           <ul>
             {% for sperre in sperrzeiten %}
-              <li>{{ sperre.beginn|date:"d.m." }}–{{ sperre.ende|date:"SHORT_DATE_FORMAT" }}
-                  {% if sperre.grund %}({{ sperre.grund }}){% endif %}</li>
+              <li>
+                {{ sperre.beginn|date:"d.m." }}–{{ sperre.ende|date:"SHORT_DATE_FORMAT" }}
+                {% if sperre.grund %}({{ sperre.grund }}){% endif %}
+                <form method="post" action="{% url 'termine:sperrzeit_loeschen' sperre.pk %}"
+                      style="display:inline"
+                      onsubmit="return confirm('Sperrzeit wirklich aufheben?');">
+                  {% csrf_token %}
+                  <button class="knopf knopf--leise knopf--klein" type="submit">Aufheben</button>
+                </form>
+              </li>
             {% endfor %}
           </ul>
         {% endif %}

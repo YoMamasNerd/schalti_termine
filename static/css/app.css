@@ -366,19 +366,20 @@ ul.wochentage input { width: auto; }
 .hinweis--fehler { background: var(--rot-hell); border-color: var(--rot); color: var(--rot); }
 .hinweis--warnung { background: var(--gelb-hell); border-color: var(--gelb); color: var(--gelb); }
 
-/* Der Einrichtungshinweis enthält einen Befehl zum Abtippen oder Kopieren.
-   Er steht auch auf der öffentlichen Seite, solange die Installation neu ist,
-   und muss deshalb in schmalen Spalten bestehen: lieber scrollen als umbrechen,
-   damit ein Befehl beim Kopieren ganz bleibt. */
-.einrichtung > p { margin: 0 0 0.6rem; }
-.einrichtung > p:last-child { margin-bottom: 0; }
-.einrichtung .befehl {
+/* Kasten für etwas, das abgetippt oder kopiert wird: der Befehl im
+   Einrichtungshinweis, die Abo-Adresse des Kalenders. Beide müssen in
+   schmalen Spalten bestehen, und beide vertragen keinen Umbruch – lieber
+   scrollen, damit das Kopierte ganz bleibt. */
+.befehl {
   margin: 0 0 0.6rem; padding: 0.55rem 0.7rem;
   border-radius: var(--radius-klein); border: 1px solid var(--linie);
   background: var(--flaeche); color: var(--text);
   overflow-x: auto; font-size: 0.86rem;
 }
-.einrichtung code {
+.einrichtung > p { margin: 0 0 0.6rem; }
+.einrichtung > p:last-child { margin-bottom: 0; }
+.einrichtung code,
+.befehl code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   white-space: pre;
 }

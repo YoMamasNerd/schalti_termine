@@ -1,7 +1,15 @@
-"""Interner Bereich für Fahrlehrer: Tagesplanung, Regeln, Buchungen.
+"""Interner Bereich für Fahrlehrer: Tagesplanung, Regeln, Buchungen, Einstellungen.
 
-Der Django-Admin bleibt für Stammdaten zuständig. Diese Seiten sind für das,
-was täglich gebraucht wird und im Admin zu umständlich wäre.
+Hier steht alles, was die Fahrschule im Betrieb braucht – einschließlich der
+Stammdaten, die sie selbst pflegt: Terminarten, die eigenen Einstellungen und
+den Planungshorizont. Der Django-Admin bleibt für das zuständig, was darüber
+hinausgeht: Benutzerkonten, Verknüpfung von Login und Fahrlehrer, der Blick in
+einzelne Datensätze.
+
+Der Zugang hat zwei Stufen und beide stehen genau einmal hier oben:
+`mitarbeiter` lässt herein, `inhaber` schränkt auf das ein, was für die ganze
+Fahrschule gilt. Welche Daten jemand dann sieht, entscheidet allein
+`_erlaubte_fahrlehrer` – verteilte Prüfungen in den Views gibt es bewusst nicht.
 """
 
 from __future__ import annotations
@@ -20,7 +28,13 @@ from django.utils.formats import date_format
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
-from .forms import RhythmusRegelForm, SperrzeitForm, TagesplanungForm
+from .forms import (
+    FahrlehrerEinstellungenForm,
+    RhythmusRegelForm,
+    SperrzeitForm,
+    TagesplanungForm,
+    TerminartForm,
+)
 from .models import (
     WOCHENTAG_KURZ,
     Buchung,
@@ -29,6 +43,7 @@ from .models import (
     Sperrzeit,
     Termin,
     Terminart,
+    neuer_token,
 )
 from .services import buchung as buchungs_service
 from .services.feiertage import feiertage_im_zeitraum
@@ -54,15 +69,41 @@ def mitarbeiter(view):
     return wrapper
 
 
-def _erlaubte_fahrlehrer(user):
-    """Staff sieht alle, ein Fahrlehrer nur sich selbst."""
+def inhaber(view):
+    """Zusätzliche Stufe für alles, was mehr als den eigenen Kalender betrifft.
+
+    Ein Fahrlehrer pflegt seine eigenen Einstellungen; wer Fahrlehrer anlegt
+    oder jemanden aus dem öffentlichen Angebot nimmt, entscheidet für die
+    ganze Fahrschule. Das ist der Inhaber – dieselbe Grenze, an der auch der
+    Django-Admin hängt.
+    """
+
+    @wraps(view)
+    @mitarbeiter
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_staff:
+            raise PermissionDenied("Das darf nur die Inhaberin oder der Inhaber.")
+        return view(request, *args, **kwargs)
+
+    return wrapper
+
+
+def _erlaubte_fahrlehrer(user, *, auch_inaktive: bool = False):
+    """Staff sieht alle, ein Fahrlehrer nur sich selbst.
+
+    Der tägliche Betrieb blendet Inaktive aus – für sie gibt es nichts zu
+    planen. Die Einstellungen müssen sie trotzdem erreichen: Sonst wäre das
+    Wegnehmen des Hakens „Aktiv“ eine Einbahnstraße, aus der nur noch der
+    Django-Admin herausführt.
+    """
     if user.is_staff:
-        return Fahrlehrer.objects.filter(aktiv=True)
+        alle = Fahrlehrer.objects.all()
+        return alle if auch_inaktive else alle.filter(aktiv=True)
     return Fahrlehrer.objects.filter(pk=user.fahrlehrer.pk)
 
 
-def _gewaehlter_fahrlehrer(request):
-    erlaubt = _erlaubte_fahrlehrer(request.user)
+def _gewaehlter_fahrlehrer(request, *, auch_inaktive: bool = False):
+    erlaubt = _erlaubte_fahrlehrer(request.user, auch_inaktive=auch_inaktive)
     slug = request.GET.get("fahrlehrer")
     if slug:
         gewaehlt = erlaubt.filter(slug=slug).first()
@@ -136,7 +177,7 @@ def tagesplanung(request):
     fahrlehrer, erlaubt = _gewaehlter_fahrlehrer(request)
     if fahrlehrer is None:
         messages.warning(request, "Bitte legen Sie zuerst einen Fahrlehrer an.")
-        return redirect("admin:termine_fahrlehrer_add")
+        return redirect("termine:fahrlehrer_neu")
 
     roh_woche = request.GET.get("woche")
     try:
@@ -456,3 +497,236 @@ def regel_loeschen(request, pk: int):
         f"Regel gelöscht. Bereits gebuchte Termine von {fahrlehrer.name} bleiben bestehen.",
     )
     return redirect("termine:regeln")
+
+
+# --- Terminarten -----------------------------------------------------------
+#
+# Bis hierher lagen die Terminarten im Django-Admin, also hinter `is_staff`.
+# Damit konnte ein Fahrlehrer zwar planen, aber nicht festlegen, *was* er
+# anbietet – und musste für jede neue Beratungsart beim Inhaber anfragen.
+# Terminarten sind Stammdaten der Fahrschule, keine persönlichen Daten;
+# deshalb darf sie hier jeder pflegen, der den internen Bereich sieht.
+
+
+@mitarbeiter
+def terminartenliste(request):
+    terminarten = Terminart.objects.annotate(
+        anzahl_termine=Count("termine", distinct=True),
+        anzahl_regeln=Count("regeln", distinct=True),
+    ).order_by("reihenfolge", "name")
+    return render(request, "staff/terminarten.html", {"terminarten": terminarten})
+
+
+@mitarbeiter
+def terminart_bearbeiten(request, pk: int | None = None):
+    terminart = get_object_or_404(Terminart, pk=pk) if pk else None
+
+    if request.method == "POST":
+        form = TerminartForm(request.POST, instance=terminart)
+        if form.is_valid():
+            terminart = form.save()
+            messages.success(request, f"Terminart „{terminart.name}“ gespeichert.")
+            return redirect("termine:terminarten")
+    else:
+        form = TerminartForm(instance=terminart)
+
+    # Womit die Terminart verbunden ist – das entscheidet, ob sie sich noch
+    # löschen lässt oder nur noch abschalten.
+    verwendung = {}
+    if terminart is not None:
+        verwendung = {
+            "termine": terminart.termine.count(),
+            "regeln": terminart.regeln.count(),
+        }
+
+    return render(
+        request,
+        "staff/terminart_formular.html",
+        {"form": form, "terminart": terminart, "verwendung": verwendung},
+    )
+
+
+@mitarbeiter
+@require_POST
+def terminart_loeschen(request, pk: int):
+    """Löscht eine Terminart – aber nur eine, die noch nirgends hängt.
+
+    `Termin.terminart` und `RhythmusRegel.terminart` stehen auf PROTECT: Ein
+    Löschversuch endete sonst im ProtectedError, und die Historie einer
+    Buchung hinge an einem Termin ohne Art. Wer eine benutzte Terminart
+    loswerden will, nimmt ihr den Haken bei „Aktiv“ – dann verschwindet sie
+    aus Formularen und öffentlicher Auswahl, ohne die Vergangenheit zu
+    verbiegen.
+    """
+    terminart = get_object_or_404(Terminart, pk=pk)
+    termine = terminart.termine.count()
+    regeln = terminart.regeln.count()
+
+    if termine or regeln:
+        messages.error(
+            request,
+            f"„{terminart.name}“ wird noch verwendet ({termine} Termine, "
+            f"{regeln} Regeln) und kann deshalb nicht gelöscht werden. "
+            "Nehmen Sie stattdessen den Haken bei „Aktiv“ heraus.",
+        )
+        return redirect("termine:terminart_bearbeiten", pk=terminart.pk)
+
+    name = terminart.name
+    terminart.delete()
+    messages.success(request, f"Terminart „{name}“ gelöscht.")
+    return redirect("termine:terminarten")
+
+
+# --- Einstellungen ---------------------------------------------------------
+
+
+@mitarbeiter
+def einstellungen(request):
+    """Was früher nur im Django-Admin einzustellen war.
+
+    Die Auswahl des Fahrlehrers läuft wie in der Tagesplanung über die
+    Adresse; das Formular schickt sie deshalb im `action` wieder mit, sonst
+    landete ein Inhaber nach dem Speichern beim ersten Fahrlehrer statt bei
+    dem, den er gerade bearbeitet hat.
+    """
+    fahrlehrer, erlaubt = _gewaehlter_fahrlehrer(request, auch_inaktive=True)
+    ist_inhaber = request.user.is_staff
+
+    if fahrlehrer is None:
+        return render(
+            request,
+            "staff/einstellungen.html",
+            {"fahrlehrer": None, "alle_fahrlehrer": erlaubt, "ist_inhaber": ist_inhaber},
+        )
+
+    if request.method == "POST":
+        alter_horizont = fahrlehrer.horizont_wochen
+        form = FahrlehrerEinstellungenForm(
+            request.POST, instance=fahrlehrer, inhaber=ist_inhaber
+        )
+        if form.is_valid():
+            fahrlehrer = form.save()
+            messages.success(request, "Einstellungen gespeichert.")
+            if fahrlehrer.horizont_wochen != alter_horizont:
+                _horizont_nachziehen(request, fahrlehrer, alter_horizont)
+            return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}")
+    else:
+        form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
+
+    jetzt = timezone.now()
+    return render(
+        request,
+        "staff/einstellungen.html",
+        {
+            "fahrlehrer": fahrlehrer,
+            "alle_fahrlehrer": erlaubt,
+            "ist_inhaber": ist_inhaber,
+            "form": form,
+            "buchbar_bis": timezone.localtime(fahrlehrer.spaetester_start()).date(),
+            "sperrzeiten": Sperrzeit.objects.filter(
+                fahrlehrer=fahrlehrer, ende__gte=jetzt
+            ).order_by("beginn"),
+            "terminarten": Terminart.objects.all(),
+        },
+    )
+
+
+def _horizont_nachziehen(request, fahrlehrer: Fahrlehrer, alter_horizont: int) -> None:
+    """Nach einer Änderung des Horizonts die Termine anpassen.
+
+    Beim Verlängern erzeugt der Generator die fehlenden Wochen sofort – sonst
+    stünde die neue Einstellung bis zum nächtlichen Lauf ohne Wirkung da.
+
+    Beim Verkürzen bleiben die schon erzeugten Termine dahinter stehen: Der
+    Generator räumt nur innerhalb seines Fensters auf, und ausgerechnet die
+    Termine, die er nicht mehr sieht, ungefragt wegzuräumen, träfe auch die
+    von Hand angelegten. Angeboten werden sie trotzdem nicht mehr – darum
+    sagt der Hinweis, wo sie noch liegen.
+    """
+    bericht = generiere_termine(fahrlehrer)
+    messages.success(
+        request,
+        f"Planungshorizont auf {fahrlehrer.horizont_wochen} Wochen geändert "
+        f"(bis {date_format(bericht.bis, 'j. F Y')}): {bericht.als_text()}.",
+    )
+    if fahrlehrer.horizont_wochen >= alter_horizont:
+        return
+    dahinter = Termin.objects.filter(
+        fahrlehrer=fahrlehrer,
+        status=Termin.Status.FREI,
+        beginn__gt=fahrlehrer.spaetester_start(),
+    ).count()
+    if dahinter:
+        messages.info(
+            request,
+            f"{dahinter} bereits geplante Termine liegen hinter dem neuen Horizont. "
+            "Kunden bekommen sie nicht mehr angeboten; in der Tagesplanung stehen "
+            "sie weiterhin und lassen sich dort einzeln entfernen.",
+        )
+
+
+@mitarbeiter
+@require_POST
+def feed_token_neu(request):
+    """Setzt das Kalender-Abo zurück – etwa wenn die Abo-URL abhandengekommen ist."""
+    fahrlehrer, _ = _gewaehlter_fahrlehrer(request, auch_inaktive=True)
+    if fahrlehrer is None:
+        messages.error(request, "Kein Fahrlehrer ausgewählt.")
+        return redirect("termine:einstellungen")
+
+    fahrlehrer.feed_token = neuer_token()
+    fahrlehrer.save(update_fields=["feed_token"])
+    messages.warning(
+        request,
+        "Neue Abo-URL erzeugt. Das alte Abo liefert ab sofort nichts mehr – "
+        "bitte in allen Kalenderprogrammen austauschen.",
+    )
+    return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}")
+
+
+@mitarbeiter
+@require_POST
+def sperrzeit_loeschen(request, pk: int):
+    """Hebt eine Sperrzeit wieder auf.
+
+    Die freien Termine, die beim Eintragen entfernt wurden, kommen dadurch
+    nicht von selbst zurück – der Generator holt sie beim nächsten Lauf, und
+    „Jetzt vorausplanen" tut es sofort. Das steht so auch im Hinweis.
+    """
+    sperre = get_object_or_404(
+        Sperrzeit, pk=pk, fahrlehrer__in=_erlaubte_fahrlehrer(request.user, auch_inaktive=True)
+    )
+    sperre.delete()
+    messages.success(
+        request,
+        "Sperrzeit aufgehoben. Termine in diesem Zeitraum entstehen beim nächsten "
+        "Planungslauf neu – über „Jetzt vorausplanen“ sofort.",
+    )
+    # Sperrzeiten stehen an zwei Stellen: in der Tagesplanung neben der Woche
+    # und in den Einstellungen als Liste. Zurück geht es dorthin, wo geklickt
+    # wurde – der Umweg über die jeweils andere Seite kostete nur die Ansicht.
+    return redirect(_sicheres_ziel(request, "termine:einstellungen"))
+
+
+@inhaber
+def fahrlehrer_neu(request):
+    """Legt einen Fahrlehrer an, ohne den Umweg über den Django-Admin.
+
+    Das Login bleibt Sache der Benutzerverwaltung: Wer sich anmelden können
+    soll, bekommt im Admin ein Konto und wird dort mit diesem Eintrag
+    verbunden. Ein Fahrlehrer ohne Login ist trotzdem sinnvoll – der Inhaber
+    plant dann für ihn mit.
+    """
+    if request.method == "POST":
+        form = FahrlehrerEinstellungenForm(request.POST, inhaber=True)
+        if form.is_valid():
+            fahrlehrer = form.save()
+            messages.success(
+                request,
+                f"{fahrlehrer.name} angelegt. Für einen eigenen Zugang muss noch ein "
+                "Login-Benutzer angelegt und in den Stammdaten verknüpft werden.",
+            )
+            return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}")
+    else:
+        form = FahrlehrerEinstellungenForm(inhaber=True)
+    return render(request, "staff/fahrlehrer_formular.html", {"form": form})

@@ -1,0 +1,60 @@
+{% extends "staff/base_staff.html" %}
+
+{% block titel %}Terminarten – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+  <h1>Terminarten</h1>
+  <p>
+    Eine Terminart legt fest, was gebucht werden kann und wie lange es dauert –
+    zum Beispiel „Erstberatung, 30 Minuten“. Dauer und Puffer bestimmen das
+    Raster: Aus einem Fenster von 14:00 bis 17:00 werden mit 30 Minuten Dauer
+    sechs Termine.
+  </p>
+
+  <p class="knopfreihe">
+    <a class="knopf" href="{% url 'termine:terminart_neu' %}">Neue Terminart</a>
+    <a class="knopf knopf--leise" href="{% url 'termine:einstellungen' %}">Zu den Einstellungen</a>
+  </p>
+
+  <div class="karte">
+    <div class="tabelle-huelle">
+      <table class="liste">
+        <thead>
+          <tr>
+            <th>Bezeichnung</th><th>Dauer</th><th>Puffer</th><th>Ort</th>
+            <th>Klasse abfragen</th><th>Verwendet</th><th>Status</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for art in terminarten %}
+            <tr>
+              <td>
+                <strong>{{ art.name }}</strong>
+                {% if art.beschreibung %}<br><span class="leer">{{ art.beschreibung|truncatewords:12 }}</span>{% endif %}
+              </td>
+              <td>{{ art.dauer_minuten }} Min.</td>
+              <td>{% if art.puffer_minuten %}{{ art.puffer_minuten }} Min.{% else %}–{% endif %}</td>
+              <td>{{ art.ort|default:"–" }}</td>
+              <td>{% if art.fuehrerscheinklasse_abfragen %}ja{% else %}nein{% endif %}</td>
+              <td>
+                {{ art.anzahl_termine }} Termin{{ art.anzahl_termine|pluralize:"e" }}<br>
+                <span class="leer">{{ art.anzahl_regeln }} Regel{{ art.anzahl_regeln|pluralize:"n" }}</span>
+              </td>
+              <td>
+                <span class="marke-status {% if art.aktiv %}status-frei{% else %}status-gebucht{% endif %}">
+                  {% if art.aktiv %}aktiv{% else %}inaktiv{% endif %}
+                </span>
+              </td>
+              <td>
+                <a class="knopf knopf--leise knopf--klein"
+                   href="{% url 'termine:terminart_bearbeiten' art.pk %}">Bearbeiten</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="8" class="leer">Noch keine Terminart angelegt.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

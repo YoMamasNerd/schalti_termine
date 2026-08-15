@@ -44,4 +44,28 @@ urlpatterns = [
     path("intern/regeln/neu/", staff_views.regel_bearbeiten, name="regel_neu"),
     path("intern/regeln/<int:pk>/", staff_views.regel_bearbeiten, name="regel_bearbeiten"),
     path("intern/regeln/<int:pk>/loeschen/", staff_views.regel_loeschen, name="regel_loeschen"),
+    path("intern/terminarten/", staff_views.terminartenliste, name="terminarten"),
+    path("intern/terminarten/neu/", staff_views.terminart_bearbeiten, name="terminart_neu"),
+    path(
+        "intern/terminarten/<int:pk>/",
+        staff_views.terminart_bearbeiten,
+        name="terminart_bearbeiten",
+    ),
+    path(
+        "intern/terminarten/<int:pk>/loeschen/",
+        staff_views.terminart_loeschen,
+        name="terminart_loeschen",
+    ),
+    path("intern/einstellungen/", staff_views.einstellungen, name="einstellungen"),
+    path(
+        "intern/einstellungen/kalender-abo/",
+        staff_views.feed_token_neu,
+        name="feed_token_neu",
+    ),
+    path(
+        "intern/einstellungen/sperrzeit/<int:pk>/loeschen/",
+        staff_views.sperrzeit_loeschen,
+        name="sperrzeit_loeschen",
+    ),
+    path("intern/einstellungen/fahrlehrer/neu/", staff_views.fahrlehrer_neu, name="fahrlehrer_neu"),
 ]

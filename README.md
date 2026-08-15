@@ -62,11 +62,16 @@ anhand des Bundeslands übersprungen.
 - **Rhythmus-Regeln**: wiederkehrende Verfügbarkeiten, wöchentlich oder in
   mehrwöchigem Takt, mit Gültigkeitszeitraum
 - **Feiertage pro Bundesland**: werden bei der automatischen Planung ausgelassen
-- **Sperrzeiten** für Urlaub und Abwesenheit
+- **Sperrzeiten** für Urlaub und Abwesenheit, jederzeit wieder aufhebbar
 - Buchungsübersicht mit Absage-Funktion (der Kunde wird automatisch informiert)
+- **Terminarten** anlegen und pflegen – was gebucht werden kann, wie lange es
+  dauert, mit welchem Puffer
+- **Einstellungen**: Buchungsfenster (wie weit im Voraus und wie kurzfristig
+  gebucht werden darf), Kontaktdaten, Bundesland, Kalender-Abo
 - **Kalender-Abo** (`.ics`-URL) für Outlook, Google Kalender oder Apple Kalender
 - Mehrere Fahrlehrer, jeder mit eigenen Regeln, eigenem Bundesland und eigenem Kalender
-- Django-Admin für die Stammdaten
+- Django-Admin für alles darüber hinaus: Benutzerkonten, Verknüpfung von Login
+  und Fahrlehrer, Blick in einzelne Datensätze
 
 ---
 
@@ -217,8 +222,13 @@ Passwort brauchen nur die Leute in der Fahrschule.
 | **Interessent** | gar kein Login | Kalender, freie Termine, Buchungsformular |
 | **Eigener Termin** | geheimer Link aus der E-Mail | nur die eigene Buchung: ansehen, bestätigen, absagen |
 | **Kalender-Abo** | geheime `.ics`-URL | Nur-Lese-Feed der bestätigten Termine eines Fahrlehrers |
-| **Fahrlehrer** | Benutzername + Passwort | ausschließlich die **eigene** Planung, eigene Regeln, eigene Buchungen |
-| **Inhaber** | Benutzername + Passwort, `is_staff` | alle Fahrlehrer, zusätzlich der Django-Admin für Stammdaten |
+| **Fahrlehrer** | Benutzername + Passwort | ausschließlich die **eigene** Planung, eigene Regeln, eigene Buchungen, eigene Einstellungen – dazu die Terminarten der Fahrschule |
+| **Inhaber** | Benutzername + Passwort, `is_staff` | alle Fahrlehrer, zusätzlich Fahrlehrer anlegen und der Django-Admin |
+
+Jede Adresse unterhalb von `/intern/` verlangt eine Anmeldung. Das ist keine
+Aufzählung in den Views, sondern zwei Stellen in `staff_views.py` – und ein
+Test, der die URL-Konfiguration durchgeht, statt sich auf eine gepflegte Liste
+zu verlassen.
 
 <table>
 <tr>
@@ -269,7 +279,7 @@ nicht `403` – die App verrät damit nicht einmal, dass es den Termin gibt.
 | --- | --- |
 | **Passwörter** | Djangos Standardverfahren (PBKDF2-SHA256). Das schnelle Testverfahren ist hinter einer Abfrage abgeriegelt und kann im Betrieb nicht aktiv werden. |
 | **Links in E-Mails** | 256-Bit-Zufallstoken aus `secrets.token_urlsafe(32)`, eindeutig und nicht über die Oberfläche änderbar. |
-| **Kalender-Abo** | Eigener Token pro Fahrlehrer. Ist er in falsche Hände geraten, setzt eine Aktion im Admin ihn neu – das alte Abo wird damit ungültig. |
+| **Kalender-Abo** | Eigener Token pro Fahrlehrer. Ist er in falsche Hände geraten, erzeugen die Einstellungen im internen Bereich einen neuen – das alte Abo wird damit ungültig. |
 | **Sitzungen** | Session- und CSRF-Cookie werden im Betrieb nur über HTTPS gesendet; alle Formulare sind CSRF-geschützt. |
 | **Formular-Spam** | Verstecktes Honigtopf-Feld im Buchungsformular; ausgefüllt bedeutet Bot, und die Buchung wird verworfen. |
 | **Doppelbuchung** | Drei Ebenen: Sperre auf der Termin-Zeile, Statusprüfung in derselben Transaktion und ein Unique-Index in der Datenbank. |
@@ -480,16 +490,20 @@ brauchen sie von außen nicht.
 
 ## So richtet man die Terminplanung ein
 
-1. **Terminart anlegen** (Django-Admin → Terminarten): Bezeichnung, Dauer,
-   optional ein Puffer danach und ein Ort. Die Dauer bestimmt, in welche
-   Häppchen ein Zeitfenster zerlegt wird.
+1. **Terminart anlegen** (Interner Bereich → Einstellungen → Terminarten):
+   Bezeichnung, Dauer, optional ein Puffer danach und ein Ort. Die Dauer
+   bestimmt, in welche Häppchen ein Zeitfenster zerlegt wird.
 
-2. **Fahrlehrer anlegen** (Django-Admin → Fahrlehrer):
+2. **Fahrlehrer anlegen** (Interner Bereich → Einstellungen → Fahrlehrer
+   anlegen; nur der Inhaber):
    - **Bundesland** – entscheidet über die Feiertage
-   - **Planungshorizont** – wie viele Wochen im Voraus geplant wird (z. B. 4)
+   - **Planungshorizont** – wie weit im Voraus Kunden buchen können (z. B. 4
+     Wochen). So weit plant auch der Generator voraus.
    - **Mindest-Vorlauf** – wie kurzfristig noch gebucht werden darf
-   - optional einen Login-Benutzer verknüpfen, damit die Person die eigene
-     Tagesplanung selbst pflegen kann
+
+   Soll sich die Person selbst anmelden können, bekommt sie im Django-Admin ein
+   Benutzerkonto, das dort mit dem Fahrlehrer verknüpft wird. Danach pflegt sie
+   Planung und Einstellungen selbst.
 
 3. **Rhythmus-Regel anlegen** (Interner Bereich → Rhythmus-Regeln), zum Beispiel
    „Di + Do, 14:00–18:00, wöchentlich“. Bei einem mehrwöchigen Takt legt das
@@ -529,14 +543,15 @@ Wer keinen Worker betreiben möchte, kann stattdessen `cron` benutzen:
 
 ## Kalender-Abo einrichten
 
-Jeder Fahrlehrer hat eine persönliche Abo-URL (Django-Admin → Fahrlehrer, oder
-im internen Bereich auf der Übersichtsseite). Diese URL im Kalenderprogramm als
+Jeder Fahrlehrer hat eine persönliche Abo-URL (Interner Bereich →
+Einstellungen, oder auf der Übersichtsseite). Diese URL im Kalenderprogramm als
 Internetkalender abonnieren – die gebuchten Termine erscheinen dann automatisch
 und aktualisieren sich von selbst.
 
 Die URL enthält ein Geheimnis und sollte nicht weitergegeben werden. Ist sie
-doch einmal in falsche Hände geraten, setzt die Aktion „Kalender-Abo-Token
-zurücksetzen“ im Admin sie neu.
+doch einmal in falsche Hände geraten, erzeugt „Neue Abo-Adresse erzeugen“ in
+den Einstellungen eine neue – die alte hört damit auf zu funktionieren und muss
+in allen Kalenderprogrammen ausgetauscht werden.
 
 ---
 

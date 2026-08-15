@@ -189,7 +189,14 @@ def buchen(request, termin_id: int):
         Termin.objects.select_related("fahrlehrer", "terminart"), pk=termin_id
     )
 
-    if termin.status != Termin.Status.FREI or termin.beginn < termin.fahrlehrer.fruehester_start():
+    # Dieselben Grenzen wie in `Termin.objects.buchbar()`. Ohne sie käme man
+    # über die Adresse an ein Formular für einen Termin, den die Übersicht
+    # gar nicht anbietet – und erführe die Absage erst nach dem Absenden.
+    ausserhalb = (
+        termin.beginn < termin.fahrlehrer.fruehester_start()
+        or termin.beginn > termin.fahrlehrer.spaetester_start()
+    )
+    if termin.status != Termin.Status.FREI or ausserhalb:
         return render(
             request,
             "termine/nicht_verfuegbar.html",

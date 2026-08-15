@@ -379,14 +379,15 @@ class Randfaelle(BackendBasis):
 
         antwort = self.client.get(reverse("termine:tagesplanung"))
 
+        # Das Ziel liegt im internen Bereich, nicht im Django-Admin: Ein
+        # Staff-Benutzer ohne Modellrechte landete dort bei 403 und käme aus
+        # der leeren Installation nicht heraus.
         self.assertEqual(antwort.status_code, 302)
-        self.assertIn("fahrlehrer/add", antwort["Location"])
+        self.assertEqual(antwort["Location"], reverse("termine:fahrlehrer_neu"))
 
     def test_generieren_ohne_fahrlehrer_meldet_das(self):
         Fahrlehrer.objects.update(aktiv=False)
 
-        # Bewusst ohne follow: Die Tagesplanung leitet ohne Fahrlehrer weiter in
-        # den Admin, und dort endet ein Staff-Benutzer ohne Modellrechte bei 403.
         antwort = self.client.post(reverse("termine:generieren"))
 
         self.assertEqual(antwort.status_code, 302)

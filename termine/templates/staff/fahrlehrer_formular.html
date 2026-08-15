@@ -1,0 +1,43 @@
+{% extends "staff/base_staff.html" %}
+
+{% block titel %}Fahrlehrer anlegen – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+  <h1>Fahrlehrer anlegen</h1>
+  <p><a href="{% url 'termine:einstellungen' %}">&larr; Zurück zu den Einstellungen</a></p>
+
+  <div class="raster-zwei">
+    <form class="karte" method="post" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="hinweis hinweis--fehler">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      {% for feld in form %}
+        {% include "termine/_feld.html" with feld=feld %}
+      {% endfor %}
+
+      <div class="knopfreihe">
+        <button class="knopf" type="submit">Anlegen</button>
+        <a class="knopf knopf--leise" href="{% url 'termine:einstellungen' %}">Abbrechen</a>
+      </div>
+    </form>
+
+    <div class="karte">
+      <h2>Was danach noch fehlt</h2>
+      <p class="leer">
+        Der Eintrag allein plant noch nichts. Damit Termine entstehen, braucht
+        es entweder eine Rhythmus-Regel oder die Tagesplanung von Hand.
+      </p>
+      <p class="leer">
+        Soll sich die neue Person selbst anmelden können, wird im Django-Admin
+        ein Benutzerkonto angelegt und in den Stammdaten mit diesem Fahrlehrer
+        verknüpft. Ohne Verknüpfung plant der Inhaber mit.
+      </p>
+      <p class="leer">
+        Das Bundesland entscheidet, welche gesetzlichen Feiertage die
+        automatische Planung überspringt.
+      </p>
+    </div>
+  </div>
+{% endblock %}
