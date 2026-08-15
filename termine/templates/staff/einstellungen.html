@@ -215,10 +215,29 @@
 
     {# --- TAB 3: Urlaube & Sperrzeiten --- #}
     <div id="tab-urlaube" class="tab-inhalt" style="display:none">
+      {% if alle_fahrlehrer.count > 1 %}
+        <div class="karte" style="margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; background:var(--flaeche-dunkel)">
+          <div style="display:flex; align-items:center; gap:0.6rem">
+            <span style="font-size:1.1rem">🏖️</span>
+            <label for="fahrlehrer_urlaub_select" style="font-weight:600; font-size:0.95rem">Ausgewählter Fahrlehrer:</label>
+          </div>
+          <form method="get" style="margin:0; display:flex; align-items:center; gap:0.5rem">
+            <select name="fahrlehrer" id="fahrlehrer_urlaub_select" style="width:auto; padding:0.4rem 0.75rem; font-size:0.95rem; font-weight:600" onchange="window.location.href='?fahrlehrer=' + this.value + '#tab-urlaube';">
+              {% for person in alle_fahrlehrer %}
+                <option value="{{ person.slug }}" {% if person.pk == fahrlehrer.pk %}selected{% endif %}>
+                  {{ person.name }}{% if not person.aktiv %} (inaktiv){% endif %}
+                </option>
+              {% endfor %}
+            </select>
+            <noscript><button class="knopf knopf--klein" type="submit">Wechseln</button></noscript>
+          </form>
+        </div>
+      {% endif %}
+
       <div class="raster-zwei">
         <div class="karte">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
-            <h2 style="margin:0">🏖️ Urlaube &amp; Abwesenheiten</h2>
+            <h2 style="margin:0">🏖️ Urlaube ({{ fahrlehrer.name }})</h2>
             <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:tagesplanung' %}?fahrlehrer={{ fahrlehrer.slug }}">
               + Urlaub eintragen
             </a>
@@ -250,6 +269,26 @@
           {% else %}
             <div style="padding:1.5rem; text-align:center; background:var(--grund-leise); border-radius:6px; margin-bottom:1rem">
               <p class="leer" style="margin:0">Keine anstehenden Urlaube für {{ fahrlehrer.name }} hinterlegt.</p>
+            </div>
+          {% endif %}
+
+          {% if alle_fahrlehrer.count > 1 and alle_lehrer_sperren %}
+            <div style="margin-top:1.5rem; border-top:1px solid var(--linie); padding-top:1rem">
+              <h3 style="margin:0 0 0.6rem; font-size:0.95rem">👥 Alle Team-Urlaube im Überblick:</h3>
+              <div class="tabelle-huelle">
+                <table class="liste" style="font-size:0.88rem">
+                  <thead><tr><th>Fahrlehrer</th><th>Zeitraum</th><th>Grund</th></tr></thead>
+                  <tbody>
+                    {% for s in alle_lehrer_sperren %}
+                      <tr {% if s.fahrlehrer.pk == fahrlehrer.pk %}style="background:var(--flaeche-dunkel); font-weight:600"{% endif %}>
+                        <td>{{ s.fahrlehrer.name }}</td>
+                        <td>{{ s.beginn|date:"SHORT_DATE_FORMAT" }} – {{ s.ende|date:"SHORT_DATE_FORMAT" }}</td>
+                        <td>{{ s.grund|default:"Urlaub" }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
             </div>
           {% endif %}
         </div>

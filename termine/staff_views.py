@@ -976,6 +976,11 @@ def einstellungen(request):
     )
     manuelle_sperren = [s for s in alle_sperren if not s.fsm_id]
     fsm_sperren_count = sum(1 for s in alle_sperren if s.fsm_id)
+    alle_lehrer_sperren = list(
+        Sperrzeit.objects.filter(fahrlehrer__in=erlaubt, ende__gte=jetzt, fsm_id="")
+        .select_related("fahrlehrer")
+        .order_by("beginn")
+    )
 
     return render(
         request,
@@ -990,6 +995,7 @@ def einstellungen(request):
             "buchbar_bis": timezone.localtime(fahrlehrer.spaetester_start()).date(),
             "sperrzeiten": manuelle_sperren,
             "alle_sperrzeiten": alle_sperren,
+            "alle_lehrer_sperren": alle_lehrer_sperren,
             "fsm_sperren_count": fsm_sperren_count,
             "terminarten": Terminart.objects.all(),
         },
