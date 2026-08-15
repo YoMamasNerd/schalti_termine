@@ -32,6 +32,12 @@ class RhythmusRegelInline(admin.TabularInline):
 
 @admin.register(Fahrlehrer)
 class FahrlehrerAdmin(admin.ModelAdmin):
+    """Anlegen und die eigenen Einstellungen gehen inzwischen ohne den Admin.
+
+    Was nur hier geht: den Login-Benutzer verknüpfen und das URL-Kürzel
+    ändern. Beides ist Verwaltung, kein Tagesgeschäft.
+    """
+
     list_display = ("name", "email", "bundesland", "horizont_wochen", "vorlauf_stunden", "aktiv")
     list_filter = ("aktiv", "bundesland")
     search_fields = ("name", "email")
@@ -83,6 +89,14 @@ class FahrlehrerAdmin(admin.ModelAdmin):
 
 @admin.register(Terminart)
 class TerminartAdmin(admin.ModelAdmin):
+    """Der Admin bleibt der zweite Weg, nicht mehr der erste.
+
+    Terminarten pflegt die Fahrschule unter `/intern/terminarten/` – dafür
+    braucht es kein `is_staff` mehr. Hier steht, was dort bewusst fehlt: das
+    URL-Kürzel, das in verteilten Links steckt und eine Umbenennung überlebt,
+    und die Farbe, die zurzeit nirgends angezeigt wird.
+    """
+
     list_display = ("name", "dauer_minuten", "puffer_minuten", "ort", "aktiv", "reihenfolge")
     list_filter = ("aktiv",)
     search_fields = ("name",)

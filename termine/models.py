@@ -141,6 +141,23 @@ class Fahrlehrer(models.Model):
         jetzt = jetzt or timezone.now()
         return jetzt + dt.timedelta(hours=self.vorlauf_stunden)
 
+    def spaetester_start(self, heute: dt.date | None = None) -> dt.datetime:
+        """Bis wann ein Termin höchstens buchbar ist (Planungshorizont).
+
+        Dieselbe Rechnung wie im Generator: Er plant von heute an
+        `wochen * 7` Tage, heute eingeschlossen – der letzte Tag ist also
+        `wochen * 7 - 1` Tage entfernt, und zwar bis zu seinem Ende.
+
+        Die Grenze gilt auch für von Hand angelegte Termine. Wer sie als
+        Fahrlehrer überschreiten will, stellt den Horizont hoch – sonst wäre
+        die Einstellung nur eine Empfehlung an den Generator und nicht das,
+        was sie verspricht: wie weit im Voraus Kunden buchen können.
+        """
+        heute = heute or timezone.localdate()
+        wochen = self.horizont_wochen or settings.DEFAULT_HORIZON_WEEKS
+        letzter_tag = heute + dt.timedelta(days=wochen * 7 - 1)
+        return timezone.make_aware(dt.datetime.combine(letzter_tag, dt.time.max))
+
 
 class Terminart(models.Model):
     """Was gebucht werden kann, z. B. „Erstberatung Führerschein Klasse B“."""
@@ -333,38 +350,41 @@ class Sperrzeit(models.Model):
 
 class TerminQuerySet(models.QuerySet):
     def buchbar(self, jetzt: dt.datetime | None = None):
-        """Freie Termine, die den Mindest-Vorlauf einhalten und nicht gesperrt sind.
+        """Freie Termine innerhalb des Buchungsfensters, die nicht gesperrt sind.
 
-        Der Mindest-Vorlauf hängt am einzelnen Fahrlehrer. Ihn in der Datenbank
-        auszurechnen (`beginn - jetzt >= vorlauf_stunden`) wäre die elegantere
-        Fassung, scheitert aber an SQLite: Dort ist „Ganzzahl mal Zeitspanne"
-        kein gültiger Operator, und SQLite ist für Einzelplatz-Installationen
-        ausdrücklich vorgesehen.
+        Das Fenster hat zwei Ränder, und beide hängen am einzelnen Fahrlehrer:
+        vorne der Mindest-Vorlauf, hinten der Planungshorizont. Sie in der
+        Datenbank auszurechnen (`beginn - jetzt >= vorlauf_stunden`) wäre die
+        elegantere Fassung, scheitert aber an SQLite: Dort ist „Ganzzahl mal
+        Zeitspanne" kein gültiger Operator, und SQLite ist für
+        Einzelplatz-Installationen ausdrücklich vorgesehen.
 
-        Deshalb wird die Grenze in Python gebildet. Haben alle Fahrlehrer
-        denselben Vorlauf – der Normalfall –, ist es eine einzige Bedingung;
+        Deshalb werden die Grenzen in Python gebildet. Haben alle Fahrlehrer
+        dieselben Werte – der Normalfall –, ist es eine einzige Bedingung;
         erst bei unterschiedlichen Werten entsteht eine Kette.
         """
         from django.db.models import Exists, OuterRef, Q
 
         jetzt = jetzt or timezone.now()
-        vorlaeufe = dict(
-            Fahrlehrer.objects.filter(aktiv=True).values_list("pk", "vorlauf_stunden")
-        )
-        if not vorlaeufe:
+        heute = timezone.localdate(jetzt)
+
+        # Nach gleichem Fenster gruppieren, nicht nach Fahrlehrer: Zwei
+        # Fahrlehrer mit denselben Einstellungen ergeben eine Bedingung.
+        fenster: dict[tuple[dt.datetime, dt.datetime], list[int]] = {}
+        for fahrlehrer in Fahrlehrer.objects.filter(aktiv=True):
+            grenzen = (fahrlehrer.fruehester_start(jetzt), fahrlehrer.spaetester_start(heute))
+            fenster.setdefault(grenzen, []).append(fahrlehrer.pk)
+        if not fenster:
             return self.none()
 
-        verschiedene = set(vorlaeufe.values())
-        if len(verschiedene) == 1:
-            stunden = verschiedene.pop()
-            vorlauf_filter = Q(
-                fahrlehrer__aktiv=True, beginn__gte=jetzt + dt.timedelta(hours=stunden)
-            )
+        if len(fenster) == 1:
+            (frueh, spaet), _ = next(iter(fenster.items()))
+            zeit_filter = Q(fahrlehrer__aktiv=True, beginn__gte=frueh, beginn__lte=spaet)
         else:
-            vorlauf_filter = Q(pk__in=[])
-            for pk, stunden in vorlaeufe.items():
-                vorlauf_filter |= Q(
-                    fahrlehrer_id=pk, beginn__gte=jetzt + dt.timedelta(hours=stunden)
+            zeit_filter = Q(pk__in=[])
+            for (frueh, spaet), pks in fenster.items():
+                zeit_filter |= Q(
+                    fahrlehrer_id__in=pks, beginn__gte=frueh, beginn__lte=spaet
                 )
 
         gesperrt = Sperrzeit.objects.filter(
@@ -374,7 +394,7 @@ class TerminQuerySet(models.QuerySet):
         )
         return (
             self.filter(status=Termin.Status.FREI)
-            .filter(vorlauf_filter)
+            .filter(zeit_filter)
             .filter(terminart__aktiv=True)
             .annotate(ist_gesperrt=Exists(gesperrt))
             .filter(ist_gesperrt=False)

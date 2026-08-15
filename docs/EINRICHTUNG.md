@@ -243,7 +243,8 @@ docker compose exec web python manage.py createsuperuser
 
 ### 2 · Terminart anlegen
 
-Im Browser unter `/django-admin/` anmelden, dann **Terminarten → Hinzufügen**:
+Im Browser unter `/intern/anmelden/` anmelden, dann **Einstellungen →
+Terminarten verwalten → Neue Terminart**:
 
 | Feld | Bedeutung |
 | --- | --- |
@@ -252,22 +253,34 @@ Im Browser unter `/django-admin/` anmelden, dann **Terminarten → Hinzufügen**
 | Puffer danach | optionale Pause zwischen zwei Terminen |
 | Ort | erscheint in der Bestätigungsmail und im Kalendereintrag |
 
+Terminarten sind Stammdaten der ganzen Fahrschule; jeder im internen Bereich
+darf sie pflegen. Löschen lässt sich nur eine, an der noch kein Termin und
+keine Regel hängt – sonst verlöre eine gebuchte Beratung nachträglich ihre
+Bezeichnung. Was nicht mehr angeboten werden soll, bekommt stattdessen den
+Haken bei „Aktiv" abgenommen.
+
 ### 3 · Fahrlehrer anlegen
 
-**Fahrlehrer → Hinzufügen**:
+**Einstellungen → Fahrlehrer anlegen** (nur der Inhaber):
 
 | Feld | Bedeutung |
 | --- | --- |
 | Name | erscheint auf der öffentlichen Seite |
 | Bundesland | entscheidet, welche Feiertage die Automatik auslässt |
-| Planungshorizont | wie viele Wochen im Voraus geplant wird |
+| Planungshorizont | wie weit im Voraus Kunden buchen können, in Wochen. So weit plant auch der Generator voraus. |
 | Mindest-Vorlauf | wie kurzfristig noch gebucht werden darf, in Stunden |
-| Benutzer | optional ein Login, damit die Person ihre eigene Planung selbst pflegt |
 | Beschreibung | erscheint auf der Buchungsseite, wenn nur ein Fahrlehrer aktiv ist |
 
+Diese Angaben pflegt die Person danach unter **Einstellungen** selbst. Wird der
+Planungshorizont dort geändert, zieht die App die Termine sofort nach.
+
+Ein eigenes Login gibt es damit noch nicht: Das Benutzerkonto wird im
+Django-Admin angelegt und dort mit dem Fahrlehrer verknüpft. Ein Fahrlehrer
+ohne Konto ist trotzdem sinnvoll – der Inhaber plant dann für ihn mit.
+
 Ein Fahrlehrer-Login sieht ausschließlich die eigenen Daten. Nur ein Konto mit
-der Kennzeichnung „Mitarbeiter" (`is_staff`) sieht alle und darf in den
-Django-Admin.
+der Kennzeichnung „Mitarbeiter" (`is_staff`) sieht alle, darf Fahrlehrer
+anlegen und kommt in den Django-Admin.
 
 ### 4 · Termine anbieten
 
@@ -277,7 +290,8 @@ Zwei Wege, die nebeneinander funktionieren:
   Verfügbarkeiten wie „Di + Do, 14:00–18:00, wöchentlich". Die Vorschau zeigt
   sofort, welche Termine dabei herauskommen.
 - **Tagesplanung** (interner Bereich → Tagesplanung): einzelne Tage von Hand
-  beplanen, einzelne Termine löschen, Urlaub sperren.
+  beplanen, einzelne Termine löschen, Urlaub sperren und Sperrzeiten wieder
+  aufheben.
 
 Die Automatik läuft danach täglich von selbst weiter.
 
@@ -419,7 +433,7 @@ Warnungen halten den Start nicht auf, Fehler schon.
 | Niemand bekommt eine Bestätigungsmail | Zugangsdaten prüfen. Häufig: Port 465 verlangt `EMAIL_USE_SSL=true` **statt** `EMAIL_USE_TLS`. |
 | Buchungen kommen an, aber es werden keine neuen Termine erzeugt | Der Worker steht. `docker compose exec worker python manage.py jobs_pruefen` fragen und `docker compose logs worker` ansehen. |
 | Die Auswahlfelder für Datum und Uhrzeit zeigen `08/13/2026` und `02:00 PM` | Kein Fehler der App: Diese Felder zeichnet der Browser in **seiner** Sprache. Ein Browser mit deutscher Oberfläche zeigt dort `13.08.2026` und `14:00`. |
-| Ein Kalender-Abo ist in falsche Hände geraten | Im Django-Admin die Aktion „Kalender-Abo-Token zurücksetzen" auf dem Fahrlehrer ausführen. Das alte Abo wird damit ungültig. |
+| Ein Kalender-Abo ist in falsche Hände geraten | Im internen Bereich unter **Einstellungen → Kalender-Abo** eine neue Abo-Adresse erzeugen. Das alte Abo wird damit ungültig und muss in allen Kalenderprogrammen ausgetauscht werden. |
 
 ---
 

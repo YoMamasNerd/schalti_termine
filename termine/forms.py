@@ -176,3 +176,75 @@ class RhythmusRegelForm(forms.ModelForm):
 
     def clean_wochentage(self):
         return sorted(int(tag) for tag in self.cleaned_data["wochentage"])
+
+
+class TerminartForm(forms.ModelForm):
+    """Terminarten pflegen – ohne den Umweg über den Django-Admin.
+
+    Das URL-Kürzel steht bewusst nicht im Formular: Es steckt in den Links,
+    die die Fahrschule auf ihrer Webseite verteilt (`?art=erstberatung`).
+    Beim Anlegen entsteht es aus dem Namen, danach bleibt es liegen – eine
+    Umbenennung soll keine fremden Links zerreißen.
+
+    Die Farbe fehlt aus einem anderen Grund: Sie wird zurzeit nirgends
+    angezeigt. Ein Bedienfeld, das nichts bewirkt, kostet nur Vertrauen.
+    """
+
+    class Meta:
+        model = Terminart
+        fields = [
+            "name",
+            "dauer_minuten",
+            "puffer_minuten",
+            "beschreibung",
+            "ort",
+            "fuehrerscheinklasse_abfragen",
+            "aktiv",
+            "reihenfolge",
+        ]
+        widgets = {"beschreibung": forms.Textarea(attrs={"rows": 3})}
+
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        doppelt = Terminart.objects.filter(name__iexact=name).exclude(pk=self.instance.pk)
+        if doppelt.exists():
+            raise forms.ValidationError("Eine Terminart mit diesem Namen gibt es bereits.")
+        return name
+
+
+class FahrlehrerEinstellungenForm(forms.ModelForm):
+    """Die Stammdaten eines Fahrlehrers, soweit er sie selbst pflegen darf.
+
+    `aktiv` und `reihenfolge` wirken auf die öffentliche Seite aller
+    Fahrlehrer, nicht nur auf die eigene – sie sieht deshalb nur der Inhaber.
+    Der Login-Benutzer und das URL-Kürzel bleiben ganz im Django-Admin: Das
+    eine ist Benutzerverwaltung, das andere trägt verteilte Links.
+    """
+
+    NUR_INHABER = ("aktiv", "reihenfolge")
+
+    class Meta:
+        model = Fahrlehrer
+        fields = [
+            "name",
+            "email",
+            "telefon",
+            "beschreibung",
+            "bundesland",
+            "vorlauf_stunden",
+            "horizont_wochen",
+            "aktiv",
+            "reihenfolge",
+        ]
+        widgets = {"beschreibung": forms.Textarea(attrs={"rows": 4})}
+        help_texts = {
+            "horizont_wochen": "Wie weit im Voraus Kunden buchen können. Die "
+            "automatische Planung reicht genauso weit – was dahinter liegt, "
+            "wird nicht angeboten.",
+        }
+
+    def __init__(self, *args, inhaber: bool = False, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not inhaber:
+            for name in self.NUR_INHABER:
+                self.fields.pop(name)

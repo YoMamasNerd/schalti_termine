@@ -40,6 +40,10 @@
       <a class="{{ hier }}" {% if hier %}aria-current="page"{% endif %}
          href="{% url 'termine:buchungen' %}">Buchungen</a>
 
+      {% aktiv 'einstellungen' 'terminarten' 'terminart_neu' 'terminart_bearbeiten' 'fahrlehrer_neu' as hier %}
+      <a class="{{ hier }}" {% if hier %}aria-current="page"{% endif %}
+         href="{% url 'termine:einstellungen' %}">Einstellungen</a>
+
       {% if user.is_staff %}<a href="/django-admin/">Stammdaten</a>{% endif %}
       <form class="menue-abmelden" method="post" action="{% url 'termine:logout' %}">
         {% csrf_token %}

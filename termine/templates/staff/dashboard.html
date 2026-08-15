@@ -47,7 +47,14 @@
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="7" class="leer">Noch kein Fahrlehrer angelegt.</td></tr>
+            <tr>
+              <td colspan="7" class="leer">
+                Noch kein Fahrlehrer angelegt.
+                {% if user.is_staff %}
+                  <a href="{% url 'termine:fahrlehrer_neu' %}">Jetzt anlegen</a>
+                {% endif %}
+              </td>
+            </tr>
           {% endfor %}
         </tbody>
       </table>

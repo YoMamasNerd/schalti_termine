@@ -101,9 +101,16 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
   (`secrets.token_urlsafe(32)`).
 - Passwort nur für die Fahrschule: Fahrlehrer sehen ausschließlich die eigenen
   Daten, `is_staff` = Inhaber sieht alle plus Django-Admin.
-- Durchgesetzt an genau **zwei** Stellen (Türsteher + `_erlaubte_fahrlehrer`),
-  nicht verstreut über die Views. Fremdzugriff liefert **404, nicht 403**.
-- Kalender-Abo pro Fahrlehrer über eigenen Token, im Admin zurücksetzbar.
+- Durchgesetzt an genau **drei** Stellen (`mitarbeiter`, `inhaber`,
+  `_erlaubte_fahrlehrer`), nicht verstreut über die Views. Fremdzugriff liefert
+  **404, nicht 403**; die fehlende Stufe (kein Zugang, keine Inhaberrechte)
+  dagegen **403**.
+- **Alles Interne liegt unter `/intern/`.** `test_zugriff.py` geht die
+  URL-Konfiguration durch statt einer gepflegten Liste – jede neue Adresse
+  fällt von selbst in die Prüfung – und hält umgekehrt fest, dass keine
+  Ansicht aus `staff_views` außerhalb von `/intern/` hängt.
+- Kalender-Abo pro Fahrlehrer über eigenen Token, im internen Bereich
+  zurücksetzbar.
 
 ### Buchungsablauf
 
@@ -117,10 +124,44 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
 - Doppelbuchung wird auf drei Ebenen verhindert: Zeilensperre, Statusprüfung in
   derselben Transaktion, partieller Unique-Index.
 
+### Was die Fahrschule selbst pflegt
+
+Der Django-Admin ist **nicht** mehr der Ort für den täglichen Bedarf. Im
+internen Bereich liegen:
+
+- **Terminarten** (`/intern/terminarten/`) – Stammdaten der ganzen Fahrschule,
+  deshalb für jeden Mitarbeiter, nicht nur für den Inhaber. Das URL-Kürzel
+  steht **nicht** im Formular: Es steckt in verteilten Links (`?art=…`) und
+  überlebt eine Umbenennung. Die `farbe` fehlt, weil sie nirgends angezeigt
+  wird – kein Bedienfeld ohne Wirkung.
+- **Einstellungen** (`/intern/einstellungen/`) – Kontakt, Beschreibung,
+  Bundesland, Mindest-Vorlauf, Planungshorizont; dazu Kalender-Abo neu
+  erzeugen, Sperrzeiten aufheben, Terminarten im Überblick.
+- **Fahrlehrer anlegen** – nur `is_staff`. Das *Login* bleibt Sache des
+  Django-Admins (Benutzerverwaltung + Verknüpfung).
+- `aktiv`/`reihenfolge` sieht nur der Inhaber: Sie wirken auf das öffentliche
+  Angebot aller, nicht auf die eigene Planung.
+- Die Einstellungsseite arbeitet als einzige mit `auch_inaktive=True`. Sonst
+  wäre das Wegnehmen von „Aktiv" eine Einbahnstraße, aus der nur der
+  Django-Admin herausführt.
+
+Im Admin bleibt, was darüber hinausgeht: Benutzerkonten, die Verknüpfung von
+Login und Fahrlehrer, der Blick in einzelne Datensätze.
+
 ### Terminplanung
 
 - Termine sind **konkrete Zeilen in der Datenbank**, keine bei jedem Aufruf
   durchgerechneten Regeln.
+- `horizont_wochen` ist **eine** Zahl für beides: wie weit der Generator plant
+  und wie weit Kunden buchen können. Durchgesetzt wird sie an denselben drei
+  Stellen wie der Mindest-Vorlauf – `Termin.objects.buchbar()`, die
+  `buchen`-View und `buchung.reservieren()`. Ohne die letzten beiden wäre sie
+  nur eine Empfehlung an den Generator, und ein direkter Aufruf käme daran
+  vorbei.
+- Der Horizont **verkürzt** nichts rückwirkend: Schon erzeugte Termine
+  dahinter bleiben stehen (der Generator räumt nur in seinem Fenster auf, und
+  von Hand angelegte fasst er nie an), werden aber nicht mehr angeboten. Die
+  Einstellungsseite sagt das ausdrücklich statt still zu löschen.
 - Der Generator (`services/planung.py`) hält vier Zusagen, jede durch Tests
   abgesichert: nur Zukunft, nie gebuchte/reservierte löschen, nie manuelle
   Termine löschen, idempotent. **Nur Zukunft gilt auch für die Handplanung.**
@@ -201,7 +242,7 @@ coverage run manage.py test termine && coverage report
 
 - `main` trägt den stabilen Stand. Entwickelt wird auf einem eigenen Branch,
   der erst nach grüner Testsuite dorthin zurückfließt.
-- Stand: 276 Tests, 97 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
+- Stand: 311 Tests, 98 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
   der Schwerpunkt liegt dort, wo ein Fehler unbemerkt bliebe (Jobs, Kommandos,
   Ausfallpfade des Mailversands).
 - Commit-Nachrichten auf Deutsch, im Stil der bestehenden Historie: erst was

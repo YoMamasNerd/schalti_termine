@@ -63,6 +63,10 @@ def reservieren(
         raise TerminNichtVerfuegbar("Dieser Termin ist inzwischen vergeben.")
     if termin.beginn < termin.fahrlehrer.fruehester_start():
         raise TerminNichtVerfuegbar("Dieser Termin liegt zu kurzfristig und ist nicht mehr buchbar.")
+    if termin.beginn > termin.fahrlehrer.spaetester_start():
+        raise TerminNichtVerfuegbar(
+            "Dieser Termin liegt weiter in der Zukunft, als zurzeit gebucht werden kann."
+        )
     if termin.ist_gesperrt():
         raise TerminNichtVerfuegbar("Dieser Termin steht nicht mehr zur Verfügung.")
 

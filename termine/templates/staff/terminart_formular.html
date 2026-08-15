@@ -1,0 +1,77 @@
+{% extends "staff/base_staff.html" %}
+
+{% block titel %}{% if terminart %}Terminart bearbeiten{% else %}Neue Terminart{% endif %} – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+  <h1>{% if terminart %}Terminart bearbeiten{% else %}Neue Terminart{% endif %}</h1>
+  <p><a href="{% url 'termine:terminarten' %}">&larr; Zurück zur Übersicht</a></p>
+
+  <div class="raster-zwei">
+    <form class="karte" method="post" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="hinweis hinweis--fehler">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      {% for feld in form %}
+        {% include "termine/_feld.html" with feld=feld %}
+      {% endfor %}
+
+      <div class="knopfreihe">
+        <button class="knopf" type="submit">Speichern</button>
+        <a class="knopf knopf--leise" href="{% url 'termine:terminarten' %}">Abbrechen</a>
+      </div>
+    </form>
+
+    <div>
+      <div class="karte">
+        <h2>Was die Angaben bewirken</h2>
+        <dl style="font-size:0.9rem">
+          <dt><strong>Dauer</strong></dt>
+          <dd style="margin:0 0 0.7rem">
+            Die Länge eines einzelnen Termins. Sie zerlegt jedes geplante
+            Zeitfenster – ein angebrochener Rest am Ende fällt weg.
+          </dd>
+          <dt><strong>Puffer danach</strong></dt>
+          <dd style="margin:0 0 0.7rem">
+            Freie Zeit zwischen zwei Terminen. 30 Minuten Dauer plus 10 Minuten
+            Puffer ergeben Termine um 14:00, 14:40, 15:20 …
+          </dd>
+          <dt><strong>Ort</strong></dt>
+          <dd style="margin:0 0 0.7rem">
+            Steht in der Bestätigungsmail und im Kalendereintrag des Kunden.
+          </dd>
+          <dt><strong>Aktiv</strong></dt>
+          <dd style="margin:0">
+            Nur aktive Terminarten erscheinen in der öffentlichen Auswahl und in
+            der Tagesplanung. Bestehende Termine bleiben davon unberührt.
+          </dd>
+        </dl>
+      </div>
+
+      {% if terminart %}
+        <div class="karte">
+          <h2>Löschen</h2>
+          {% if verwendung.termine or verwendung.regeln %}
+            <p class="leer">
+              Diese Terminart hängt an {{ verwendung.termine }} Termin{{ verwendung.termine|pluralize:"en" }}
+              und {{ verwendung.regeln }} Regel{{ verwendung.regeln|pluralize:"n" }}. Sie lässt sich
+              deshalb nicht löschen – sonst verlöre eine gebuchte Beratung nachträglich
+              ihre Bezeichnung. Nehmen Sie den Haken bei „Aktiv“ heraus: Dann wird sie
+              nicht mehr angeboten, und alles Gebuchte bleibt lesbar.
+            </p>
+          {% else %}
+            <p class="leer">
+              Diese Terminart wird nirgends verwendet und kann gelöscht werden.
+            </p>
+            <form method="post" action="{% url 'termine:terminart_loeschen' terminart.pk %}"
+                  onsubmit="return confirm('Terminart wirklich löschen?');">
+              {% csrf_token %}
+              <button class="knopf knopf--gefahr knopf--klein" type="submit">Terminart löschen</button>
+            </form>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
