@@ -62,6 +62,7 @@ FSM_SYNC_ENABLED = env_bool("FSM_SYNC_ENABLED", default=False)
 FSM_EMAIL = os.environ.get("FSM_EMAIL", "")
 FSM_PASSWORD = os.environ.get("FSM_PASSWORD", "")
 FSM_BASE_URL = os.environ.get("FSM_BASE_URL", "https://api.fahrschulmanager.de/v1").rstrip("/")
+FSM_AUTH_TOKEN = os.environ.get("FSM_AUTH_TOKEN", "")
 FSM_API_KEY = os.environ.get(
     "FSM_API_KEY",
     "04TapXakdwXWUDVJyNEE8.W3t83Y3FhNryQABM0cMUq10JBH6Wv7X2k1iassfBsXOJpgyUHlYm2nUfCk6vdgVl10NadmfI8KnSmqefUlOJjv.8gCXHwujMBoT0TY2gGQ",
