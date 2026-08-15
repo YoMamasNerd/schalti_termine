@@ -48,9 +48,29 @@
     </div>
   </div>
 
-  <!-- Zuordnungstabelle -->
+  <!-- Zuordnungstabelle & Token -->
   <form method="post" novalidate>
     {% csrf_token %}
+
+    <div class="karte" style="margin-bottom: 1.5rem">
+      <h2>FSM Authentifizierung</h2>
+      <p class="leer">
+        Für den Zugriff auf die FSM-API wird ein gültiges Bearer-Token benötigt.
+        Dieses kann entweder in der <code>.env</code> als <code>FSM_AUTH_TOKEN</code> hinterlegt
+        oder hier direkt eingetragen werden.
+      </p>
+      <div style="margin-top: 0.5rem">
+        <label for="fsm_auth_token" style="display:block; font-weight:600; margin-bottom:0.25rem">
+          FSM Bearer Token
+        </label>
+        <textarea name="fsm_auth_token"
+                  id="fsm_auth_token"
+                  rows="3"
+                  placeholder="eyJhbGciOi..."
+                  style="width:100%; font-family:monospace; font-size:0.85rem">{{ fsm_auth_token }}</textarea>
+      </div>
+    </div>
+
     <div class="karte">
       <h2>Fahrlehrer-Zuordnung</h2>
       <div class="tabelle-huelle">

@@ -766,6 +766,11 @@ def fsm_einstellungen(request):
             )
             return redirect("termine:fsm_einstellungen")
 
+        if "fsm_auth_token" in request.POST:
+            token_neu = request.POST.get("fsm_auth_token", "").strip()
+            if token_neu:
+                fsm_client.set_auth_token(token_neu)
+
         # Zuordnungen speichern
         for fahrlehrer in fahrlehrer_liste:
             key_id = f"fsm_id_{fahrlehrer.pk}"
@@ -776,7 +781,7 @@ def fsm_einstellungen(request):
                 fahrlehrer.fsm_sync_aktiv = key_aktiv in request.POST
                 fahrlehrer.save(update_fields=["fsm_id", "fsm_sync_aktiv"])
 
-        messages.success(request, "FSM-Verknüpfungen gespeichert.")
+        messages.success(request, "FSM-Einstellungen gespeichert.")
 
         if "sync_nach_speichern" in request.POST:
             from .services.fsm_sync import sync_alle_fahrlehrer
@@ -812,6 +817,7 @@ def fsm_einstellungen(request):
             "fahrlehrer_daten": fahrlehrer_daten,
             "fsm_lehrer_liste": fsm_lehrer_liste,
             "fsm_fehler": fsm_fehler,
+            "fsm_auth_token": fsm_client.get_auth_token() or "",
             "ist_inhaber": ist_inhaber,
         },
     )
