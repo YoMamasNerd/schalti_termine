@@ -333,9 +333,8 @@ class Uebersichtsseite(BackendBasis):
         self.assertContains(antwort, "Anna Berger")
         self.assertContains(antwort, "Tom Keller")
 
-        zeilen = {f.name: f for f in antwort.context["fahrlehrer_liste"]}
-        self.assertEqual(zeilen["Anna Berger"].frei, 1)
-        self.assertEqual(zeilen["Anna Berger"].gebucht, 1)
+        self.assertEqual(antwort.context["kpi_frei"], 1)
+        self.assertEqual(antwort.context["kpi_gebucht"], 1)
 
     def test_offene_buchungen_werden_hervorgehoben(self):
         termin = self.termin_fuer(self.anna)
@@ -348,14 +347,14 @@ class Uebersichtsseite(BackendBasis):
         self.client.login(username="chef", password="geheim123")
         antwort = self.client.get(reverse("termine:dashboard"))
 
-        self.assertEqual(antwort.context["offene_buchungen"], 1)
-        self.assertContains(antwort, "E-Mail-Bestätigung")
+        self.assertEqual(antwort.context["kpi_offen"], 1)
+        self.assertContains(antwort, "Wartet auf Bestätigung")
 
     def test_fahrlehrer_sieht_nur_die_eigene_zeile(self):
         self.client.login(username="anna", password="geheim123")
         antwort = self.client.get(reverse("termine:dashboard"))
 
-        namen = [f.name for f in antwort.context["fahrlehrer_liste"]]
+        namen = [f.name for f in antwort.context["alle_fahrlehrer"]]
         self.assertEqual(namen, ["Anna Berger"])
 
 

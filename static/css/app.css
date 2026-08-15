@@ -287,11 +287,35 @@ p { margin: 0 0 1em; }
 }
 .tag--frei:hover { border-color: var(--gruen); }
 .tag--frei .punkt { background: var(--gruen); }
-.tag--gewaehlt { background: var(--marke); color: var(--auf-akzent); border-color: var(--marke); }
-.tag--gewaehlt .punkt { background: var(--auf-akzent); }
+.tag--gebucht {
+  background: var(--marke-hell); color: var(--marke-dunkel);
+  border-color: color-mix(in srgb, var(--marke) 25%, transparent);
+  font-weight: 600; cursor: pointer;
+}
+.tag--gebucht:hover { border-color: var(--marke); }
+.tag--gebucht .punkt { background: var(--marke); }
+.tag--gemischt {
+  background: linear-gradient(135deg, var(--gruen-hell) 50%, var(--marke-hell) 50%);
+  color: var(--marke-dunkel);
+  border-color: var(--linie);
+  font-weight: 600; cursor: pointer;
+}
+.tag--gemischt:hover { border-color: var(--marke); }
+.tag--gewaehlt { background: var(--marke) !important; color: var(--auf-akzent) !important; border-color: var(--marke) !important; }
+.tag--gewaehlt .punkt,
+.tag--gewaehlt .punkt--gruen,
+.tag--gewaehlt .punkt--blau,
+.tag--gewaehlt .punkt--gelb { background: var(--auf-akzent) !important; }
 .tag--fremd { opacity: 0.35; }
 .tag--heute { outline: 2px solid var(--marke); outline-offset: -2px; }
 .tag--feiertag { color: var(--rot); }
+
+.punkte-reihe {
+  display: flex; gap: 2px; justify-content: center; align-items: center; margin-top: 3px; min-height: 4px;
+}
+.punkt--gruen { width: 4px; height: 4px; border-radius: 50%; background: var(--gruen); }
+.punkt--blau { width: 4px; height: 4px; border-radius: 50%; background: var(--marke); }
+.punkt--gelb { width: 4px; height: 4px; border-radius: 50%; background: var(--gelb); }
 
 .legende {
   display: flex; gap: 1rem; flex-wrap: wrap;
@@ -303,7 +327,38 @@ p { margin: 0 0 1em; }
   background: var(--gruen-hell); border: 1px solid var(--gruen);
 }
 .legende i.frei-voll { background: var(--marke); }
+.legende i.gebucht-voll { background: var(--marke-hell); border-color: var(--marke); }
 .legende i.feiertag { background: var(--rot-hell); border-color: var(--rot); }
+
+/* --- Interne Terminkarten --- */
+.termin-karte-liste {
+  display: flex; flex-direction: column; gap: 0.65rem;
+}
+.termin-karte {
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  padding: 0.85rem 1rem;
+  background: var(--flaeche);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.termin-karte--gebucht {
+  border-left: 4px solid var(--marke);
+}
+.termin-karte--frei {
+  border-left: 4px solid var(--gruen);
+}
+.termin-karte--offen {
+  border-left: 4px solid var(--gelb);
+}
+.termin-karte-kopf {
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;
+}
+.termin-karte-details {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.4rem 1rem;
+  font-size: 0.9rem; margin-top: 0.2rem;
+}
 
 /* --- Terminliste --- */
 

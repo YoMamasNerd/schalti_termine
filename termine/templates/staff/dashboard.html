@@ -3,76 +3,230 @@
 {% block titel %}Übersicht – {{ SITE_NAME }}{% endblock %}
 
 {% block inhalt %}
-  <h1>Übersicht</h1>
-
-  {% if offene_buchungen %}
-    <div class="hinweis hinweis--warnung">
-      {{ offene_buchungen }} Buchung{{ offene_buchungen|pluralize:"en" }} warte{{ offene_buchungen|pluralize:"t,n" }}
-      noch auf die E-Mail-Bestätigung durch den Interessenten.
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem">
+    <div>
+      <h1 style="margin:0">Übersicht</h1>
     </div>
-  {% endif %}
+    {% if fahrlehrer_auswahl %}
+      <form method="get" style="display:flex; align-items:center; gap:0.5rem">
+        {% if gewaehlter_tag %}<input type="hidden" name="tag" value="{{ gewaehlter_tag|date:'Y-m-d' }}">{% endif %}
+        <input type="hidden" name="monat" value="{{ jahr }}-{{ monat|stringformat:'02d' }}">
+        <label for="fahrlehrer_select" style="font-weight:600; font-size:0.9rem">Fahrlehrer:</label>
+        <select name="fahrlehrer" id="fahrlehrer_select" onchange="this.form.submit()" style="padding:0.4rem 0.6rem">
+          <option value="">Alle Fahrlehrer</option>
+          {% for fl in alle_fahrlehrer %}
+            <option value="{{ fl.slug }}" {% if gewaehlter_slug == fl.slug %}selected{% endif %}>
+              {{ fl.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </form>
+    {% endif %}
+  </div>
 
-  <div class="karte">
-    <h2>Freie und gebuchte Termine</h2>
-    <div class="tabelle-huelle">
-      <table class="liste">
+  <!-- KPI Kennzahlen -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; margin-bottom:1.5rem">
+    <div class="karte" style="margin:0; padding:0.9rem 1.1rem; display:flex; align-items:center; gap:0.9rem">
+      <div style="width:40px; height:40px; border-radius:8px; background:var(--gruen-hell); color:var(--gruen-dunkel); display:flex; align-items:center; justify-content:center; font-size:1.2rem; font-weight:700">
+        ✓
+      </div>
+      <div>
+        <div style="font-size:1.4rem; font-weight:700; line-height:1.1">{{ kpi_frei }}</div>
+        <div class="leer" style="font-size:0.85rem">Freie Beratungstermine</div>
+      </div>
+    </div>
+    <div class="karte" style="margin:0; padding:0.9rem 1.1rem; display:flex; align-items:center; gap:0.9rem">
+      <div style="width:40px; height:40px; border-radius:8px; background:var(--marke-hell); color:var(--marke-dunkel); display:flex; align-items:center; justify-content:center; font-size:1.2rem; font-weight:700">
+        📅
+      </div>
+      <div>
+        <div style="font-size:1.4rem; font-weight:700; line-height:1.1">{{ kpi_gebucht }}</div>
+        <div class="leer" style="font-size:0.85rem">Bestätigte Buchungen</div>
+      </div>
+    </div>
+    {% if kpi_offen %}
+      <div class="karte" style="margin:0; padding:0.9rem 1.1rem; display:flex; align-items:center; gap:0.9rem; border-color:var(--gelb)">
+        <div style="width:40px; height:40px; border-radius:8px; background:var(--gelb-hell); color:var(--gelb); display:flex; align-items:center; justify-content:center; font-size:1.2rem; font-weight:700">
+          ⏳
+        </div>
+        <div>
+          <div style="font-size:1.4rem; font-weight:700; line-height:1.1; color:var(--gelb)">{{ kpi_offen }}</div>
+          <div class="leer" style="font-size:0.85rem">Wartet auf Bestätigung</div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Gespiegelter Kalender & Tagesdetails -->
+  <div class="raster-zwei" id="dashboard-kalender" style="margin-bottom:1.5rem">
+    <!-- Linke Spalte: Monatskalender -->
+    <div class="karte" style="margin-bottom:0">
+      <div class="kalender-kopf">
+        <a class="knopf knopf--leise knopf--klein"
+           href="?monat={{ vorheriger_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
+           hx-get="?monat={{ vorheriger_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
+           hx-select="#dashboard-kalender" hx-target="#dashboard-kalender" hx-swap="outerHTML"
+           aria-label="Vorheriger Monat">&larr;</a>
+
+        <h2>{{ monatsname }}</h2>
+
+        <a class="knopf knopf--leise knopf--klein"
+           href="?monat={{ naechster_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
+           hx-get="?monat={{ naechster_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
+           hx-select="#dashboard-kalender" hx-target="#dashboard-kalender" hx-swap="outerHTML"
+           aria-label="Nächster Monat">&rarr;</a>
+      </div>
+
+      <table class="monat">
         <thead>
           <tr>
-            <th>Fahrlehrer</th>
-            <th>Bundesland</th>
-            <th>Frei</th>
-            <th>Gebucht</th>
-            <th>Horizont</th>
-            <th>Kalender-Abo</th>
-            <th></th>
+            <th scope="col"><abbr title="Montag">Mo</abbr></th>
+            <th scope="col"><abbr title="Dienstag">Di</abbr></th>
+            <th scope="col"><abbr title="Mittwoch">Mi</abbr></th>
+            <th scope="col"><abbr title="Donnerstag">Do</abbr></th>
+            <th scope="col"><abbr title="Freitag">Fr</abbr></th>
+            <th scope="col"><abbr title="Samstag">Sa</abbr></th>
+            <th scope="col"><abbr title="Sonntag">So</abbr></th>
           </tr>
         </thead>
         <tbody>
-          {% for person in fahrlehrer_liste %}
+          {% for woche in gitter %}
             <tr>
-              <td><strong>{{ person.name }}</strong></td>
-              <td>{{ person.get_bundesland_display }}</td>
-              <td>{{ person.frei }}</td>
-              <td>{{ person.gebucht }}</td>
-              <td>{{ person.horizont_wochen }} Wochen</td>
-              <td><a href="{{ person.feed_url }}">Abo-Link</a></td>
-              <td>
-                <form method="post" action="{% url 'termine:generieren' %}">
-                  {% csrf_token %}
-                  <input type="hidden" name="fahrlehrer" value="{{ person.slug }}">
-                  <button class="knopf knopf--leise knopf--klein" type="submit">
-                    Termine erzeugen
-                  </button>
-                </form>
-              </td>
-            </tr>
-          {% empty %}
-            <tr>
-              <td colspan="7" class="leer">
-                Noch kein Fahrlehrer angelegt.
-                {% if user.is_staff %}
-                  <a href="{% url 'termine:fahrlehrer_neu' %}">Jetzt anlegen</a>
-                {% endif %}
-              </td>
+              {% for zelle in woche %}
+                <td>
+                  {% if zelle.hat_termine %}
+                    <a class="tag {% if zelle.hat_frei and zelle.hat_gebucht %}tag--gemischt{% elif zelle.hat_gebucht %}tag--gebucht{% else %}tag--frei{% endif %}{% if zelle.ausgewaehlt %} tag--gewaehlt{% endif %}{% if not zelle.im_monat %} tag--fremd{% endif %}{% if zelle.ist_heute %} tag--heute{% endif %}"
+                       href="?tag={{ zelle.datum|date:'Y-m-d' }}&monat={{ jahr }}-{{ monat|stringformat:'02d' }}{% if querystring %}&{{ querystring }}{% endif %}"
+                       hx-get="?tag={{ zelle.datum|date:'Y-m-d' }}&monat={{ jahr }}-{{ monat|stringformat:'02d' }}{% if querystring %}&{{ querystring }}{% endif %}"
+                       hx-select="#dashboard-kalender" hx-target="#dashboard-kalender" hx-swap="outerHTML"
+                       title="{{ zelle.datum|date:'l, j. F Y' }} – {{ zelle.frei_anzahl }} frei, {{ zelle.gebucht_anzahl }} gebucht">
+                      <span class="zahl">{{ zelle.tag }}</span>
+                      <span class="punkte-reihe">
+                        {% if zelle.frei_anzahl %}<span class="punkt--gruen" title="{{ zelle.frei_anzahl }} frei"></span>{% endif %}
+                        {% if zelle.gebucht_anzahl %}<span class="punkt--blau" title="{{ zelle.gebucht_anzahl }} gebucht"></span>{% endif %}
+                        {% if zelle.offen_anzahl %}<span class="punkt--gelb" title="{{ zelle.offen_anzahl }} offen"></span>{% endif %}
+                      </span>
+                    </a>
+                  {% else %}
+                    <a class="tag{% if zelle.ausgewaehlt %} tag--gewaehlt{% endif %}{% if not zelle.im_monat %} tag--fremd{% endif %}{% if zelle.ist_heute %} tag--heute{% endif %}{% if zelle.feiertag %} tag--feiertag{% endif %}"
+                       href="?tag={{ zelle.datum|date:'Y-m-d' }}&monat={{ jahr }}-{{ monat|stringformat:'02d' }}{% if querystring %}&{{ querystring }}{% endif %}"
+                       hx-get="?tag={{ zelle.datum|date:'Y-m-d' }}&monat={{ jahr }}-{{ monat|stringformat:'02d' }}{% if querystring %}&{{ querystring }}{% endif %}"
+                       hx-select="#dashboard-kalender" hx-target="#dashboard-kalender" hx-swap="outerHTML"
+                       {% if zelle.feiertag %}title="{{ zelle.feiertag }}"{% endif %}>
+                      <span class="zahl">{{ zelle.tag }}</span>
+                      <span class="punkt"></span>
+                    </a>
+                  {% endif %}
+                </td>
+              {% endfor %}
             </tr>
           {% endfor %}
         </tbody>
       </table>
+
+      <div class="legende">
+        <span><i style="background:var(--gruen-hell); border:1px solid var(--gruen)"></i> Freie Termine</span>
+        <span><i class="gebucht-voll"></i> Gebuchte Termine</span>
+        <span><i class="frei-voll"></i> Ausgewählter Tag</span>
+      </div>
+    </div>
+
+    <!-- Rechte Spalte: Tagesansicht -->
+    <div class="karte" style="margin-bottom:0; display:flex; flex-direction:column">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:1rem; border-bottom:1px solid var(--linie); padding-bottom:0.6rem">
+        <h2 style="margin:0">{{ gewaehlter_tag|date:"l, j. F Y" }}</h2>
+        <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:tagesplanung' %}?woche={{ gewaehlter_tag|date:'Y-m-d' }}">
+          In Tagesplanung öffnen &rarr;
+        </a>
+      </div>
+
+      {% if tages_termine %}
+        <div class="termin-karte-liste">
+          {% for item in tages_termine %}
+            <div class="termin-karte {% if item.termin.status == 'gebucht' %}termin-karte--gebucht{% elif item.termin.status == 'frei' %}termin-karte--frei{% else %}termin-karte--offen{% endif %}">
+              <div class="termin-karte-kopf">
+                <div style="font-weight:700; font-size:1.05rem">
+                  {{ item.termin.beginn_lokal|date:"H:i" }}–{{ item.termin.ende_lokal|date:"H:i" }} Uhr
+                  <span style="font-weight:normal; font-size:0.9rem; color:var(--text-leise)">({{ item.termin.terminart.name }})</span>
+                </div>
+                <div>
+                  {% if item.termin.status == 'gebucht' %}
+                    <span class="abzeichen abzeichen--info" style="background:var(--marke-hell); color:var(--marke-dunkel); padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:600">Gebucht</span>
+                  {% elif item.termin.status == 'frei' %}
+                    <span class="abzeichen abzeichen--erfolg" style="background:var(--gruen-hell); color:var(--gruen-dunkel); padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:600">Frei</span>
+                  {% elif item.termin.status == 'reserviert' %}
+                    <span class="abzeichen abzeichen--warnung" style="background:var(--gelb-hell); color:var(--gelb); padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:600">Wartet auf E-Mail-Bestätigung</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="termin-karte-details">
+                <div>
+                  <strong style="color:var(--text-leise)">Fahrlehrer:</strong> {{ item.termin.fahrlehrer.name }}
+                </div>
+                {% if item.termin.terminart.ort %}
+                  <div>
+                    <strong style="color:var(--text-leise)">Ort:</strong> {{ item.termin.terminart.ort }}
+                  </div>
+                {% endif %}
+              </div>
+
+              {% if item.buchung %}
+                <div style="margin-top:0.4rem; padding-top:0.4rem; border-top:1px dashed var(--linie); font-size:0.9rem">
+                  <div>
+                    <strong>Kunde:</strong> {{ item.buchung.name }}
+                    {% if item.buchung.fuehrerscheinklasse %}
+                      <span class="leer">({{ item.buchung.get_fuehrerscheinklasse_display }})</span>
+                    {% endif %}
+                  </div>
+                  <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.2rem">
+                    {% if item.buchung.telefon %}
+                      <div>📞 <a href="tel:{{ item.buchung.telefon }}">{{ item.buchung.telefon }}</a></div>
+                    {% endif %}
+                    <div>✉️ <a href="mailto:{{ item.buchung.email }}">{{ item.buchung.email }}</a></div>
+                  </div>
+                  {% if item.buchung.nachricht %}
+                    <div style="margin-top:0.3rem; color:var(--text-leise); font-style:italic">
+                      „{{ item.buchung.nachricht|truncatewords:20 }}“
+                    </div>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div style="text-align:center; padding:2rem 1rem; color:var(--text-leise)">
+          <p style="font-size:1.05rem; margin-bottom:0.5rem">An diesem Tag sind keine Beratungstermine angelegt.</p>
+          <p><a class="knopf knopf--leise knopf--klein" href="{% url 'termine:tagesplanung' %}?woche={{ gewaehlter_tag|date:'Y-m-d' }}">Termine in Tagesplanung anlegen</a></p>
+        </div>
+      {% endif %}
     </div>
   </div>
 
+  <!-- Nächste anstehende Buchungen Tabelle -->
   <div class="karte">
-    <h2>Nächste Termine</h2>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+      <h2 style="margin:0">Nächste gebuchte Termine</h2>
+      <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:buchungen' %}">Alle Buchungen &rarr;</a>
+    </div>
+
     {% if naechste_buchungen %}
       <div class="tabelle-huelle">
         <table class="liste">
           <thead>
-            <tr><th>Wann</th><th>Wer</th><th>Kontakt</th><th>Terminart</th><th>Fahrlehrer</th></tr>
+            <tr>
+              <th>Wann</th>
+              <th>Kunde</th>
+              <th>Kontakt</th>
+              <th>Terminart</th>
+              <th>Fahrlehrer</th>
+            </tr>
           </thead>
           <tbody>
             {% for buchung in naechste_buchungen %}
               <tr>
-                <td>{{ buchung.termin.beginn_lokal|date:"D, j. M Y, H:i" }}</td>
+                <td><strong>{{ buchung.termin.beginn_lokal|date:"D, j. M Y, H:i" }} Uhr</strong></td>
                 <td>
                   {{ buchung.name }}
                   {% if buchung.fuehrerscheinklasse %}
@@ -81,7 +235,7 @@
                 </td>
                 <td>
                   <a href="mailto:{{ buchung.email }}">{{ buchung.email }}</a>
-                  {% if buchung.telefon %}<br>{{ buchung.telefon }}{% endif %}
+                  {% if buchung.telefon %}<br><a href="tel:{{ buchung.telefon }}">{{ buchung.telefon }}</a>{% endif %}
                 </td>
                 <td>{{ buchung.termin.terminart.name }}</td>
                 <td>{{ buchung.termin.fahrlehrer.name }}</td>
@@ -91,10 +245,7 @@
         </table>
       </div>
     {% else %}
-      <p class="leer">Zurzeit sind keine Termine gebucht.</p>
+      <p class="leer">Zurzeit stehen keine bestätigten Beratungstermine an.</p>
     {% endif %}
-    <p style="margin-top:1rem">
-      <a class="knopf knopf--leise" href="{% url 'termine:buchungen' %}">Alle Buchungen</a>
-    </p>
   </div>
 {% endblock %}

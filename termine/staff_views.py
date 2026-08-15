@@ -14,7 +14,9 @@ Fahrschule gilt. Welche Daten jemand dann sieht, entscheidet allein
 
 from __future__ import annotations
 
+import calendar
 import datetime as dt
+from collections import defaultdict
 from functools import wraps
 
 from django.conf import settings
@@ -132,47 +134,204 @@ def _sicheres_ziel(request, standard: str) -> str:
     return reverse(standard)
 
 
+def _datum_aus_get(request, name: str) -> dt.date | None:
+    roh = request.GET.get(name)
+    if not roh:
+        return None
+    try:
+        return dt.date.fromisoformat(roh)
+    except ValueError:
+        return None
+
+
+def _monat_aus_get(request) -> tuple[int, int]:
+    """Liest den anzuzeigenden Monat aus der URL, sonst der aktuelle Monat."""
+    heute = timezone.localdate()
+    roh = request.GET.get("monat")
+    if roh:
+        try:
+            jahr, monat = roh.split("-")
+            return int(jahr), int(monat)
+        except (ValueError, TypeError):
+            pass
+    return heute.year, heute.month
+
+
+def _monatsgrenzen(jahr: int, monat: int) -> tuple[dt.date, dt.date]:
+    """Erster und letzter im Monatsgitter sichtbarer Tag (inkl. Nachbarmonate)."""
+    wochen = calendar.Calendar(firstweekday=0).monthdatescalendar(jahr, monat)
+    return wochen[0][0], wochen[-1][-1]
+
+
 @mitarbeiter
 def dashboard(request):
     erlaubt = _erlaubte_fahrlehrer(request.user)
-    jetzt = timezone.now()
+    alle_fahrlehrer = list(erlaubt.order_by("reihenfolge", "name"))
 
+    gewaehlter_slug = request.GET.get("fahrlehrer", "")
+    gewaehlter_fahrlehrer = erlaubt.filter(slug=gewaehlter_slug).first() if gewaehlter_slug else None
+
+    if gewaehlter_fahrlehrer:
+        ziel_fahrlehrer = [gewaehlter_fahrlehrer]
+    else:
+        ziel_fahrlehrer = alle_fahrlehrer
+
+    ziel_pks = [fl.pk for fl in ziel_fahrlehrer]
+
+    jetzt = timezone.now()
+    heute = timezone.localdate()
+
+    # Monat aus GET
+    jahr, monat = _monat_aus_get(request)
+    try:
+        gitter_von, gitter_bis = _monatsgrenzen(jahr, monat)
+    except (calendar.IllegalMonthError, ValueError):
+        jahr, monat = heute.year, heute.month
+        gitter_von, gitter_bis = _monatsgrenzen(jahr, monat)
+
+    erster_im_monat = dt.date(jahr, monat, 1)
+    vorheriger = erster_im_monat - dt.timedelta(days=1)
+    naechster = (erster_im_monat + dt.timedelta(days=32)).replace(day=1)
+
+    # Alle relevanten Termine im sichtbaren Monatszeitraum
+    termine_im_monat = (
+        Termin.objects.filter(
+            fahrlehrer__in=ziel_pks,
+            beginn__gte=lokal(gitter_von, dt.time.min),
+            beginn__lte=lokal(gitter_bis, dt.time.max),
+            status__in=[Termin.Status.FREI, Termin.Status.RESERVIERT, Termin.Status.GEBUCHT],
+        )
+        .select_related("fahrlehrer", "terminart")
+        .prefetch_related("buchungen")
+    )
+
+    termine_pro_tag = defaultdict(list)
+    stats_pro_tag = defaultdict(lambda: {"frei": 0, "gebucht": 0, "offen": 0, "gesamt": 0})
+
+    for t in termine_im_monat:
+        d = timezone.localtime(t.beginn).date()
+        termine_pro_tag[d].append(t)
+        stats_pro_tag[d]["gesamt"] += 1
+        if t.status == Termin.Status.FREI:
+            stats_pro_tag[d]["frei"] += 1
+        elif t.status == Termin.Status.GEBUCHT:
+            stats_pro_tag[d]["gebucht"] += 1
+        elif t.status == Termin.Status.RESERVIERT:
+            stats_pro_tag[d]["offen"] += 1
+
+    # Gewählter Tag
+    gewaehlter_tag = _datum_aus_get(request, "tag")
+    if gewaehlter_tag is None:
+        if erster_im_monat <= heute <= gitter_bis:
+            gewaehlter_tag = heute
+        else:
+            tage_mit_terminen = sorted([d for d in termine_pro_tag.keys() if d.month == monat])
+            gewaehlter_tag = tage_mit_terminen[0] if tage_mit_terminen else erster_im_monat
+
+    # Monatsgitter
+    kal = calendar.Calendar(firstweekday=0)
+    wochen = kal.monthdatescalendar(jahr, monat)
+
+    bundesland = gewaehlter_fahrlehrer.bundesland if gewaehlter_fahrlehrer else "BW"
+    feiertage = feiertage_im_zeitraum(bundesland, gitter_von, gitter_bis)
+
+    gitter = []
+    for woche in wochen:
+        zeile = []
+        for tag in woche:
+            st = stats_pro_tag[tag]
+            zeile.append({
+                "datum": tag,
+                "tag": tag.day,
+                "im_monat": tag.month == monat,
+                "ist_heute": tag == heute,
+                "ist_vergangen": tag < heute,
+                "feiertag": feiertage.get(tag),
+                "frei_anzahl": st["frei"],
+                "gebucht_anzahl": st["gebucht"],
+                "offen_anzahl": st["offen"],
+                "gesamt_anzahl": st["gesamt"],
+                "hat_termine": st["gesamt"] > 0,
+                "hat_frei": st["frei"] > 0,
+                "hat_gebucht": (st["gebucht"] + st["offen"]) > 0,
+                "ausgewaehlt": tag == gewaehlter_tag,
+            })
+        gitter.append(zeile)
+
+    # Termine am gewählten Tag
+    tages_termine_qs = (
+        Termin.objects.filter(
+            fahrlehrer__in=ziel_pks,
+            beginn__gte=lokal(gewaehlter_tag, dt.time.min),
+            beginn__lte=lokal(gewaehlter_tag, dt.time.max),
+            status__in=[Termin.Status.FREI, Termin.Status.RESERVIERT, Termin.Status.GEBUCHT],
+        )
+        .select_related("fahrlehrer", "terminart")
+        .prefetch_related("buchungen")
+        .order_by("beginn", "fahrlehrer__name")
+    )
+
+    tages_termine = []
+    for termin in tages_termine_qs:
+        aktive_buchung = termin.buchungen.exclude(status=Buchung.Status.STORNIERT).first()
+        tages_termine.append({
+            "termin": termin,
+            "buchung": aktive_buchung,
+        })
+
+    # Nächste bestätigte Buchungen
     naechste = (
         Buchung.objects.filter(
             status=Buchung.Status.BESTAETIGT,
-            termin__fahrlehrer__in=erlaubt,
+            termin__fahrlehrer__in=ziel_pks,
             termin__beginn__gte=jetzt,
         )
         .select_related("termin", "termin__terminart", "termin__fahrlehrer")
-        .order_by("termin__beginn")[:10]
+        .order_by("termin__beginn")[:8]
     )
 
-    offen = Buchung.objects.filter(
-        status=Buchung.Status.OFFEN, termin__fahrlehrer__in=erlaubt
+    # KPIs
+    kpi_frei = Termin.objects.filter(
+        fahrlehrer__in=ziel_pks,
+        status=Termin.Status.FREI,
+        beginn__gte=jetzt,
     ).count()
 
-    freie_pro_fahrlehrer = (
-        Fahrlehrer.objects.filter(pk__in=erlaubt)
-        .annotate(
-            frei=Count(
-                "termine",
-                filter=Q(termine__status=Termin.Status.FREI, termine__beginn__gte=jetzt),
-            ),
-            gebucht=Count(
-                "termine",
-                filter=Q(termine__status=Termin.Status.GEBUCHT, termine__beginn__gte=jetzt),
-            ),
-        )
-        .order_by("reihenfolge", "name")
-    )
+    kpi_gebucht = Buchung.objects.filter(
+        termin__fahrlehrer__in=ziel_pks,
+        status=Buchung.Status.BESTAETIGT,
+        termin__beginn__gte=jetzt,
+    ).count()
+
+    kpi_offen = Buchung.objects.filter(
+        termin__fahrlehrer__in=ziel_pks,
+        status=Buchung.Status.OFFEN,
+        termin__beginn__gte=jetzt,
+    ).count()
+
+    querystring = f"fahrlehrer={gewaehlter_slug}" if gewaehlter_slug else ""
 
     return render(
         request,
         "staff/dashboard.html",
         {
+            "alle_fahrlehrer": alle_fahrlehrer,
+            "fahrlehrer_auswahl": len(alle_fahrlehrer) > 1,
+            "gewaehlter_fahrlehrer": gewaehlter_fahrlehrer,
+            "gewaehlter_slug": gewaehlter_slug,
+            "querystring": querystring,
+            "jahr": jahr,
+            "monat": monat,
+            "monatsname": date_format(erster_im_monat, "F Y"),
+            "vorheriger_monat": f"{vorheriger:%Y-%m}",
+            "naechster_monat": f"{naechster:%Y-%m}",
+            "gitter": gitter,
+            "gewaehlter_tag": gewaehlter_tag,
+            "tages_termine": tages_termine,
             "naechste_buchungen": naechste,
-            "offene_buchungen": offen,
-            "fahrlehrer_liste": freie_pro_fahrlehrer,
+            "kpi_frei": kpi_frei,
+            "kpi_gebucht": kpi_gebucht,
+            "kpi_offen": kpi_offen,
         },
     )
 
