@@ -196,7 +196,7 @@ class Terminart(models.Model):
     slug = models.SlugField("URL-Kürzel", max_length=140, unique=True, blank=True)
     dauer_minuten = models.PositiveIntegerField(
         "Dauer (Minuten)",
-        default=30,
+        default=90,
         validators=[MinValueValidator(5), MaxValueValidator(600)],
     )
     puffer_minuten = models.PositiveIntegerField(
@@ -270,8 +270,8 @@ class RhythmusRegel(models.Model):
         default=list,
         help_text="Liste von Wochentagen (0 = Montag … 6 = Sonntag).",
     )
-    beginn = models.TimeField("Von", default=dt.time(9, 0))
-    ende = models.TimeField("Bis", default=dt.time(12, 0))
+    beginn = models.TimeField("Von", default=dt.time(15, 30))
+    ende = models.TimeField("Bis", default=dt.time(17, 0))
     intervall_wochen = models.PositiveIntegerField(
         "Rhythmus",
         default=1,

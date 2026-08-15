@@ -90,7 +90,7 @@ class TagesplanungForm(forms.Form):
     )
     von = forms.TimeField(
         label="Von",
-        initial=dt.time(14, 0),
+        initial=dt.time(15, 30),
         widget=forms.TimeInput(attrs={"type": "time"}, format="%H:%M"),
     )
     bis = forms.TimeField(
@@ -170,6 +170,9 @@ class RhythmusRegelForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            self.initial.setdefault("beginn", dt.time(15, 30))
+            self.initial.setdefault("ende", dt.time(17, 0))
         vorhanden = self.initial.get("wochentage") or []
         if vorhanden:
             self.initial["wochentage"] = [str(tag) for tag in vorhanden]
@@ -179,16 +182,7 @@ class RhythmusRegelForm(forms.ModelForm):
 
 
 class TerminartForm(forms.ModelForm):
-    """Terminarten pflegen – ohne den Umweg über den Django-Admin.
-
-    Das URL-Kürzel steht bewusst nicht im Formular: Es steckt in den Links,
-    die die Fahrschule auf ihrer Webseite verteilt (`?art=erstberatung`).
-    Beim Anlegen entsteht es aus dem Namen, danach bleibt es liegen – eine
-    Umbenennung soll keine fremden Links zerreißen.
-
-    Die Farbe fehlt aus einem anderen Grund: Sie wird zurzeit nirgends
-    angezeigt. Ein Bedienfeld, das nichts bewirkt, kostet nur Vertrauen.
-    """
+    """Terminarten pflegen – ohne den Umweg über den Django-Admin."""
 
     class Meta:
         model = Terminart
@@ -203,6 +197,11 @@ class TerminartForm(forms.ModelForm):
             "reihenfolge",
         ]
         widgets = {"beschreibung": forms.Textarea(attrs={"rows": 3})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            self.initial.setdefault("dauer_minuten", 90)
 
     def clean_name(self):
         name = self.cleaned_data["name"].strip()
