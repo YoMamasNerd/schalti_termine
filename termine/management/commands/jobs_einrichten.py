@@ -28,6 +28,12 @@ JOBS = {
         None,
         "Anonymisiert alte Buchungen (DSGVO).",
     ),
+    "FSM synchronisieren": (
+        "termine.jobs.fsm_synchronisieren",
+        Schedule.MINUTES,
+        15,
+        "Gleicht Belegungszeiten (Sperren) aus dem Fahrschulmanager ab.",
+    ),
 }
 
 

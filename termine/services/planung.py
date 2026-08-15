@@ -177,6 +177,19 @@ def termine_entfernen(termine) -> tuple[int, set[int]]:
     if not pks:
         return 0, set()
 
+    # Eventuell in FSM hinterlegte Termine ebenfalls dort löschen
+    fsm_ids_to_delete = list(
+        termine.exclude(fsm_termin_id="").values_list("fsm_termin_id", flat=True)
+    )
+    if fsm_ids_to_delete:
+        from . import fsm_sync
+
+        def _cleanup_fsm():
+            for fid in fsm_ids_to_delete:
+                fsm_sync.loesche_fsm_termin_by_id(fid)
+
+        transaction.on_commit(_cleanup_fsm)
+
     mit_historie = set(
         Buchung.objects.filter(termin_id__in=pks).values_list("termin_id", flat=True)
     )

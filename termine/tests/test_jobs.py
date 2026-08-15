@@ -169,3 +169,9 @@ class Datenpflege(JobBasis):
         buchung.refresh_from_db()
         self.assertEqual(buchung.email, "max@example.org")
         self.assertIsNone(buchung.anonymisiert_am)
+
+
+class FsmSynchronisieren(JobBasis):
+    def test_ruft_sync_service_auf(self):
+        ergebnis = jobs.fsm_synchronisieren()
+        self.assertIn("FSM-Sync:", ergebnis)

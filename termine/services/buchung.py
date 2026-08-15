@@ -22,7 +22,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from ..models import Buchung, Termin
-from . import mail
+from . import fsm_sync, mail
 
 logger = logging.getLogger(__name__)
 
@@ -119,11 +119,12 @@ def bestaetigen(buchung: Buchung) -> Buchung:
     Termin.objects.filter(pk=buchung.termin_id).update(status=Termin.Status.GEBUCHT)
     buchung.termin.status = Termin.Status.GEBUCHT
 
-    def _mails():
+    def _nach_bestaetigung():
         mail.buchung_bestaetigt_kunde(buchung)
         mail.buchung_bestaetigt_fahrlehrer(buchung)
+        fsm_sync.buche_in_fsm(buchung)
 
-    transaction.on_commit(_mails)
+    transaction.on_commit(_nach_bestaetigung)
     logger.info("Buchung %s bestätigt", buchung.referenz)
     return buchung
 
@@ -147,16 +148,15 @@ def stornieren(buchung: Buchung, *, von: str = "kunde", benachrichtigen: bool = 
     if buchung.termin.beginn > timezone.now():
         Termin.objects.filter(pk=buchung.termin_id).update(status=Termin.Status.FREI)
 
-    if benachrichtigen and war_bestaetigt:
-        def _mails():
-            # Der Kunde wird immer benachrichtigt. Der Fahrlehrer nur dann,
-            # wenn die Absage vom Kunden kam – hat die Fahrschule selbst
-            # abgesagt, weiß sie es bereits.
-            mail.storno_kunde(buchung)
-            if von != "fahrschule":
-                mail.storno_fahrlehrer(buchung)
+    if war_bestaetigt:
+        def _nach_storno():
+            if benachrichtigen:
+                mail.storno_kunde(buchung)
+                if von != "fahrschule":
+                    mail.storno_fahrlehrer(buchung)
+            fsm_sync.storniere_in_fsm(buchung)
 
-        transaction.on_commit(_mails)
+        transaction.on_commit(_nach_storno)
 
     logger.info("Buchung %s storniert (%s)", buchung.referenz, von)
     return buchung

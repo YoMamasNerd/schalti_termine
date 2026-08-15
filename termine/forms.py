@@ -233,6 +233,8 @@ class FahrlehrerEinstellungenForm(forms.ModelForm):
             "bundesland",
             "vorlauf_stunden",
             "horizont_wochen",
+            "fsm_id",
+            "fsm_sync_aktiv",
             "aktiv",
             "reihenfolge",
         ]
@@ -241,6 +243,7 @@ class FahrlehrerEinstellungenForm(forms.ModelForm):
             "horizont_wochen": "Wie weit im Voraus Kunden buchen können. Die "
             "automatische Planung reicht genauso weit – was dahinter liegt, "
             "wird nicht angeboten.",
+            "fsm_id": "UUID des Fahrlehrers im Fahrschulmanager (z. B. aus der FSM-Adressleiste oder Lehrerliste).",
         }
 
     def __init__(self, *args, inhaber: bool = False, **kwargs):
