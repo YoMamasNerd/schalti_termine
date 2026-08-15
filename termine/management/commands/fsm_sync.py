@@ -1,13 +1,22 @@
 from django.core.management.base import BaseCommand
 
 from termine.models import Fahrlehrer
-from termine.services.fsm_sync import sync_alle_fahrlehrer, sync_blocker_fuer_fahrlehrer
+from termine.services.fsm_sync import (
+    importiere_fahrlehrer_aus_fsm,
+    sync_alle_fahrlehrer,
+    sync_blocker_fuer_fahrlehrer,
+)
 
 
 class Command(BaseCommand):
     help = "Synchronisiert Belegungszeiten und Fahrstunden aus dem Fahrschulmanager (FSM)."
 
     def add_arguments(self, parser):
+        parser.add_argument(
+            "--import-fahrlehrer",
+            action="store_true",
+            help="Importiert alle aktiven Fahrlehrer aus FSM und legt sie in Schalti an.",
+        )
         parser.add_argument(
             "--fahrlehrer",
             type=str,
@@ -21,6 +30,15 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        if options.get("import_fahrlehrer"):
+            self.stdout.write("Importiere Fahrlehrer aus FSM...")
+            neu, akt = importiere_fahrlehrer_aus_fsm()
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"{len(neu)} Fahrlehrer neu angelegt, {len(akt)} aktualisiert/verknüpft."
+                )
+            )
+
         spezifisch = options.get("fahrlehrer")
         tage = options.get("tage")
 

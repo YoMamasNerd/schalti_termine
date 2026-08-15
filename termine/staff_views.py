@@ -815,6 +815,17 @@ def fsm_einstellungen(request):
             )
             return redirect("termine:fsm_einstellungen")
 
+        if aktion == "import_fahrlehrer":
+            from .services.fsm_sync import importiere_fahrlehrer_aus_fsm, sync_alle_fahrlehrer
+
+            neu, aktualisiert = importiere_fahrlehrer_aus_fsm(client=fsm_client)
+            sync_alle_fahrlehrer(client=fsm_client)
+            messages.success(
+                request,
+                f"Fahrlehrer-Import erfolgreich: {len(neu)} neu angelegt, {len(aktualisiert)} verknüpft/aktualisiert.",
+            )
+            return redirect("termine:fsm_einstellungen")
+
         if "fsm_auth_token" in request.POST:
             token_neu = request.POST.get("fsm_auth_token", "").strip()
             if token_neu:

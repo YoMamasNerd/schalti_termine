@@ -38,13 +38,22 @@
         {% endif %}
       </div>
 
-      <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="aktion" value="sync">
-        <button class="knopf knopf--leise" type="submit">
-          Jetzt manuell synchronisieren
-        </button>
-      </form>
+      <div class="knopfreihe">
+        <form method="post" style="display:inline">
+          {% csrf_token %}
+          <input type="hidden" name="aktion" value="import_fahrlehrer">
+          <button class="knopf" type="submit">
+            Fahrlehrer aus FSM importieren &amp; verknüpfen
+          </button>
+        </form>
+        <form method="post" style="display:inline">
+          {% csrf_token %}
+          <input type="hidden" name="aktion" value="sync">
+          <button class="knopf knopf--leise" type="submit">
+            Jetzt synchronisieren
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 

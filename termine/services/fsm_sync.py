@@ -30,6 +30,87 @@ def is_fsm_aktiv_fuer_fahrlehrer(fahrlehrer: Fahrlehrer) -> bool:
     return bool(global_aktiv and fahrlehrer.fsm_sync_aktiv and fahrlehrer.fsm_id)
 
 
+def importiere_fahrlehrer_aus_fsm(
+    client: FsmClient | None = None,
+) -> tuple[list[Fahrlehrer], list[Fahrlehrer]]:
+    """Liest alle aktiven Fahrlehrer aus FSM aus und legt sie in Schalti Termine an
+    bzw. verknüpft sie anhand von FSM-ID oder Name.
+
+    Gibt (neu_erstellte, aktualisierte_oder_verknuepfte) zurück.
+    """
+    if not getattr(settings, "FSM_SYNC_ENABLED", False):
+        return [], []
+
+    client = client or FsmClient()
+    fsm_lehrer = client.get_fahrlehrer()
+
+    neu_erstellt: list[Fahrlehrer] = []
+    aktualisiert: list[Fahrlehrer] = []
+
+    for entry in fsm_lehrer:
+        if not isinstance(entry, dict):
+            continue
+
+        fsm_id = str(entry.get("id") or "").strip()
+        if not fsm_id:
+            continue
+
+        vorname = str(entry.get("vorname") or "").strip()
+        nachname = str(entry.get("nachname") or "").strip()
+        if vorname and nachname:
+            voller_name = f"{vorname} {nachname}"
+        else:
+            voller_name = str(entry.get("displayName") or entry.get("name") or "Fahrlehrer").strip()
+
+        email = str(entry.get("email") or "").strip()
+        if not email:
+            fallback = getattr(settings, "DEFAULT_FROM_EMAIL", "mail@fahrschule-schaltwerk.de")
+            if "<" in fallback and ">" in fallback:
+                email = fallback.split("<")[1].replace(">", "").strip()
+            else:
+                email = fallback
+
+        telefon = str(entry.get("mobil") or entry.get("telefon") or "").strip()
+
+        # 1. Prüfe auf bestehende FSM-ID
+        lehrer = Fahrlehrer.objects.filter(fsm_id=fsm_id).first()
+
+        # 2. Wenn nicht gefunden, suche nach passendem Namen
+        if not lehrer:
+            lehrer = Fahrlehrer.objects.filter(name__iexact=voller_name).first()
+
+        if lehrer:
+            geaendert = False
+            if lehrer.fsm_id != fsm_id:
+                lehrer.fsm_id = fsm_id
+                geaendert = True
+            if not lehrer.fsm_sync_aktiv:
+                lehrer.fsm_sync_aktiv = True
+                geaendert = True
+            if telefon and not lehrer.telefon:
+                lehrer.telefon = telefon
+                geaendert = True
+            if geaendert:
+                lehrer.save()
+            aktualisiert.append(lehrer)
+        else:
+            # Neu anlegen
+            neuer_fl = Fahrlehrer.objects.create(
+                name=voller_name,
+                email=email,
+                telefon=telefon,
+                fsm_id=fsm_id,
+                fsm_sync_aktiv=True,
+                aktiv=True,
+                bundesland=getattr(settings, "DEFAULT_BUNDESLAND", "BB"),
+                vorlauf_stunden=24,
+                horizont_wochen=4,
+            )
+            neu_erstellt.append(neuer_fl)
+
+    return neu_erstellt, aktualisiert
+
+
 def exportiere_termin_nach_fsm(
     termin: Termin,
     client: FsmClient | None = None,

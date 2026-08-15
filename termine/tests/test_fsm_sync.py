@@ -392,4 +392,31 @@ class FsmEinstellungenViewTests(TestCase):
             )
             self.assertRedirects(res, reverse("termine:fsm_einstellungen"))
 
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_import_fahrlehrer_button(self):
+        with patch("termine.staff_views.FsmClient") as mock_cls:
+            mock_inst = MagicMock()
+            mock_inst.get_fahrlehrer.return_value = [
+                {
+                    "id": "fsm-lehrer-neu-123",
+                    "vorname": "Stefan",
+                    "nachname": "Richter",
+                    "email": "stefan@example.com",
+                    "mobil": "0171/123456",
+                }
+            ]
+            mock_inst.get_termine.return_value = []
+            mock_cls.return_value = mock_inst
+
+            res = self.client.post(
+                reverse("termine:fsm_einstellungen"),
+                {"aktion": "import_fahrlehrer"},
+            )
+            self.assertRedirects(res, reverse("termine:fsm_einstellungen"))
+
+            neuer_fl = Fahrlehrer.objects.get(fsm_id="fsm-lehrer-neu-123")
+            self.assertEqual(neuer_fl.name, "Stefan Richter")
+            self.assertTrue(neuer_fl.fsm_sync_aktiv)
+
+
 
