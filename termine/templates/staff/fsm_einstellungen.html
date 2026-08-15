@@ -107,7 +107,7 @@
                       <option value="">– Nicht verknüpft –</option>
                       {% for fsm_l in fsm_lehrer_liste %}
                         <option value="{{ fsm_l.id }}" {% if item.fahrlehrer.fsm_id == fsm_l.id %}selected{% endif %}>
-                          {{ fsm_l.name }}
+                          {% if fsm_l.vorname and fsm_l.nachname %}{{ fsm_l.vorname }} {{ fsm_l.nachname }}{% elif fsm_l.displayName %}{{ fsm_l.displayName }}{% else %}{{ fsm_l.name }}{% endif %}
                         </option>
                       {% endfor %}
                     </select>

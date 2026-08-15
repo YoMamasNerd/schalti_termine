@@ -28,35 +28,18 @@
 </head>
 <body class="oeffentlich einbettung-koerper">
   <main class="einbettung">
-    {% if terminart_auswahl or fahrlehrer_auswahl %}
+    {% if terminart_auswahl %}
       <form class="karte" method="get" style="margin-bottom:1rem">
-        <div {% if terminart_auswahl and fahrlehrer_auswahl %}class="raster-zwei"{% endif %}>
-          {% if terminart_auswahl %}
-            <div class="feld" style="margin-bottom:0">
-              <label for="art">Worum geht es?</label>
-              <select name="art" id="art">
-                <option value="">Alle Terminarten</option>
-                {% for art in alle_terminarten %}
-                  <option value="{{ art.slug }}" {% if terminart and terminart.pk == art.pk %}selected{% endif %}>
-                    {{ art.name }} ({{ art.dauer_minuten }} Min.)
-                  </option>
-                {% endfor %}
-              </select>
-            </div>
-          {% endif %}
-          {% if fahrlehrer_auswahl %}
-            <div class="feld" style="margin-bottom:0">
-              <label for="fahrlehrer">Bei wem?</label>
-              <select name="fahrlehrer" id="fahrlehrer">
-                <option value="">Egal – alle anzeigen</option>
-                {% for person in alle_fahrlehrer %}
-                  <option value="{{ person.slug }}" {% if fahrlehrer and fahrlehrer.pk == person.pk %}selected{% endif %}>
-                    {{ person.name }}
-                  </option>
-                {% endfor %}
-              </select>
-            </div>
-          {% endif %}
+        <div class="feld" style="margin-bottom:0">
+          <label for="art">Worum geht es?</label>
+          <select name="art" id="art">
+            <option value="">Alle Terminarten</option>
+            {% for art in alle_terminarten %}
+              <option value="{{ art.slug }}" {% if terminart and terminart.pk == art.pk %}selected{% endif %}>
+                {{ art.name }} ({{ art.dauer_minuten }} Min.)
+              </option>
+            {% endfor %}
+          </select>
         </div>
         <div class="knopfreihe" style="margin-top:0.9rem">
           <button class="knopf" type="submit">Termine anzeigen</button>

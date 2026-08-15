@@ -21,8 +21,6 @@
         <dd>{{ termin.beginn_lokal|date:"l, j. F Y" }}, {{ termin.beginn_lokal|date:"H:i" }}–{{ termin.ende_lokal|date:"H:i" }} Uhr</dd>
         <dt>Was</dt>
         <dd>{{ termin.terminart.name }}</dd>
-        <dt>Bei wem</dt>
-        <dd>{{ termin.fahrlehrer.name }}</dd>
         {% if termin.terminart.ort %}<dt>Wo</dt><dd>{{ termin.terminart.ort }}</dd>{% endif %}
       </dl>
     </div>

@@ -26,11 +26,16 @@ logger = logging.getLogger(__name__)
 
 def _kontext(buchung, **extra) -> dict:
     termin = buchung.termin
+    kontakt_email = getattr(settings, "DEFAULT_FROM_EMAIL", "mail@fahrschule-schaltwerk.de")
+    if "<" in kontakt_email and ">" in kontakt_email:
+        kontakt_email = kontakt_email.split("<")[1].replace(">", "").strip()
+
     return {
         "buchung": buchung,
         "termin": termin,
         "terminart": termin.terminart,
         "fahrlehrer": termin.fahrlehrer,
+        "kontakt_email": kontakt_email,
         "beginn": timezone.localtime(termin.beginn),
         "ende": timezone.localtime(termin.ende),
         "site_name": settings.SITE_NAME,
@@ -84,7 +89,7 @@ def bestaetigung_anfordern(buchung) -> bool:
         template="bestaetigung_anfordern",
         empfaenger=[buchung.email],
         kontext=kontext,
-        antwort_an=buchung.termin.fahrlehrer.email,
+        antwort_an=None,
     )
 
 
@@ -96,7 +101,7 @@ def buchung_bestaetigt_kunde(buchung) -> bool:
         empfaenger=[buchung.email],
         kontext=_kontext(buchung),
         ics=buchung_als_ics(buchung),
-        antwort_an=buchung.termin.fahrlehrer.email,
+        antwort_an=None,
     )
 
 
@@ -120,7 +125,7 @@ def storno_kunde(buchung) -> bool:
         kontext=_kontext(buchung),
         ics=buchung_als_ics(buchung, storniert=True),
         ics_methode="CANCEL",
-        antwort_an=buchung.termin.fahrlehrer.email,
+        antwort_an=None,
     )
 
 
@@ -142,5 +147,5 @@ def erinnerung(buchung) -> bool:
         empfaenger=[buchung.email],
         kontext=_kontext(buchung),
         ics=buchung_als_ics(buchung),
-        antwort_an=buchung.termin.fahrlehrer.email,
+        antwort_an=None,
     )

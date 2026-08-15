@@ -4,7 +4,6 @@ eine kurze Erinnerung an Ihren Beratungstermin:
 
   Wann:      {{ beginn|date:"l, j. F Y" }}, {{ beginn|date:"H:i" }} bis {{ ende|date:"H:i" }} Uhr
   Was:       {{ terminart.name }}
-  Bei wem:   {{ fahrlehrer.name }}
 {% if terminart.ort %}  Wo:        {{ terminart.ort }}
 {% endif %}
 Sollte etwas dazwischenkommen, sagen Sie bitte hier ab:

@@ -28,7 +28,6 @@ def _titel(buchung) -> str:
 def _beschreibung(buchung) -> str:
     zeilen = [
         f"Terminart: {buchung.termin.terminart.name}",
-        f"Fahrlehrer: {buchung.termin.fahrlehrer.name}",
         f"Name: {buchung.name}",
         f"E-Mail: {buchung.email}",
     ]
@@ -38,7 +37,7 @@ def _beschreibung(buchung) -> str:
         zeilen.append(f"Führerscheinklasse: {buchung.get_fuehrerscheinklasse_display()}")
     if buchung.nachricht:
         zeilen.append("")
-        zeilen.append(buchung.nachricht)
+        zeilen.extend(buchung.nachricht.splitlines())
     zeilen.append("")
     zeilen.append(f"Termin verwalten: {buchung.verwaltungs_url}")
     return "\n".join(zeilen)
@@ -54,6 +53,10 @@ def _kalender() -> Calendar:
 
 def _event(buchung, *, sequence: int = 0, storniert: bool = False) -> Event:
     termin = buchung.termin
+    kontakt_email = getattr(settings, "DEFAULT_FROM_EMAIL", "mail@fahrschule-schaltwerk.de")
+    if "<" in kontakt_email and ">" in kontakt_email:
+        kontakt_email = kontakt_email.split("<")[1].replace(">", "").strip()
+
     event = Event()
     event.add("uid", _uid(buchung))
     event.add("dtstamp", timezone.now())
@@ -66,7 +69,7 @@ def _event(buchung, *, sequence: int = 0, storniert: bool = False) -> Event:
     event.add("transp", "OPAQUE")
     if termin.terminart.ort:
         event.add("location", vText(termin.terminart.ort))
-    event.add("organizer", f"MAILTO:{termin.fahrlehrer.email}")
+    event.add("organizer", f"MAILTO:{kontakt_email}")
     event.add("url", buchung.verwaltungs_url)
     return event
 

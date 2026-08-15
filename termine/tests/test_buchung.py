@@ -424,29 +424,16 @@ class OeffentlicheSeiten(BuchungsBasis):
         # Der Kalender ist trotzdem da.
         self.assertContains(antwort, "buchungsbereich")
 
-    def test_einziger_fahrlehrer_wird_still_verwendet(self):
-        """Ohne Auswahl gilt implizit der eine Fahrlehrer – ohne Parameter in der URL."""
-        self.fahrlehrer.beschreibung = "Klassen B und BE."
-        self.fahrlehrer.save()
-
-        antwort = self.client.get(reverse("termine:start"))
-
-        # Seine Beschreibung erscheint, sein Name steht nicht an jedem Termin.
-        self.assertContains(antwort, "Klassen B und BE.")
-        self.assertNotContains(antwort, '<br>Anna Berger')
-        # Die Navigationslinks bleiben frei von einem überflüssigen Parameter.
-        self.assertNotContains(antwort, "fahrlehrer=anna-berger")
-
-    def test_bei_mehreren_fahrlehrern_gibt_es_die_auswahl(self):
+    def test_keine_fahrlehrer_auswahl_fuer_kunden(self):
+        """Kunden sehen keine Fahrlehrer-Auswahl auf der öffentlichen Seite."""
         Fahrlehrer.objects.create(
             name="Tom Keller", email="tom@example.org", bundesland="BE", vorlauf_stunden=1
         )
 
         antwort = self.client.get(reverse("termine:start"))
 
-        self.assertContains(antwort, 'name="fahrlehrer"')
-        self.assertContains(antwort, "Egal – alle anzeigen")
-        self.assertContains(antwort, "Tom Keller")
+        self.assertNotContains(antwort, 'name="fahrlehrer"')
+        self.assertNotContains(antwort, "Bei wem?")
 
     def test_bei_mehreren_terminarten_gibt_es_die_auswahl(self):
         Terminart.objects.create(name="Ausführliche Beratung", dauer_minuten=60)

@@ -12,7 +12,6 @@
           <span class="uhrzeit">{{ termin.beginn_lokal|date:"H:i" }}</span>
           <span class="meta">
             {{ termin.terminart.dauer_minuten }} Min.
-            {% if not fahrlehrer %}<br>{{ termin.fahrlehrer.name }}{% endif %}
           </span>
         </a>
       {% endfor %}
@@ -23,9 +22,9 @@
 {% else %}
   <h2>Keine freien Termine</h2>
   <p class="leer">
-    {% if terminart or fahrlehrer %}
-      Für diese Auswahl sind derzeit keine Termine verfügbar.
-      Versuchen Sie es mit einer anderen Terminart oder einem anderen Fahrlehrer.
+    {% if terminart %}
+      Für diese Terminart sind derzeit keine Termine verfügbar.
+      Versuchen Sie es mit einer anderen Terminart.
     {% else %}
       Aktuell sind keine Termine freigegeben. Bitte schauen Sie später noch einmal vorbei.
     {% endif %}

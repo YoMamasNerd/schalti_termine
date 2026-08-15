@@ -131,7 +131,8 @@ class MailUndKalender(Basis):
         text = buchung_als_ics(buchung).decode()
         # Genau ein SUMMARY-Feld: Der Umbruch aus der Nachricht darf keine
         # zweite Eigenschaft erzeugen.
-        self.assertEqual(text.count("SUMMARY:"), 1)
+        summary_zeilen = [line for line in text.splitlines() if line.startswith("SUMMARY:")]
+        self.assertEqual(len(summary_zeilen), 1)
 
 
 class Zugriffsgrenzen(Basis):

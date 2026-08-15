@@ -4,7 +4,6 @@ Ihr Beratungstermin ist verbindlich gebucht. Wir freuen uns auf Sie.
 
   Wann:      {{ beginn|date:"l, j. F Y" }}, {{ beginn|date:"H:i" }} bis {{ ende|date:"H:i" }} Uhr
   Was:       {{ terminart.name }}
-  Bei wem:   {{ fahrlehrer.name }}
 {% if terminart.ort %}  Wo:        {{ terminart.ort }}
 {% endif %}
 Der Kalendereintrag hängt dieser E-Mail an – ein Klick darauf trägt den Termin
@@ -17,8 +16,7 @@ kann ihn jemand anderes bekommen:
 
 {{ buchung.verwaltungs_url }}
 
-Bei Rückfragen erreichen Sie {{ fahrlehrer.name }} unter {{ fahrlehrer.email }}{% if fahrlehrer.telefon %}
-oder telefonisch unter {{ fahrlehrer.telefon }}{% endif %}.
+Bei Rückfragen oder Problemen erreichen Sie uns per E-Mail unter {{ kontakt_email }}.
 
 Viele Grüße
 {{ site_name }}
