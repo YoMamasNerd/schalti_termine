@@ -23,6 +23,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - default
+      - fsm-network
     ports:
       - "127.0.0.1:8000:8000"
     # Die Deployment-Prüfungen laufen zuerst: Zeigt SITE_BASE_URL noch auf
@@ -72,6 +75,9 @@ services:
       # lange, bis der Neustart zufällig spät genug kommt.
       web:
         condition: service_healthy
+    networks:
+      - default
+      - fsm-network
     command: python manage.py qcluster
     # Ein laufender Prozess sagt nichts darüber, ob er noch etwas tut. Geprüft
     # wird deshalb der Fahrplan selbst: Bleibt ein Job überfällig liegen,
@@ -85,3 +91,9 @@ services:
 
 volumes:
   postgres-daten:
+
+networks:
+  default:
+  fsm-network:
+    name: fsm-network
+    external: true
