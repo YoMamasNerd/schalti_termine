@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from termine.models import Buchung, Fahrlehrer, Sperrzeit, Termin, Terminart
 from termine.services import buchung as buchung_service
-from termine.services.fsm_client import FsmError, FsmTermin
+from termine.services.fsm_client import FsmClient, FsmError, FsmTermin
 from termine.services.fsm_sync import (
     buche_in_fsm,
     storniere_in_fsm,
@@ -350,15 +350,12 @@ class FsmEinstellungenViewTests(TestCase):
 
     @override_settings(FSM_SYNC_ENABLED=True)
     def test_laedt_wenn_fsm_aktiv(self):
-        with patch("termine.staff_views.FsmClient") as mock_cls:
-            mock_inst = MagicMock()
-            mock_inst.get_fahrlehrer.return_value = []
-            mock_cls.return_value = mock_inst
-
+        with patch.object(FsmClient, "get_fahrlehrer", return_value=[]):
             res = self.client.get(reverse("termine:fsm_einstellungen"))
             self.assertEqual(res.status_code, 200)
             self.assertContains(res, "Fahrschulmanager (FSM)")
             self.assertContains(res, "Jonas Eisele")
+            self.assertContains(res, "FSM-Gateway Verbindung")
 
     @override_settings(FSM_SYNC_ENABLED=True)
     def test_speichert_fsm_zuordnungen(self):

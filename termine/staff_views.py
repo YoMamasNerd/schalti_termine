@@ -1292,11 +1292,6 @@ def fsm_einstellungen(request):
                 messages.error(request, f"Fehler beim Import: {exc}")
             return redirect("termine:fsm_einstellungen")
 
-        if "fsm_auth_token" in request.POST:
-            token_neu = request.POST.get("fsm_auth_token", "").strip()
-            if token_neu:
-                fsm_client.set_auth_token(token_neu)
-
         # Globale FSM-Optionen speichern
         globale_einst = FahrschulEinstellungen.get_solo()
         globale_einst.fsm_theorie_blockiert_beratung = "fsm_theorie_blockiert_beratung" in request.POST
@@ -1365,7 +1360,9 @@ def fsm_einstellungen(request):
             "fahrlehrer_daten": fahrlehrer_daten,
             "fsm_lehrer_liste": fsm_lehrer_liste,
             "fsm_fehler": fsm_fehler,
-            "fsm_auth_token": fsm_client.get_auth_token() or "",
+            "fsm_gateway_url": getattr(settings, "FSM_GATEWAY_URL", ""),
+            "fsm_leistungsart_id": getattr(settings, "FSM_LEISTUNGSART_ID", ""),
+            "fsm_api_key_configured": bool(getattr(settings, "FSM_GATEWAY_API_KEY", "")),
             "globale_einst": FahrschulEinstellungen.get_solo(),
             "ist_inhaber": ist_inhaber,
         },

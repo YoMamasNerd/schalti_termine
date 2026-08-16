@@ -97,21 +97,28 @@
     </div>
 
     <div class="karte" style="margin-bottom: 1.5rem">
-      <h2>FSM Authentifizierung</h2>
+      <h2>FSM-Gateway Verbindung</h2>
       <p class="leer">
-        Für den Zugriff auf die FSM-API wird ein gültiges Bearer-Token benötigt.
-        Dieses kann entweder in der <code>.env</code> als <code>FSM_AUTH_TOKEN</code> hinterlegt
-        oder hier direkt eingetragen werden.
+        Die Kommunikation mit dem Fahrschulmanager erfolgt über das zentrale FSM-Gateway.
+        Die Verbindungsparameter werden über die Umgebungsvariablen (<code>.env</code>) gesteuert.
       </p>
-      <div style="margin-top: 0.5rem">
-        <label for="fsm_auth_token" style="display:block; font-weight:600; margin-bottom:0.25rem">
-          FSM Bearer Token
-        </label>
-        <textarea name="fsm_auth_token"
-                  id="fsm_auth_token"
-                  rows="3"
-                  placeholder="eyJhbGciOi..."
-                  style="width:100%; font-family:monospace; font-size:0.85rem">{{ fsm_auth_token }}</textarea>
+      <div style="margin-top: 0.75rem; display: grid; gap: 0.5rem; font-size: 0.9rem">
+        <div>
+          <strong>Gateway-URL:</strong> <code>{{ fsm_gateway_url|default:"http://127.0.0.1:8090/v1" }}</code>
+        </div>
+        <div>
+          <strong>API-Schlüssel:</strong>
+          {% if fsm_api_key_configured %}
+            <span style="color: #166534; font-weight: 600">✓ Konfiguriert</span>
+          {% else %}
+            <span class="leer">Kein API-Schlüssel gesetzt</span>
+          {% endif %}
+        </div>
+        {% if fsm_leistungsart_id %}
+          <div>
+            <strong>Leistungsart-ID (Beratung):</strong> <code>{{ fsm_leistungsart_id }}</code>
+          </div>
+        {% endif %}
       </div>
     </div>
 
@@ -277,18 +284,6 @@
           autoSaveSettings();
         });
       });
-
-      // Token-Textarea mit Debounce
-      const tokenTextarea = document.getElementById('fsm_auth_token');
-      if (tokenTextarea) {
-        let tokenDebounce = null;
-        tokenTextarea.addEventListener('input', () => {
-          clearTimeout(tokenDebounce);
-          tokenDebounce = setTimeout(() => {
-            autoSaveSettings();
-          }, 800);
-        });
-      }
 
       // Explizites Speichern per Button
       settingsForm.addEventListener('submit', async (e) => {
