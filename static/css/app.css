@@ -493,6 +493,16 @@ table.liste th, table.liste td {
 table.liste th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-leise); }
 table.liste tr:last-child td { border-bottom: none; }
 
+table.tabelle--kompakt th, table.tabelle--kompakt td {
+  padding: 0.5rem 0.55rem;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+table.tabelle--kompakt th {
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+}
+
 /* --- Tagesplanung (Wochenraster) --- */
 
 .woche {

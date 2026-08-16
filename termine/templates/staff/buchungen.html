@@ -15,61 +15,68 @@
 
   <div class="karte">
     <div class="tabelle-huelle">
-      <table class="liste">
+      <table class="liste tabelle--kompakt">
         <thead>
           <tr>
-            <th>Termin</th><th>Wer</th><th>Kontakt</th><th>Klasse</th>
-            <th>Nachricht</th><th>Fahrlehrer</th><th>Status</th><th></th>
+            <th style="width:26%">Termin</th>
+            <th style="width:32%">Kunde &amp; Kontakt</th>
+            <th style="width:20%">Klasse / Notiz</th>
+            <th style="width:12%">Status</th>
+            <th style="width:10%; text-align:right"></th>
           </tr>
         </thead>
         <tbody>
           {% for buchung in buchungen %}
             <tr>
               <td>
-                <a href="{% url 'termine:buchung_detail' buchung.pk %}">
-                  {{ buchung.termin.beginn_lokal|date:"D" }}, {{ buchung.termin.beginn_lokal|date:"SHORT_DATE_FORMAT" }}<br>
-                  <strong>{{ buchung.termin.beginn_lokal|date:"H:i" }}–{{ buchung.termin.ende_lokal|date:"H:i" }}</strong>
-                </a><br>
-                <span class="leer">{{ buchung.termin.terminart.name }}</span>
+                <a href="{% url 'termine:buchung_detail' buchung.pk %}" style="font-weight:700">
+                  {{ buchung.termin.beginn_lokal|date:"d.m.Y" }} · {{ buchung.termin.beginn_lokal|date:"H:i" }}–{{ buchung.termin.ende_lokal|date:"H:i" }} Uhr
+                </a>
+                <div style="font-size:0.82rem; color:var(--text-leise); margin-top:2px">
+                  {{ buchung.termin.fahrlehrer.name }}{% if buchung.termin.terminart.name %} · {{ buchung.termin.terminart.name }}{% endif %}
+                </div>
               </td>
               <td>
-                <a href="{% url 'termine:buchung_detail' buchung.pk %}"><strong>{{ buchung.name }}</strong></a>
+                <a href="{% url 'termine:buchung_detail' buchung.pk %}" style="font-weight:700; color:var(--text)">
+                  {{ buchung.name }}
+                </a>
+                <div style="font-size:0.82rem; margin-top:2px; display:flex; flex-wrap:wrap; gap:0.6rem">
+                  {% if buchung.telefon %}
+                    <a href="tel:{{ buchung.telefon }}" style="color:var(--text-leise); text-decoration:none">📞 {{ buchung.telefon }}</a>
+                  {% endif %}
+                  {% if buchung.email %}
+                    <a href="mailto:{{ buchung.email }}" style="color:var(--text-leise); text-decoration:none">✉️ {{ buchung.email }}</a>
+                  {% endif %}
+                </div>
               </td>
               <td>
-                {% if buchung.email %}<a href="mailto:{{ buchung.email }}">{{ buchung.email }}</a>{% endif %}
-                {% if buchung.telefon %}<br>{{ buchung.telefon }}{% endif %}
+                {% if buchung.fuehrerscheinklasse %}
+                  <span class="abzeichen" title="{{ buchung.get_fuehrerscheinklasse_display }}" style="background:var(--marke-hell); color:var(--marke-dunkel); font-weight:600; padding:1px 6px; border-radius:3px; font-size:0.78rem">
+                    Klasse {{ buchung.fuehrerscheinklasse }}
+                  </span>
+                {% else %}
+                  <span style="color:var(--text-leise); font-size:0.82rem">—</span>
+                {% endif %}
+                {% if buchung.nachricht %}
+                  <div style="font-size:0.8rem; color:var(--text-leise); font-style:italic; margin-top:2px" title="{{ buchung.nachricht }}">
+                    „{{ buchung.nachricht|truncatechars:35 }}“
+                  </div>
+                {% endif %}
               </td>
-              {% comment %}
-                Nur das Kürzel, die ausgeschriebene Klasse steht im Tooltip –
-                sonst wird die Tabelle so breit, dass die Absage-Schaltfläche
-                aus dem Bild läuft.
-              {% endcomment %}
-              <td title="{{ buchung.get_fuehrerscheinklasse_display }}">
-                {{ buchung.fuehrerscheinklasse|default:"—" }}
-              </td>
-              <td>{{ buchung.nachricht|truncatechars:45|default:"—" }}</td>
-              <td>{{ buchung.termin.fahrlehrer.name }}</td>
               <td>
                 <span class="marke-status
                   {% if buchung.status == 'bestaetigt' %}status-frei
                   {% elif buchung.status == 'offen' %}status-reserviert
-                  {% else %}status-gebucht{% endif %}">
+                  {% else %}status-gebucht{% endif %}" style="white-space:nowrap">
                   {{ buchung.get_status_display }}
                 </span>
               </td>
               <td style="text-align:right; white-space:nowrap">
-                <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:buchung_detail' buchung.pk %}">Details</a>
-                {% if buchung.ist_aktiv %}
-                  <form method="post" action="{% url 'termine:buchung_absagen' buchung.pk %}"
-                        onsubmit="return confirm('Buchung wirklich absagen? Der Kunde bekommt eine E-Mail.');" style="display:inline-block; margin-left:4px">
-                    {% csrf_token %}
-                    <button class="knopf knopf--gefahr knopf--klein" type="submit">Absagen</button>
-                  </form>
-                {% endif %}
+                <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:buchung_detail' buchung.pk %}" style="padding:3px 8px; font-size:0.8rem">Details &rarr;</a>
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="8" class="leer">Keine Buchungen in dieser Ansicht.</td></tr>
+            <tr><td colspan="5" class="leer">Keine Buchungen in dieser Ansicht.</td></tr>
           {% endfor %}
         </tbody>
       </table>
