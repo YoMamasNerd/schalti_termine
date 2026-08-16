@@ -506,6 +506,13 @@ def sync_blocker_fuer_fahrlehrer(
                 bereinigt = " ".join(strip_tags(termin.titel).split())
                 grund = f"FSM: {bereinigt[:150]}"
 
+            # FSM-Einträge mit Titel 'Beratungen' / 'Beratungsgespräch' reservieren Beratungszeiten
+            # und dürfen keine Sperrzeiten erzeugen, die Buchungen blockieren:
+            titel_check = (bereinigt or termin.titel or "").strip().lower()
+            art_check = (termin.terminart or "").strip().lower()
+            if titel_check in ["beratungen", "beratung", "beratungsgespräch", "beratungsgespraech"] or art_check in ["beratungen", "beratung"]:
+                continue
+
             Sperrzeit.objects.update_or_create(
                 fahrlehrer=fahrlehrer,
                 fsm_id=fsm_id,
