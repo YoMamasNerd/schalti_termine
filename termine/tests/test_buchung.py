@@ -495,13 +495,43 @@ class RobusteParameter(BuchungsBasis):
         self.assertEqual(antwort.status_code, 404)
 
     def test_kein_rueckwaertsblaettern_vor_den_aktuellen_monat(self):
-        antwort = self.client.get(reverse("termine:start"))
+        heute = timezone.localdate()
+        antwort = self.client.get(reverse("termine:start"), {"monat": f"{heute:%Y-%m}"})
         self.assertIsNone(antwort.context["vorheriger_monat"])
 
     def test_kein_vorwaertsblaettern_hinter_den_horizont(self):
         weit = (timezone.localdate() + dt.timedelta(days=365)).strftime("%Y-%m")
         antwort = self.client.get(reverse("termine:start"), {"monat": weit})
         self.assertIsNone(antwort.context["naechster_monat"])
+
+    def test_kalender_springt_automatisch_auf_ersten_monat_mit_freiem_termin(self):
+        from termine.models import FahrschulEinstellungen
+
+        # Alle aktuellen Termine löschen
+        Termin.objects.all().delete()
+        heute = timezone.localdate()
+
+        # Horizont erweitern
+        einst = FahrschulEinstellungen.get_solo()
+        einst.horizont_wochen = 12
+        einst.save()
+
+        # Freien Termin 45 Tage in der Zukunft (nächster Monat) anlegen
+        zukunft = timezone.now() + dt.timedelta(days=45)
+        zukunft_datum = timezone.localtime(zukunft).date()
+        Termin.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            terminart=self.art,
+            beginn=zukunft,
+            ende=zukunft + dt.timedelta(minutes=30),
+            status=Termin.Status.FREI,
+        )
+
+        # Aufruf der Startseite ohne Monatsparameter
+        antwort = self.client.get(reverse("termine:start"))
+        self.assertEqual(antwort.status_code, 200)
+        self.assertEqual(antwort.context["jahr"], zukunft_datum.year)
+        self.assertEqual(antwort.context["monat"], zukunft_datum.month)
 
 
 class LogOhnePersonenbezug(BuchungsBasis):

@@ -40,9 +40,17 @@ def _datum_aus_get(request, name: str) -> dt.date | None:
         return None
 
 
-def _monat_aus_get(request) -> tuple[int, int]:
-    """Liest den anzuzeigenden Monat aus der URL, sonst der aktuelle Monat."""
-    heute = timezone.localdate()
+def _monat_aus_get(
+    request,
+    fahrlehrer: Fahrlehrer | None = None,
+    terminart: Terminart | None = None,
+) -> tuple[int, int]:
+    """Liest den anzuzeigenden Monat aus der URL.
+
+    Wurde kein Monat explizit übergeben, springt der Kalender automatisch
+    auf den ersten Monat, der einen freien Termin für die gewählte Auswahl hat.
+    Gibt es aktuell keine freien Termine, wird der aktuelle Monat gewählt.
+    """
     roh = request.GET.get("monat")
     if roh:
         try:
@@ -50,6 +58,18 @@ def _monat_aus_get(request) -> tuple[int, int]:
             return int(jahr), int(monat)
         except (ValueError, TypeError):
             pass
+
+    tag_param = _datum_aus_get(request, "tag")
+    if tag_param:
+        return tag_param.year, tag_param.month
+
+    # Finde den ersten freien buchbaren Termin
+    erster_freier = freie_termine(fahrlehrer=fahrlehrer, terminart=terminart).first()
+    if erster_freier:
+        datum = timezone.localtime(erster_freier.beginn).date()
+        return datum.year, datum.month
+
+    heute = timezone.localdate()
     return heute.year, heute.month
 
 
@@ -88,7 +108,7 @@ def _basis_kontext(request, slug: str | None = None) -> dict:
     if fahrlehrer_implizit:
         fahrlehrer = alle_fahrlehrer[0]
 
-    jahr, monat = _monat_aus_get(request)
+    jahr, monat = _monat_aus_get(request, fahrlehrer=fahrlehrer, terminart=terminart)
     try:
         gitter_von, gitter_bis = _monatsgrenzen(jahr, monat)
     except (calendar.IllegalMonthError, ValueError):
