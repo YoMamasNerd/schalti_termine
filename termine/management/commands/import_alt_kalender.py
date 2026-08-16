@@ -114,9 +114,7 @@ class Command(BaseCommand):
                 continue  # Vergangene Termine ignorieren
 
             summary = str(component.get("summary", "")).strip()
-            # Ignoriere freie / ungebuchte Slots
-            if summary.lower() in ["verfügbar", "available", "frei", ""]:
-                continue
+            ist_gebucht = summary.lower() not in ["verfügbar", "available", "frei", ""]
 
             dtend = component.get("dtend")
             end = dtend.dt if dtend else st + dt.timedelta(minutes=30)
@@ -127,32 +125,35 @@ class Command(BaseCommand):
             loc = str(component.get("location", "")).strip()
             uid = str(component.get("uid", "")).strip()
 
-            # Name aus Summary bereinigen (Haken und Status-Emojis entfernen)
-            kunde_name = re.sub(r"^[✔️⌛\s\-\*]+", "", summary).strip()
+            kunde_name = ""
             kunde_email = ""
             kunde_telefon = ""
             kunde_nachricht = ""
 
-            # Description parsen: "Name | Telefon | E-Mail | Nachricht"
-            if "|" in desc:
-                teile = [t.strip() for t in desc.split("|")]
-                if len(teile) >= 1 and teile[0]:
-                    kunde_name = teile[0]
-                if len(teile) >= 2 and teile[1]:
-                    kunde_telefon = teile[1]
-                if len(teile) >= 3 and teile[2]:
-                    kunde_email = teile[2]
-                if len(teile) >= 4 and teile[3]:
-                    kunde_nachricht = teile[3]
-            else:
-                # E-Mail mit Regex suchen
-                email_match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", desc)
-                if email_match:
-                    kunde_email = email_match.group(0)
-                # Telefon mit Regex suchen
-                tel_match = re.search(r"(\+?[0-9\s\-/]{7,25})", desc)
-                if tel_match:
-                    kunde_telefon = tel_match.group(0).strip()
+            if ist_gebucht:
+                # Name aus Summary bereinigen (Haken und Status-Emojis entfernen)
+                kunde_name = re.sub(r"^[✔️⌛\s\-\*]+", "", summary).strip()
+
+                # Description parsen: "Name | Telefon | E-Mail | Nachricht"
+                if "|" in desc:
+                    teile = [t.strip() for t in desc.split("|")]
+                    if len(teile) >= 1 and teile[0]:
+                        kunde_name = teile[0]
+                    if len(teile) >= 2 and teile[1]:
+                        kunde_telefon = teile[1]
+                    if len(teile) >= 3 and teile[2]:
+                        kunde_email = teile[2]
+                    if len(teile) >= 4 and teile[3]:
+                        kunde_nachricht = teile[3]
+                else:
+                    # E-Mail mit Regex suchen
+                    email_match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", desc)
+                    if email_match:
+                        kunde_email = email_match.group(0)
+                    # Telefon mit Regex suchen
+                    tel_match = re.search(r"(\+?[0-9\s\-/]{7,25})", desc)
+                    if tel_match:
+                        kunde_telefon = tel_match.group(0).strip()
 
             # Fahrlehrer-Zuordnung:
             # Prüfe, welcher Fahrlehrer an diesem Tag eine Beratungssperre / Zeitfenster hat
@@ -166,7 +167,7 @@ class Command(BaseCommand):
             if sperre_lehrer:
                 zugeordneter_lehrer = sperre_lehrer.fahrlehrer
             else:
-                # Standard-Zuordnung nach Monat (August -> Stefan, September -> Marten)
+                # Standard-Zuordnung nach Monat (August -> Stefan, September/Oktober -> Marten)
                 if st.month == 8:
                     zugeordneter_lehrer = stefan
                 else:
@@ -175,8 +176,9 @@ class Command(BaseCommand):
             gefundene_termine.append({
                 "start": st,
                 "end": end,
+                "ist_gebucht": ist_gebucht,
                 "kunde_name": kunde_name,
-                "kunde_email": kunde_email or "keine-email@example.org",
+                "kunde_email": kunde_email or ("keine-email@example.org" if ist_gebucht else ""),
                 "kunde_telefon": kunde_telefon,
                 "kunde_nachricht": kunde_nachricht,
                 "fahrlehrer": zugeordneter_lehrer,
@@ -186,28 +188,37 @@ class Command(BaseCommand):
 
         gefundene_termine.sort(key=lambda x: x["start"])
 
-        self.stdout.write(f"\n{len(gefundene_termine)} anstehende Kundentermine gefunden:")
-        self.stdout.write("-" * 80)
+        gebuchte_count = sum(1 for t in gefundene_termine if t["ist_gebucht"])
+        freie_count = sum(1 for t in gefundene_termine if not t["ist_gebucht"])
+
+        self.stdout.write(f"\n{len(gefundene_termine)} anstehende Termine gefunden ({gebuchte_count} gebucht, {freie_count} frei):")
+        self.stdout.write("-" * 90)
 
         for i, item in enumerate(gefundene_termine, 1):
             st_lokal = item["start"].astimezone(berlin_tz)
             end_lokal = item["end"].astimezone(berlin_tz)
+            if item["ist_gebucht"]:
+                status_str = f"GEBUCHT ({item['kunde_name'][:20]})"
+                info_str = f"Tel: {item['kunde_telefon'] or '–'} | Mail: {item['kunde_email']}"
+            else:
+                status_str = "FREI (Verfügbar)"
+                info_str = "–"
+
             self.stdout.write(
                 f"[{i:2d}] {st_lokal:%d.%m.%Y %H:%M} – {end_lokal:%H:%M} | "
-                f"Kunde: {item['kunde_name']:<22} | "
                 f"FL: {item['fahrlehrer'].name:<14} | "
-                f"Tel: {item['kunde_telefon'] or '–'} | "
-                f"Mail: {item['kunde_email']}"
+                f"{status_str:<30} | {info_str}"
             )
 
-        self.stdout.write("-" * 80)
+        self.stdout.write("-" * 90)
 
         if dry_run:
             self.stdout.write(self.style.WARNING("\n[DRY RUN] Es wurden keine Änderungen an der Datenbank vorgenommen."))
             return
 
         # Echten Import durchführen
-        importiert_count = 0
+        gebucht_importiert = 0
+        frei_importiert = 0
         blocker_entfernt_count = 0
 
         with transaction.atomic():
@@ -229,45 +240,62 @@ class Command(BaseCommand):
                         kollidierende_sperren.delete()
                         blocker_entfernt_count += anz
 
-                # 2. Termin anlegen oder aktualisieren
-                termin, created = Termin.objects.update_or_create(
-                    fahrlehrer=fl,
-                    beginn=st,
-                    defaults={
-                        "ende": end,
-                        "terminart": terminart,
-                        "status": Termin.Status.GEBUCHT,
-                        "herkunft": Termin.Herkunft.MANUELL,
-                    },
-                )
-
-                # 3. Buchung anlegen oder aktualisieren
-                buchung = Buchung.objects.filter(termin=termin, status__in=[Buchung.Status.OFFEN, Buchung.Status.BESTAETIGT]).first()
-                if not buchung:
-                    buchung = Buchung.objects.create(
-                        termin=termin,
-                        name=item["kunde_name"],
-                        email=item["kunde_email"],
-                        telefon=item["kunde_telefon"],
-                        nachricht=item["kunde_nachricht"],
-                        status=Buchung.Status.BESTAETIGT,
-                        bestaetigt_am=timezone.now(),
-                        einwilligung_am=timezone.now(),
+                if item["ist_gebucht"]:
+                    # 2. Gebuchten Termin anlegen oder aktualisieren
+                    termin, _ = Termin.objects.update_or_create(
+                        fahrlehrer=fl,
+                        beginn=st,
+                        defaults={
+                            "ende": end,
+                            "terminart": terminart,
+                            "status": Termin.Status.GEBUCHT,
+                            "herkunft": Termin.Herkunft.MANUELL,
+                        },
                     )
-                else:
-                    buchung.name = item["kunde_name"]
-                    buchung.email = item["kunde_email"]
-                    buchung.telefon = item["kunde_telefon"]
-                    buchung.nachricht = item["kunde_nachricht"]
-                    buchung.status = Buchung.Status.BESTAETIGT
-                    buchung.bestaetigt_am = buchung.bestaetigt_am or timezone.now()
-                    buchung.save()
 
-                importiert_count += 1
+                    # 3. Buchung anlegen oder aktualisieren
+                    buchung = Buchung.objects.filter(
+                        termin=termin,
+                        status__in=[Buchung.Status.OFFEN, Buchung.Status.BESTAETIGT],
+                    ).first()
+                    if not buchung:
+                        Buchung.objects.create(
+                            termin=termin,
+                            name=item["kunde_name"],
+                            email=item["kunde_email"],
+                            telefon=item["kunde_telefon"],
+                            nachricht=item["kunde_nachricht"],
+                            status=Buchung.Status.BESTAETIGT,
+                            bestaetigt_am=timezone.now(),
+                            einwilligung_am=timezone.now(),
+                        )
+                    else:
+                        buchung.name = item["kunde_name"]
+                        buchung.email = item["kunde_email"]
+                        buchung.telefon = item["kunde_telefon"]
+                        buchung.nachricht = item["kunde_nachricht"]
+                        buchung.status = Buchung.Status.BESTAETIGT
+                        buchung.bestaetigt_am = buchung.bestaetigt_am or timezone.now()
+                        buchung.save()
+
+                    gebucht_importiert += 1
+                else:
+                    # Freien buchbaren Termin anlegen
+                    Termin.objects.update_or_create(
+                        fahrlehrer=fl,
+                        beginn=st,
+                        defaults={
+                            "ende": end,
+                            "terminart": terminart,
+                            "status": Termin.Status.FREI,
+                            "herkunft": Termin.Herkunft.MANUELL,
+                        },
+                    )
+                    frei_importiert += 1
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"\nErfolg: {importiert_count} Termine & Buchungen erfolgreich importiert! "
+                f"\nErfolg: {gebucht_importiert} gebuchte und {frei_importiert} freie Termine importiert! "
                 f"({blocker_entfernt_count} kollidierende FSM-Beratungssperren aufgelöst)."
             )
         )
