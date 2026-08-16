@@ -458,11 +458,13 @@ class FsmEinstellungenViewTests(TestCase):
         self.fahrlehrer.fsm_sync_aktiv = True
         self.fahrlehrer.save()
 
-        jetzt = timezone.now()
+        basis_tag = timezone.localdate() + dt.timedelta(days=5)
+        beginn = timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(8, 0)))
+        ende = timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(16, 0)))
         sperre = Sperrzeit.objects.create(
             fahrlehrer=self.fahrlehrer,
-            beginn=jetzt + dt.timedelta(days=5, hours=8),
-            ende=jetzt + dt.timedelta(days=5, hours=16),
+            beginn=beginn,
+            ende=ende,
             grund="Urlaub",
             typ=Sperrzeit.Typ.SONSTIGE,
         )
@@ -489,11 +491,13 @@ class FsmEinstellungenViewTests(TestCase):
         self.fahrlehrer.fsm_sync_aktiv = True
         self.fahrlehrer.save()
 
-        jetzt = timezone.now()
+        basis_tag = timezone.localdate() + dt.timedelta(days=2)
+        beginn = timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(13, 0)))
+        ende = timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(15, 30)))
         sperre = Sperrzeit.objects.create(
             fahrlehrer=self.fahrlehrer,
-            beginn=jetzt + dt.timedelta(days=2, hours=13),
-            ende=jetzt + dt.timedelta(days=2, hours=15, minutes=30),
+            beginn=beginn,
+            ende=ende,
             grund="Kinder aus Kita abholen",
             typ=Sperrzeit.Typ.PRIVAT,
         )
