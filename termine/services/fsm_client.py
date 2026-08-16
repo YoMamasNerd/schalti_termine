@@ -150,6 +150,8 @@ class FsmClient:
     ) -> list[FsmTermin]:
         """Ruft alle Termine eines Fahrlehrers für einen Zeitraum ab."""
         params = {
+            "von": start.isoformat(),
+            "bis": end.isoformat(),
             "start": start.isoformat(),
             "end": end.isoformat(),
         }
