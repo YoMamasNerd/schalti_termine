@@ -1,4 +1,4 @@
-"""Tests für den Fahrschulmanager (FSM) API-Client."""
+"""Tests für den FSM-Gateway Client."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def _mock_http_error(status_code: int, data: dict | list | str | None = None) ->
     )
     fp = io.BytesIO(body_bytes)
     return urllib.error.HTTPError(
-        url="https://api.fahrschulmanager.de/v1/test",
+        url="http://127.0.0.1:8090/v1/test",
         code=status_code,
         msg=f"HTTP {status_code}",
         hdrs={},  # type: ignore[arg-type]
@@ -55,36 +55,29 @@ class FsmClientTests(SimpleTestCase):
         super().setUp()
         cache.clear()
 
-    @override_settings(FSM_SYNC_ENABLED=True, FSM_API_KEY="test-api-key")
+    @override_settings(FSM_SYNC_ENABLED=True, FSM_GATEWAY_URL="http://127.0.0.1:8090/v1")
     def test_initialisierung_und_einstellungen(self):
         client = FsmClient()
         self.assertTrue(client.is_enabled)
-        self.assertEqual(client.get_api_key(), "test-api-key")
-
-        client.set_auth_token("mein-token")
-        self.assertEqual(client.get_auth_token(), "mein-token")
+        self.assertEqual(client.gateway_url, "http://127.0.0.1:8090/v1")
 
     @override_settings(FSM_SYNC_ENABLED=False)
     def test_is_enabled_deaktiviert(self):
         client = FsmClient()
         self.assertFalse(client.is_enabled)
 
-    def test_header_generierung(self):
-        client = FsmClient(api_key="key123", auth_token="token456")
-        headers = client._get_headers()
-        self.assertEqual(headers["Authorization"], "Bearer token456")
-        self.assertEqual(headers["x-fsm-apikey"], "key123")
-        self.assertEqual(headers["Referer"], "https://portal.fahrschulmanager.de/")
-
     @patch("urllib.request.urlopen")
     def test_get_fahrlehrer_erfolg(self, mock_urlopen):
-        mock_data = [
-            {"id": "uuid-1", "vorname": "Jonas", "nachname": "Eisele", "name": "Eisele"},
-            {"id": "uuid-2", "vorname": "Max", "nachname": "Hampel", "name": "Hampel"},
-        ]
+        mock_data = {
+            "count": 2,
+            "fahrlehrer": [
+                {"id": "uuid-1", "vorname": "Jonas", "nachname": "Eisele", "name": "Jonas Eisele"},
+                {"id": "uuid-2", "vorname": "Max", "nachname": "Hampel", "name": "Max Hampel"},
+            ],
+        }
         mock_urlopen.return_value = _mock_response(200, mock_data)
 
-        client = FsmClient(auth_token="valid-token")
+        client = FsmClient()
         fahrlehrer = client.get_fahrlehrer()
 
         self.assertEqual(len(fahrlehrer), 2)
@@ -93,110 +86,76 @@ class FsmClientTests(SimpleTestCase):
 
     @patch("urllib.request.urlopen")
     def test_get_termine_erfolg(self, mock_urlopen):
-        mock_data = [
-            {
-                "id": "termin-1",
-                "von": "2026-08-15T10:00:00+02:00",
-                "bis": "2026-08-15T11:20:00+02:00",
-                "fidTerminart": "PS",
-                "texte": "Fahrstunde",
-                "schuelername": "Mustermann, Max",
-            },
-            {
-                "id": "termin-2",
-                "von": "2026-08-15T14:00:00+02:00",
-                "bis": "2026-08-15T14:45:00+02:00",
-                "fidTerminart": "PX",
-                "texte": "Beratungen",
-                "schuelername": None,
-            },
-        ]
-        mock_urlopen.return_value = _mock_response(200, mock_data)
-
-        client = FsmClient(auth_token="valid-token")
-        von = dt.datetime(2026, 8, 15, 0, 0, tzinfo=dt.timezone.utc)
-        bis = dt.datetime(2026, 8, 16, 0, 0, tzinfo=dt.timezone.utc)
-
-        termine = client.get_termine("uuid-1", von, bis)
-
-        self.assertEqual(len(termine), 2)
-        self.assertIsInstance(termine[0], FsmTermin)
-        self.assertEqual(termine[0].id, "termin-1")
-        self.assertEqual(termine[0].terminart, "PS")
-        self.assertEqual(termine[0].schueler_name, "Mustermann, Max")
-        self.assertEqual(termine[1].titel, "Beratungen")
-
-    @patch("urllib.request.urlopen")
-    def test_termin_anlegen_erfolg(self, mock_urlopen):
-        mock_response_data = {
-            "viewModel": {
-                "id": "neu-erstellte-uuid-123",
-                "fidTerminart": "PX",
-                "texte": "Beratung Max",
-            },
-            "responses": [],
-        }
-        mock_urlopen.return_value = _mock_response(201, mock_response_data)
-
-        client = FsmClient(auth_token="valid-token")
-        von = dt.datetime(2026, 8, 15, 14, 0, tzinfo=dt.timezone.utc)
-        bis = dt.datetime(2026, 8, 15, 14, 45, tzinfo=dt.timezone.utc)
-
-        termin_id = client.termin_anlegen(
-            fahrlehrer_fsm_id="lehrer-uuid",
-            von=von,
-            bis=bis,
-            titel="Beratung Max",
-        )
-
-        self.assertEqual(termin_id, "neu-erstellte-uuid-123")
-
-    @patch("urllib.request.urlopen")
-    def test_termin_anlegen_konflikt_400(self, mock_urlopen):
-        err_payload = {
-            "viewModel": None,
-            "responses": [
+        mock_data = {
+            "fahrlehrer_id": "uuid-1",
+            "start": "2026-08-15T00:00:00",
+            "end": "2026-08-15T23:59:59",
+            "count": 1,
+            "events": [
                 {
-                    "question": 2,
-                    "errorMessage": "Fahrlehrer bereits verplant von 14:00 bis 14:45 Uhr.",
+                    "id": "termin-1",
+                    "von": "2026-08-15T10:00:00+02:00",
+                    "bis": "2026-08-15T11:20:00+02:00",
+                    "fahrlehrer_id": "uuid-1",
+                    "terminart": "FS",
+                    "titel": "Fahrstunde",
+                    "schueler_name": "Max Mustermann",
+                    "ist_fahrstunde": True,
+                    "dauer_minuten": 80.0,
                 }
             ],
         }
-        mock_urlopen.side_effect = _mock_http_error(400, err_payload)
+        mock_urlopen.return_value = _mock_response(200, mock_data)
 
-        client = FsmClient(auth_token="valid-token")
-        von = dt.datetime(2026, 8, 15, 14, 0, tzinfo=dt.timezone.utc)
-        bis = dt.datetime(2026, 8, 15, 14, 45, tzinfo=dt.timezone.utc)
+        client = FsmClient()
+        start = dt.datetime(2026, 8, 15, 0, 0)
+        end = dt.datetime(2026, 8, 15, 23, 59)
+        termine = client.get_termine("uuid-1", start, end)
 
-        with self.assertRaises(FsmApiError) as ctx:
-            client.termin_anlegen("lehrer-uuid", von, bis, "Beratung")
-
-        self.assertIn("Fahrlehrer bereits verplant", str(ctx.exception))
-        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertEqual(len(termine), 1)
+        termin = termine[0]
+        self.assertIsInstance(termin, FsmTermin)
+        self.assertEqual(termin.id, "termin-1")
+        self.assertEqual(termin.terminart, "FS")
+        self.assertEqual(termin.schueler_name, "Max Mustermann")
 
     @patch("urllib.request.urlopen")
-    def test_auth_fehler_401(self, mock_urlopen):
-        mock_urlopen.side_effect = _mock_http_error(401, {"error": "Unauthorized"})
+    def test_termin_anlegen_erfolg(self, mock_urlopen):
+        mock_data = {
+            "success": True,
+            "created_ids": ["neue-termin-uuid"],
+            "count": 1,
+        }
+        mock_urlopen.return_value = _mock_response(200, mock_data)
 
-        client = FsmClient(auth_token="abgelaufenes-token")
+        client = FsmClient()
+        von = dt.datetime(2026, 8, 15, 14, 0)
+        bis = dt.datetime(2026, 8, 15, 14, 45)
+        termin_id = client.termin_anlegen("uuid-1", von, bis, "Beratungstermin")
 
+        self.assertEqual(termin_id, "neue-termin-uuid")
+
+    @patch("urllib.request.urlopen")
+    def test_termin_loeschen_erfolg(self, mock_urlopen):
+        mock_data = {"success": True, "deleted_id": "termin-123"}
+        mock_urlopen.return_value = _mock_response(200, mock_data)
+
+        client = FsmClient()
+        success = client.termin_loeschen("termin-123")
+        self.assertTrue(success)
+
+    @patch("urllib.request.urlopen")
+    def test_fehlerbehandlung_401(self, mock_urlopen):
+        mock_urlopen.side_effect = _mock_http_error(401, {"detail": "Nicht autorisiert"})
+
+        client = FsmClient()
         with self.assertRaises(FsmAuthError):
             client.get_fahrlehrer()
 
     @patch("urllib.request.urlopen")
-    def test_termin_loeschen_erfolg(self, mock_urlopen):
-        mock_urlopen.return_value = _mock_response(200, {"viewModel": {"id": "termin-123"}})
-
-        client = FsmClient(auth_token="valid-token")
-        erfolg = client.termin_loeschen("termin-123")
-
-        self.assertTrue(erfolg)
-
-    @patch("urllib.request.urlopen")
-    def test_netzwerkfehler_urlerror(self, mock_urlopen):
+    def test_fehlerbehandlung_netzwerk(self, mock_urlopen):
         mock_urlopen.side_effect = urllib.error.URLError("Connection refused")
 
-        client = FsmClient(auth_token="valid-token")
-
+        client = FsmClient()
         with self.assertRaises(FsmError):
             client.get_fahrlehrer()
