@@ -351,3 +351,46 @@ class FuehrerscheinklasseForm(forms.ModelForm):
         if doppelt.exists():
             raise forms.ValidationError("Eine Klasse mit diesem Kürzel existiert bereits.")
         return code
+
+
+class SmtpEinstellungenForm(forms.ModelForm):
+    """Formular zur Pflege der zentralen SMTP- und E-Mail-Einstellungen."""
+
+    class Meta:
+        from .models import FahrschulEinstellungen
+
+        model = FahrschulEinstellungen
+        fields = [
+            "email_host",
+            "email_port",
+            "email_user",
+            "email_password",
+            "email_use_tls",
+            "email_use_ssl",
+            "email_from",
+        ]
+        widgets = {
+            "email_host": forms.TextInput(attrs={"placeholder": "z. B. smtp.strato.de oder mail.meine-fahrschule.de"}),
+            "email_port": forms.NumberInput(attrs={"placeholder": "587"}),
+            "email_user": forms.TextInput(attrs={"placeholder": "z. B. info@meine-fahrschule.de"}),
+            "email_password": forms.PasswordInput(render_value=True, attrs={"placeholder": "Passwort des E-Mail-Postfachs"}),
+            "email_from": forms.TextInput(attrs={"placeholder": "z. B. Fahrschule Schaltwerk <termine@fahrschule-schaltwerk.de>"}),
+        }
+        help_texts = {
+            "email_host": "Der SMTP-Server Ihres Mailanbieters. Wenn leer, gelten die Werte aus der .env-Datei.",
+            "email_port": "Standard: 587 (STARTTLS) oder 465 (SSL/TLS).",
+            "email_user": "Benutzername oder E-Mail-Adresse für die Authentifizierung.",
+            "email_password": "Das Passwort für Ihr Postfach oder ein anwendungsspezifisches App-Passwort.",
+            "email_use_tls": "Verschlüsselung per STARTTLS (Standard für Port 587).",
+            "email_use_ssl": "Verschlüsselung per SSL/TLS (Standard für Port 465).",
+            "email_from": "Angezeigter Absender für Benachrichtigungen (z. B. Buchungsbestätigungen).",
+        }
+
+    def clean(self):
+        daten = super().clean()
+        tls = daten.get("email_use_tls")
+        ssl = daten.get("email_use_ssl")
+        if tls and ssl:
+            self.add_error("email_use_ssl", "Bitte aktivieren Sie entweder STARTTLS (Port 587) oder SSL/TLS (Port 465), nicht beides gleichzeitig.")
+        return daten
+

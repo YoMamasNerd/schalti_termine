@@ -37,6 +37,7 @@ from .forms import (
     FuehrerscheinklasseForm,
     GlobaleEinstellungenForm,
     RhythmusRegelForm,
+    SmtpEinstellungenForm,
     SperrzeitForm,
     TagesplanungForm,
     TerminartForm,
@@ -66,6 +67,7 @@ from .services.planung import (
     termine_manuell_anlegen,
     vorschau,
 )
+from .services.smtp import sende_test_email, teste_smtp_authentifizierung
 
 
 def mitarbeiter(view):
@@ -999,8 +1001,22 @@ def einstellungen(request):
             if is_ajax:
                 return JsonResponse({"ok": False, "fehler": globale_form.errors.as_text()}, status=400)
             form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
+            smtp_form = SmtpEinstellungenForm(instance=globale_einst)
+        elif request.POST.get("form_art") == "smtp" and ist_inhaber:
+            smtp_form = SmtpEinstellungenForm(request.POST, instance=globale_einst)
+            if smtp_form.is_valid():
+                globale_einst = smtp_form.save()
+                if is_ajax:
+                    return JsonResponse({"ok": True, "nachricht": "SMTP-Einstellungen automatisch gespeichert."})
+                messages.success(request, "SMTP-Einstellungen gespeichert.")
+                return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}#tab-system")
+            if is_ajax:
+                return JsonResponse({"ok": False, "fehler": smtp_form.errors.as_text()}, status=400)
+            form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
+            globale_form = GlobaleEinstellungenForm(instance=globale_einst)
         else:
             globale_form = GlobaleEinstellungenForm(instance=globale_einst)
+            smtp_form = SmtpEinstellungenForm(instance=globale_einst)
             form = FahrlehrerEinstellungenForm(
                 request.POST, instance=fahrlehrer, inhaber=ist_inhaber
             )
@@ -1015,6 +1031,7 @@ def einstellungen(request):
     else:
         form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
         globale_form = GlobaleEinstellungenForm(instance=globale_einst)
+        smtp_form = SmtpEinstellungenForm(instance=globale_einst)
 
     jetzt = timezone.now()
     alle_sperren = list(
@@ -1037,6 +1054,7 @@ def einstellungen(request):
             "ist_inhaber": ist_inhaber,
             "form": form,
             "globale_form": globale_form,
+            "smtp_form": smtp_form,
             "globale_einstellungen": globale_einst,
             "buchbar_bis": timezone.localtime(fahrlehrer.spaetester_start()).date(),
             "sperrzeiten": manuelle_sperren,
@@ -1046,6 +1064,68 @@ def einstellungen(request):
             "terminarten": Terminart.objects.all(),
         },
     )
+
+
+@mitarbeiter
+@require_POST
+def smtp_test_ajax(request):
+    """Führt einen Live-Test der SMTP-Authentifizierung oder einen Test-Mail-Versand durch."""
+    if not request.user.is_staff:
+        raise PermissionDenied("Nur Inhaber dürfen SMTP-Einstellungen testen.")
+
+    globale_einst = FahrschulEinstellungen.get_solo()
+    cfg = globale_einst.get_effective_email_config()
+
+    host = request.POST.get("email_host", "").strip() or cfg.get("host") or ""
+    port_val = request.POST.get("email_port", "").strip() or cfg.get("port") or 587
+    user = request.POST.get("email_user", "").strip()
+    if not user and (not host or host == cfg.get("host")):
+        user = cfg.get("user") or ""
+
+    password = request.POST.get("email_password", "")
+    if not password and (not host or host == cfg.get("host")):
+        password = cfg.get("password") or ""
+
+    if "email_use_tls" in request.POST:
+        use_tls = request.POST.get("email_use_tls") in ["true", "True", "1", "on"]
+    else:
+        use_tls = cfg.get("use_tls", True)
+
+    if "email_use_ssl" in request.POST:
+        use_ssl = request.POST.get("email_use_ssl") in ["true", "True", "1", "on"]
+    else:
+        use_ssl = cfg.get("use_ssl", False)
+
+    from_email = request.POST.get("email_from", "").strip() or cfg.get("from_email") or ""
+    aktion = request.POST.get("aktion", "auth")
+
+    if aktion == "mail":
+        empfaenger = request.POST.get("test_empfaenger", "").strip() or request.user.email or from_email
+        ergebnis = sende_test_email(
+            empfaenger=empfaenger,
+            host=host,
+            port=port_val,
+            user=user,
+            password=password,
+            use_tls=use_tls,
+            use_ssl=use_ssl,
+            from_email=from_email,
+        )
+    else:
+        ergebnis = teste_smtp_authentifizierung(
+            host=host,
+            port=port_val,
+            user=user,
+            password=password,
+            use_tls=use_tls,
+            use_ssl=use_ssl,
+        )
+
+    return JsonResponse({
+        "ok": ergebnis.ok,
+        "meldung": ergebnis.meldung,
+        "details": ergebnis.details,
+    })
 
 
 def _globaler_horizont_nachziehen(request, alter_horizont: int) -> None:

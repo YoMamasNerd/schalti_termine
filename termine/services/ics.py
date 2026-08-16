@@ -53,9 +53,8 @@ def _kalender() -> Calendar:
 
 def _event(buchung, *, sequence: int = 0, storniert: bool = False) -> Event:
     termin = buchung.termin
-    kontakt_email = getattr(settings, "DEFAULT_FROM_EMAIL", "mail@fahrschule-schaltwerk.de")
-    if "<" in kontakt_email and ">" in kontakt_email:
-        kontakt_email = kontakt_email.split("<")[1].replace(">", "").strip()
+    from .mail import get_kontakt_email
+    kontakt_email = get_kontakt_email()
 
     event = Event()
     event.add("uid", _uid(buchung))

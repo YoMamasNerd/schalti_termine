@@ -325,6 +325,95 @@
     {# --- TAB 4: Schnittstellen & System --- #}
     <div id="tab-system" class="tab-inhalt" style="display:none">
       <div class="raster-zwei">
+        {% if ist_inhaber %}
+          <div class="karte" style="grid-column: 1 / -1">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem">
+              <div>
+                <h2 style="margin:0">✉️ E-Mail- &amp; SMTP-Server</h2>
+                <p class="leer" style="margin:0.25rem 0 0; font-size:0.9rem; line-height:1.5">
+                  Konfigurieren Sie den SMTP-Server für den automatischen Versand von Buchungsbestätigungen, Stornierungen und Terminerinnerungen.
+                </p>
+              </div>
+              {% if globale_einstellungen.email_host %}
+                <span class="status status--gebucht" style="font-size:0.8rem">Datenbank aktiv</span>
+              {% else %}
+                <span class="status status--frei" style="font-size:0.8rem">Fallback (.env) aktiv</span>
+              {% endif %}
+            </div>
+
+            <form class="js-auto-save-form" id="form-smtp" method="post"
+                  action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-system" novalidate>
+              {% csrf_token %}
+              <input type="hidden" name="form_art" value="smtp">
+
+              {% if smtp_form.non_field_errors %}
+                <div class="hinweis hinweis--fehler">{{ smtp_form.non_field_errors }}</div>
+              {% endif %}
+
+              <div class="raster-zwei" style="gap:1rem; margin-bottom:0.75rem">
+                <div>
+                  {% include "termine/_feld.html" with feld=smtp_form.email_host %}
+                </div>
+                <div>
+                  {% include "termine/_feld.html" with feld=smtp_form.email_port %}
+                </div>
+              </div>
+
+              <div class="raster-zwei" style="gap:1rem; margin-bottom:0.75rem">
+                <div>
+                  {% include "termine/_feld.html" with feld=smtp_form.email_user %}
+                </div>
+                <div>
+                  {% include "termine/_feld.html" with feld=smtp_form.email_password %}
+                </div>
+              </div>
+
+              <div class="raster-zwei" style="gap:1rem; margin-bottom:0.75rem">
+                <div>
+                  {% include "termine/_feld.html" with feld=smtp_form.email_use_tls %}
+                </div>
+                <div>
+                  {% include "termine/_feld.html" with feld=smtp_form.email_use_ssl %}
+                </div>
+              </div>
+
+              <div style="margin-bottom:1.25rem">
+                {% include "termine/_feld.html" with feld=smtp_form.email_from %}
+              </div>
+
+              <div class="knopfreihe" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem">
+                <button class="knopf" type="submit">SMTP-Einstellungen speichern</button>
+                <button class="knopf knopf--leise" type="button" id="btn-smtp-live-test" style="border-color:var(--marke); color:var(--marke); font-weight:600">
+                  ⚡ SMTP-Authentifizierung live testen
+                </button>
+              </div>
+            </form>
+
+            {# Live-Test Feedback Box #}
+            <div id="smtp-test-box" style="display:none; border-radius:6px; padding:1rem; margin-top:1.25rem; font-size:0.92rem; line-height:1.5">
+              <div id="smtp-test-spinner" style="display:none; align-items:center; gap:0.6rem; color:var(--text-leise)">
+                <span class="lade-kreis" style="display:inline-block; width:18px; height:18px; border:2px solid var(--linie); border-top-color:var(--marke); border-radius:50%; animation:drehen 0.8s linear infinite"></span>
+                <span>Verbindung zum SMTP-Server wird aufgebaut und Authentifizierung geprüft…</span>
+              </div>
+              <div id="smtp-test-ergebnis" style="display:none"></div>
+            </div>
+
+            {# Optionaler Test-Mail-Versand #}
+            <details style="margin-top:1.25rem; border-top:1px solid var(--linie); padding-top:1rem">
+              <summary style="cursor:pointer; font-weight:600; font-size:0.9rem; color:var(--marke)">
+                ✉️ Test-E-Mail an eigene Adresse senden
+              </summary>
+              <div style="margin-top:0.75rem; display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap">
+                <input type="email" id="smtp-test-mail-empfaenger" placeholder="Ihre E-Mail-Adresse"
+                       value="{{ request.user.email|default:fahrlehrer.email }}" style="max-width:320px; padding:0.45rem 0.75rem">
+                <button class="knopf knopf--klein knopf--leise" type="button" id="btn-sende-test-mail">
+                  Test-Mail abschicken
+                </button>
+              </div>
+            </details>
+          </div>
+        {% endif %}
+
         {% if FSM_SYNC_ENABLED %}
           <div class="karte">
             <h2>🔌 Fahrschulmanager (FSM)</h2>
@@ -361,6 +450,9 @@
     </div>
 
     <style>
+      @keyframes drehen {
+        to { transform: rotate(360deg); }
+      }
       .tab-schalter {
         background: transparent;
         border: none;
@@ -491,8 +583,8 @@
             });
           });
 
-          // Debounced speichern bei Text, Email, Number, Textarea
-          const textInputs = form.querySelectorAll('input[type="text"], input[type="email"], input[type="number"], input[type="tel"], textarea');
+          // Debounced speichern bei Text, Email, Number, Textarea, Password
+          const textInputs = form.querySelectorAll('input[type="text"], input[type="email"], input[type="number"], input[type="tel"], input[type="password"], textarea');
           let debounceTimer = null;
           textInputs.forEach(el => {
             el.addEventListener('input', () => {
@@ -509,7 +601,112 @@
             submitFormAsync(form);
           });
         });
+
+        // --- SMTP Live-Test & Test-E-Mail ---
+        const btnSmtpTest = document.getElementById('btn-smtp-live-test');
+        const btnSmtpMail = document.getElementById('btn-sende-test-mail');
+        const smtpTestBox = document.getElementById('smtp-test-box');
+        const smtpTestSpinner = document.getElementById('smtp-test-spinner');
+        const smtpTestErgebnis = document.getElementById('smtp-test-ergebnis');
+        const formSmtp = document.getElementById('form-smtp');
+
+        async function fuehreSmtpTestAus(aktion = 'auth') {
+          if (!formSmtp) return;
+          const formData = new FormData(formSmtp);
+          formData.set('aktion', aktion);
+
+          if (aktion === 'mail') {
+            const empfInput = document.getElementById('smtp-test-mail-empfaenger');
+            if (empfInput && empfInput.value) {
+              formData.set('test_empfaenger', empfInput.value.trim());
+            }
+          }
+
+          if (smtpTestBox) {
+            smtpTestBox.style.display = 'block';
+            smtpTestBox.style.background = 'var(--grund-leise)';
+            smtpTestBox.style.border = '1px solid var(--linie)';
+          }
+          if (smtpTestSpinner) smtpTestSpinner.style.display = 'flex';
+          if (smtpTestErgebnis) smtpTestErgebnis.style.display = 'none';
+
+          if (btnSmtpTest) btnSmtpTest.disabled = true;
+          if (btnSmtpMail) btnSmtpMail.disabled = true;
+
+          try {
+            const resp = await fetch("{% url 'termine:smtp_test' %}", {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+              }
+            });
+            const daten = await resp.json();
+            if (smtpTestSpinner) smtpTestSpinner.style.display = 'none';
+            if (smtpTestErgebnis) {
+              smtpTestErgebnis.style.display = 'block';
+              if (daten.ok) {
+                if (smtpTestBox) {
+                  smtpTestBox.style.background = '#f0fdf4';
+                  smtpTestBox.style.border = '1px solid #86efac';
+                }
+                smtpTestErgebnis.innerHTML = `
+                  <div style="display:flex; align-items:flex-start; gap:0.6rem; color:#166534">
+                    <span style="font-size:1.2rem; line-height:1">✓</span>
+                    <div>
+                      <strong style="display:block; margin-bottom:0.2rem">${daten.meldung}</strong>
+                      ${daten.details ? `<div style="font-size:0.85rem; color:#15803d">${daten.details}</div>` : ''}
+                    </div>
+                  </div>
+                `;
+              } else {
+                if (smtpTestBox) {
+                  smtpTestBox.style.background = '#fef2f2';
+                  smtpTestBox.style.border = '1px solid #fca5a5';
+                }
+                smtpTestErgebnis.innerHTML = `
+                  <div style="display:flex; align-items:flex-start; gap:0.6rem; color:#991b1b">
+                    <span style="font-size:1.2rem; line-height:1">✕</span>
+                    <div>
+                      <strong style="display:block; margin-bottom:0.2rem">${daten.meldung || 'Fehler beim SMTP-Test'}</strong>
+                      ${daten.details ? `<div style="font-size:0.85rem; color:#b91c1c">${daten.details}</div>` : ''}
+                    </div>
+                  </div>
+                `;
+              }
+            }
+          } catch (err) {
+            if (smtpTestSpinner) smtpTestSpinner.style.display = 'none';
+            if (smtpTestErgebnis) {
+              smtpTestErgebnis.style.display = 'block';
+              if (smtpTestBox) {
+                smtpTestBox.style.background = '#fef2f2';
+                smtpTestBox.style.border = '1px solid #fca5a5';
+              }
+              smtpTestErgebnis.innerHTML = `
+                <div style="display:flex; align-items:flex-start; gap:0.6rem; color:#991b1b">
+                  <span style="font-size:1.2rem; line-height:1">✕</span>
+                  <div>
+                    <strong style="display:block; margin-bottom:0.2rem">Netzwerk- oder Serverfehler</strong>
+                    <div style="font-size:0.85rem; color:#b91c1c">${err.message || err}</div>
+                  </div>
+                </div>
+              `;
+            }
+          } finally {
+            if (btnSmtpTest) btnSmtpTest.disabled = false;
+            if (btnSmtpMail) btnSmtpMail.disabled = false;
+          }
+        }
+
+        if (btnSmtpTest) {
+          btnSmtpTest.addEventListener('click', () => fuehreSmtpTestAus('auth'));
+        }
+        if (btnSmtpMail) {
+          btnSmtpMail.addEventListener('click', () => fuehreSmtpTestAus('mail'));
+        }
       })();
     </script>
+
   {% endif %}
 {% endblock %}

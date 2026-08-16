@@ -81,6 +81,47 @@ class FahrschulEinstellungen(models.Model):
         help_text="Wie oft die Belegungszeiten (Sperren) im Hintergrund automatisch mit dem Fahrschulmanager abgeglichen werden.",
     )
 
+    # --- SMTP- und E-Mail-Einstellungen ---
+    email_host = models.CharField(
+        "SMTP-Server (Host)",
+        max_length=255,
+        blank=True,
+        help_text="z. B. smtp.strato.de, mail.meine-fahrschule.de oder smtp.gmail.com. Leer = Fallback auf .env",
+    )
+    email_port = models.PositiveIntegerField(
+        "SMTP-Port",
+        default=587,
+        help_text="Standard: 587 (STARTTLS) oder 465 (SSL/TLS).",
+    )
+    email_user = models.CharField(
+        "SMTP-Benutzername",
+        max_length=255,
+        blank=True,
+        help_text="Meist Ihre vollständige E-Mail-Adresse für das Postfach.",
+    )
+    email_password = models.CharField(
+        "SMTP-Passwort",
+        max_length=255,
+        blank=True,
+        help_text="Das Passwort Ihres E-Mail-Postfachs / App-Passwort.",
+    )
+    email_use_tls = models.BooleanField(
+        "STARTTLS aktivieren",
+        default=True,
+        help_text="Empfohlen für Port 587.",
+    )
+    email_use_ssl = models.BooleanField(
+        "SSL/TLS aktivieren",
+        default=False,
+        help_text="Empfohlen für Port 465 (nicht zusammen mit STARTTLS verwenden).",
+    )
+    email_from = models.CharField(
+        "Standard-Absenderadresse",
+        max_length=255,
+        blank=True,
+        help_text="z. B. Fahrschule Schaltwerk <termine@fahrschule-schaltwerk.de> oder info@meine-fahrschule.de",
+    )
+
     class Meta:
         app_label = "termine"
         verbose_name = "Fahrschul-Einstellungen"
@@ -93,3 +134,32 @@ class FahrschulEinstellungen(models.Model):
     def get_solo(cls) -> "FahrschulEinstellungen":
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+    def get_effective_email_config(self) -> dict:
+        """Liefert die effektive E-Mail-/SMTP-Konfiguration (DB vor .env/settings)."""
+        from django.conf import settings
+
+        if self.email_host:
+            return {
+                "host": self.email_host,
+                "port": self.email_port or 587,
+                "user": self.email_user or "",
+                "password": self.email_password or "",
+                "use_tls": self.email_use_tls,
+                "use_ssl": self.email_use_ssl,
+                "from_email": self.email_from or getattr(settings, "DEFAULT_FROM_EMAIL", "termine@example.org"),
+                "backend": "django.core.mail.backends.smtp.EmailBackend",
+                "quelle": "datenbank",
+            }
+        return {
+            "host": getattr(settings, "EMAIL_HOST", ""),
+            "port": getattr(settings, "EMAIL_PORT", 587),
+            "user": getattr(settings, "EMAIL_HOST_USER", ""),
+            "password": getattr(settings, "EMAIL_HOST_PASSWORD", ""),
+            "use_tls": getattr(settings, "EMAIL_USE_TLS", True),
+            "use_ssl": getattr(settings, "EMAIL_USE_SSL", False),
+            "from_email": getattr(settings, "DEFAULT_FROM_EMAIL", "termine@example.org"),
+            "backend": getattr(settings, "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"),
+            "quelle": "env",
+        }
+

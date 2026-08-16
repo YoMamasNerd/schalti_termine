@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
+from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
@@ -24,11 +24,58 @@ from .ics import buchung_als_ics
 logger = logging.getLogger(__name__)
 
 
+def get_from_email() -> str:
+    """Liefert die konfigurierte Absenderadresse (DB vor settings/.env)."""
+    try:
+        from ..models import FahrschulEinstellungen
+
+        einst = FahrschulEinstellungen.get_solo()
+        if einst.email_from:
+            return einst.email_from
+    except Exception:
+        pass
+    return getattr(settings, "DEFAULT_FROM_EMAIL", "mail@fahrschule-schaltwerk.de")
+
+
+def get_kontakt_email() -> str:
+    """Liefert die reine Kontakt-E-Mail-Adresse ohne Klammern/Namen."""
+    kontakt_email = get_from_email()
+    if "<" in kontakt_email and ">" in kontakt_email:
+        return kontakt_email.split("<")[1].replace(">", "").strip()
+    return kontakt_email.strip()
+
+
+def get_mail_connection(fail_silently: bool = False):
+    """Erzeugt eine Django-Mail-Connection basierend auf DB- oder Umgebungseinstellungen."""
+    try:
+        from ..models import FahrschulEinstellungen
+
+        einst = FahrschulEinstellungen.get_solo()
+        cfg = einst.get_effective_email_config()
+    except Exception:
+        return get_connection(fail_silently=fail_silently)
+
+    # Wenn in der DB ein Host hinterlegt ist, nutzen wir SMTP mit diesen Werten:
+    if cfg.get("host") and cfg.get("quelle") == "datenbank":
+        return get_connection(
+            backend="django.core.mail.backends.smtp.EmailBackend",
+            host=cfg["host"],
+            port=cfg["port"],
+            username=cfg["user"] or None,
+            password=cfg["password"] or None,
+            use_tls=cfg["use_tls"],
+            use_ssl=cfg["use_ssl"],
+            timeout=10,
+            fail_silently=fail_silently,
+        )
+
+    # Andernfalls Standard-Backend (z. B. locmem im Testlauf, console oder SMTP aus settings)
+    return get_connection(fail_silently=fail_silently)
+
+
 def _kontext(buchung, **extra) -> dict:
     termin = buchung.termin
-    kontakt_email = getattr(settings, "DEFAULT_FROM_EMAIL", "mail@fahrschule-schaltwerk.de")
-    if "<" in kontakt_email and ">" in kontakt_email:
-        kontakt_email = kontakt_email.split("<")[1].replace(">", "").strip()
+    kontakt_email = get_kontakt_email()
 
     return {
         "buchung": buchung,
@@ -63,12 +110,16 @@ def _senden(
     """`template` ist der Name ohne Endung; `.txt` und `.html` gehören zusammen."""
     if not empfaenger:
         return False
+    from_email = get_from_email()
+    connection = get_mail_connection(fail_silently=False)
+
     nachricht = EmailMultiAlternatives(
         subject=betreff,
         body=render_to_string(f"mail/{template}.txt", kontext),
-        from_email=settings.DEFAULT_FROM_EMAIL,
+        from_email=from_email,
         to=empfaenger,
         reply_to=[antwort_an] if antwort_an else None,
+        connection=connection,
     )
     nachricht.attach_alternative(render_to_string(f"mail/{template}.html", kontext), "text/html")
     if ics:
