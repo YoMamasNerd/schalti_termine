@@ -70,6 +70,11 @@ urlpatterns = [
     path("intern/klassen/<int:pk>/loeschen/", staff_views.klasse_loeschen, name="klasse_loeschen"),
     path("intern/einstellungen/", staff_views.einstellungen, name="einstellungen"),
     path(
+        "intern/einstellungen/disconnect-sso/",
+        staff_views.disconnect_sso,
+        name="disconnect_sso",
+    ),
+    path(
         "intern/einstellungen/kalender-abo/",
         staff_views.feed_token_neu,
         name="feed_token_neu",

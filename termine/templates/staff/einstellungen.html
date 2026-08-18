@@ -102,6 +102,46 @@
             </form>
           </div>
 
+          {# --- VoidAuth SSO Karte --- #}
+          {% load socialaccount %}
+          <div class="karte" style="margin-top:1rem">
+            <h2>🛡️ Single Sign-On (VoidAuth)</h2>
+            <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+              Verknüpfen Sie Ihren Login mit VoidAuth, um sich mit nur einem Klick oder per Passkey anzumelden.
+            </p>
+
+            {% if social_account %}
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.75rem; border:1px solid var(--gruen); border-radius:var(--radius-klein); background:var(--gruen-hell);">
+                <div>
+                  <strong style="color:var(--gruen-dunkel); display:block;">✓ Mit VoidAuth verknüpft</strong>
+                  <span style="font-size:0.85rem; color:var(--text-leise)">
+                    SSO-UID: <code>{{ social_account.uid }}</code>
+                    {% if social_account.extra_data.preferred_username %}
+                      &middot; Benutzer: {{ social_account.extra_data.preferred_username }}
+                    {% endif %}
+                  </span>
+                </div>
+                <form method="post" action="{% url 'termine:disconnect_sso' %}" onsubmit="return confirm('Möchten Sie die Verknüpfung mit VoidAuth wirklich aufheben?');">
+                  {% csrf_token %}
+                  <button class="knopf knopf--leise knopf--klein" type="submit" style="color:var(--rot);">
+                    Verknüpfung aufheben
+                  </button>
+                </form>
+              </div>
+            {% else %}
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.75rem; border:1px solid var(--linie); border-radius:var(--radius-klein);">
+                <div>
+                  <strong>Noch nicht verknüpft</strong>
+                  <span style="display:block; font-size:0.85rem; color:var(--text-leise)">Verbinden Sie Ihr lokales Benutzerkonto mit VoidAuth.</span>
+                </div>
+                <a href="{% provider_login_url 'openid_connect' provider_id='voidauth' process='connect' %}"
+                   class="knopf knopf--klein">
+                  Jetzt mit VoidAuth verknüpfen
+                </a>
+              </div>
+            {% endif %}
+          </div>
+
           {% if ist_inhaber %}
             <div class="karte" style="margin-top:1rem">
               <h2>Team-Verwaltung</h2>

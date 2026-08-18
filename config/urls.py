@@ -7,5 +7,6 @@ admin.site.index_title = "Verwaltung"
 
 urlpatterns = [
     path("django-admin/", admin.site.urls),
+    path("accounts/", include("allauth.urls")),
     path("", include("termine.urls")),
 ]

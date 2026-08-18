@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load socialaccount %}
 
 {% block titel %}Anmelden – {{ SITE_NAME }}{% endblock %}
 
@@ -14,12 +15,30 @@
     </div>
   {% endif %}
 
+  <div class="karte" style="margin-bottom: 1.5rem; text-align: center;">
+    <p style="margin-top: 0; margin-bottom: 1rem; color: var(--text-leise); font-size: 0.95rem;">
+      Schnelle & sichere Anmeldung mit zentralem Konto:
+    </p>
+    <a href="{% provider_login_url 'openid_connect' provider_id='voidauth' process='login' %}"
+       class="knopf"
+       style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; text-decoration: none; font-weight: 600;">
+      <span>🛡️ Mit VoidAuth SSO anmelden</span>
+    </a>
+  </div>
+
+  <div style="position: relative; text-align: center; margin: 1.5rem 0;">
+    <hr style="border: 0; border-top: 1px solid var(--linie); margin: 0;">
+    <span style="position: relative; top: -0.7em; background: var(--grund); padding: 0 0.75rem; color: var(--text-leise); font-size: 0.85rem;">
+      oder mit Passwort
+    </span>
+  </div>
+
   <form class="karte" method="post">
     {% csrf_token %}
     {% for feld in form %}
       {% include "termine/_feld.html" with feld=feld %}
     {% endfor %}
-    <button class="knopf" type="submit">Anmelden</button>
+    <button class="knopf" type="submit" style="width: 100%; margin-top: 0.5rem;">Mit Passwort anmelden</button>
     <input type="hidden" name="next" value="{{ next }}">
   </form>
 </div>

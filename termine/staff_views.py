@@ -1045,6 +1045,9 @@ def einstellungen(request):
         .order_by("beginn")
     )
 
+    from allauth.socialaccount.models import SocialAccount
+    social_account = SocialAccount.objects.filter(user=request.user).first()
+
     return render(
         request,
         "staff/einstellungen.html",
@@ -1062,8 +1065,33 @@ def einstellungen(request):
             "alle_lehrer_sperren": alle_lehrer_sperren,
             "fsm_sperren_count": fsm_sperren_count,
             "terminarten": Terminart.objects.all(),
+            "social_account": social_account,
         },
     )
+
+
+@mitarbeiter
+@require_POST
+def disconnect_sso(request):
+    """Trennt die Verknüpfung mit VoidAuth SSO."""
+    from allauth.socialaccount.models import SocialAccount
+
+    account = SocialAccount.objects.filter(user=request.user).first()
+    if not account:
+        messages.info(request, "Keine aktive SSO-Verknüpfung vorhanden.")
+        return redirect("termine:einstellungen")
+
+    if not request.user.has_usable_password():
+        messages.error(
+            request,
+            "Du hast noch kein lokales Passwort festgelegt. Bitte setze zuerst über 'Passwort vergessen' "
+            "ein Passwort, bevor du die SSO-Verknüpfung trennst, um dich nicht auszusperren."
+        )
+        return redirect("termine:einstellungen")
+
+    account.delete()
+    messages.success(request, "Die Verknüpfung mit VoidAuth wurde erfolgreich aufgehoben.")
+    return redirect("termine:einstellungen")
 
 
 @mitarbeiter

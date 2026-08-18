@@ -66,6 +66,11 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_q",
     "termine",
+    # Allauth & VoidAuth SSO
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.openid_connect",
 ]
 
 MIDDLEWARE = [
@@ -77,6 +82,12 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
+]
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -165,6 +176,34 @@ STORAGES = {
 LOGIN_URL = "/intern/anmelden/"
 LOGIN_REDIRECT_URL = "/intern/"
 LOGOUT_REDIRECT_URL = "/intern/anmelden/"
+
+# --- VoidAuth SSO (OpenID Connect) -----------------------------------------
+
+VOIDAUTH_CLIENT_ID = os.environ.get("VOIDAUTH_CLIENT_ID", "jE31npKLpMyW7Kd3")
+VOIDAUTH_CLIENT_SECRET = os.environ.get("VOIDAUTH_CLIENT_SECRET", "ot1o84oAKTDChA8I1tv1Ptz5mOqTFUM9")
+VOIDAUTH_ISSUER_URL = os.environ.get("VOIDAUTH_ISSUER_URL", "https://auth.arbeits-zimmer.de/oidc")
+
+SOCIALACCOUNT_ADAPTER = "termine.social_adapter.VoidAuthSocialAccountAdapter"
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+SOCIALACCOUNT_LOGIN_ON_GET = True
+
+SOCIALACCOUNT_PROVIDERS = {
+    "openid_connect": {
+        "APPS": [
+            {
+                "provider_id": "voidauth",
+                "name": "VoidAuth",
+                "client_id": VOIDAUTH_CLIENT_ID,
+                "secret": VOIDAUTH_CLIENT_SECRET,
+                "settings": {
+                    "server_url": VOIDAUTH_ISSUER_URL,
+                },
+            }
+        ],
+        "SCOPE": ["openid", "profile", "email", "groups"],
+    }
+}
 
 # --- E-Mail ----------------------------------------------------------------
 
