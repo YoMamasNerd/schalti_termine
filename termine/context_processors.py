@@ -12,5 +12,6 @@ def site(request):
         "KONTAKT_EMAIL": get_kontakt_email(),
         "RESERVATION_MINUTES": settings.RESERVATION_MINUTES,
         "FSM_SYNC_ENABLED": getattr(settings, "FSM_SYNC_ENABLED", False),
+        "VOIDAUTH_ENABLED": getattr(settings, "VOIDAUTH_ENABLED", False),
     }
 

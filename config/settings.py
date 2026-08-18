@@ -179,31 +179,35 @@ LOGOUT_REDIRECT_URL = "/intern/anmelden/"
 
 # --- VoidAuth SSO (OpenID Connect) -----------------------------------------
 
-VOIDAUTH_CLIENT_ID = os.environ.get("VOIDAUTH_CLIENT_ID", "jE31npKLpMyW7Kd3")
-VOIDAUTH_CLIENT_SECRET = os.environ.get("VOIDAUTH_CLIENT_SECRET", "ot1o84oAKTDChA8I1tv1Ptz5mOqTFUM9")
-VOIDAUTH_ISSUER_URL = os.environ.get("VOIDAUTH_ISSUER_URL", "https://auth.arbeits-zimmer.de/oidc")
+VOIDAUTH_CLIENT_ID = os.environ.get("VOIDAUTH_CLIENT_ID", "").strip()
+VOIDAUTH_CLIENT_SECRET = os.environ.get("VOIDAUTH_CLIENT_SECRET", "").strip()
+VOIDAUTH_ISSUER_URL = os.environ.get("VOIDAUTH_ISSUER_URL", "").strip()
+VOIDAUTH_ENABLED = bool(VOIDAUTH_CLIENT_ID and VOIDAUTH_CLIENT_SECRET and VOIDAUTH_ISSUER_URL)
 
 SOCIALACCOUNT_ADAPTER = "termine.social_adapter.VoidAuthSocialAccountAdapter"
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
-SOCIALACCOUNT_PROVIDERS = {
-    "openid_connect": {
-        "APPS": [
-            {
-                "provider_id": "voidauth",
-                "name": "VoidAuth",
-                "client_id": VOIDAUTH_CLIENT_ID,
-                "secret": VOIDAUTH_CLIENT_SECRET,
-                "settings": {
-                    "server_url": VOIDAUTH_ISSUER_URL,
-                },
-            }
-        ],
-        "SCOPE": ["openid", "profile", "email", "groups"],
+if VOIDAUTH_ENABLED:
+    SOCIALACCOUNT_PROVIDERS = {
+        "openid_connect": {
+            "APPS": [
+                {
+                    "provider_id": "voidauth",
+                    "name": "VoidAuth",
+                    "client_id": VOIDAUTH_CLIENT_ID,
+                    "secret": VOIDAUTH_CLIENT_SECRET,
+                    "settings": {
+                        "server_url": VOIDAUTH_ISSUER_URL,
+                    },
+                }
+            ],
+            "SCOPE": ["openid", "profile", "email", "groups"],
+        }
     }
-}
+else:
+    SOCIALACCOUNT_PROVIDERS = {}
 
 # --- E-Mail ----------------------------------------------------------------
 
