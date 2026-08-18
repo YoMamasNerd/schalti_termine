@@ -23,8 +23,11 @@
 
     {# --- Tab Leiste --- #}
     <div class="einstellungen-tabs" style="display:flex; gap:0.4rem; border-bottom:2px solid var(--linie); margin-bottom:1.5rem; overflow-x:auto; padding-bottom:2px;">
-      <button type="button" class="tab-schalter active" data-tab="tab-profil">
-        👤 Fahrlehrer &amp; Profil
+      <button type="button" class="tab-schalter active" data-tab="tab-mein-profil">
+        👤 Mein Benutzerkonto
+      </button>
+      <button type="button" class="tab-schalter" data-tab="tab-fahrlehrer">
+        🚗 Fahrlehrer-Zeiten
       </button>
       <button type="button" class="tab-schalter" data-tab="tab-buchung">
         🌐 Globale Buchungsregeln
@@ -38,16 +41,116 @@
       </button>
     </div>
 
-    {# --- TAB 1: Fahrlehrer & Profil --- #}
-    <div id="tab-profil" class="tab-inhalt">
+    {# --- TAB 1: Mein Benutzerkonto --- #}
+    <div id="tab-mein-profil" class="tab-inhalt">
+      <div class="raster-zwei">
+        <div>
+          {# Persönliche Angaben #}
+          <form class="karte js-auto-save-form" id="form-user-profil" method="post"
+                action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-mein-profil" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="form_art" value="user_profile">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+              <h2 style="margin:0">👤 Persönliche Angaben</h2>
+              <span class="status status--gebucht" style="font-size:0.8rem">Login: {{ request.user.username }}</span>
+            </div>
+            <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+              Ihre persönlichen Benutzerkontodaten für den internen Zugang.
+            </p>
+
+            {% if user_form.non_field_errors %}
+              <div class="hinweis hinweis--fehler">{{ user_form.non_field_errors }}</div>
+            {% endif %}
+
+            {% for feld in user_form %}
+              {% include "termine/_feld.html" with feld=feld %}
+            {% endfor %}
+
+            <div class="knopfreihe" style="margin-top:1.5rem">
+              <button class="knopf" type="submit">Änderungen speichern</button>
+            </div>
+          </form>
+
+          {# Passwort ändern #}
+          <form class="karte" id="form-password-change" method="post" style="margin-top:1.25rem"
+                action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-mein-profil" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="form_art" value="password_change">
+            <h2>🔑 Passwort ändern</h2>
+            <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+              Legen Sie ein neues Passwort für Ihren lokalen Login fest.
+            </p>
+
+            {% if password_form.non_field_errors %}
+              <div class="hinweis hinweis--fehler">{{ password_form.non_field_errors }}</div>
+            {% endif %}
+
+            {% for feld in password_form %}
+              {% include "termine/_feld.html" with feld=feld %}
+            {% endfor %}
+
+            <div class="knopfreihe" style="margin-top:1.5rem">
+              <button class="knopf knopf--leise" type="submit">Neues Passwort speichern</button>
+            </div>
+          </form>
+        </div>
+
+        <div>
+          {% if VOIDAUTH_ENABLED %}
+          {# --- VoidAuth SSO Karte --- #}
+          {% load socialaccount %}
+          <div class="karte">
+            <h2>🛡️ Single Sign-On (VoidAuth)</h2>
+            <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+              Verknüpfen Sie Ihren Login mit VoidAuth, um sich mit nur einem Klick oder per Passkey anzumelden.
+            </p>
+
+            {% if social_account %}
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.75rem; border:1px solid var(--gruen); border-radius:var(--radius-klein); background:var(--gruen-hell);">
+                <div>
+                  <strong style="color:var(--gruen-dunkel); display:block;">✓ Mit VoidAuth verknüpft</strong>
+                  <span style="font-size:0.85rem; color:var(--text-leise)">
+                    SSO-UID: <code>{{ social_account.uid }}</code>
+                    {% if social_account.extra_data.preferred_username %}
+                      &middot; Benutzer: {{ social_account.extra_data.preferred_username }}
+                    {% endif %}
+                  </span>
+                </div>
+                <form method="post" action="{% url 'termine:disconnect_sso' %}" onsubmit="return confirm('Möchten Sie die Verknüpfung mit VoidAuth wirklich aufheben?');">
+                  {% csrf_token %}
+                  <button class="knopf knopf--leise knopf--klein" type="submit" style="color:var(--rot);">
+                    Verknüpfung aufheben
+                  </button>
+                </form>
+              </div>
+            {% else %}
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.75rem; border:1px solid var(--linie); border-radius:var(--radius-klein);">
+                <div>
+                  <strong>Noch nicht verknüpft</strong>
+                  <span style="display:block; font-size:0.85rem; color:var(--text-leise)">Verbinden Sie Ihr lokales Benutzerkonto mit VoidAuth.</span>
+                </div>
+                <a href="{% provider_login_url 'openid_connect' provider_id='voidauth' process='connect' %}"
+                   class="knopf knopf--klein">
+                  Jetzt mit VoidAuth verknüpfen
+                </a>
+              </div>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# --- TAB 2: Fahrlehrer & Kalender --- #}
+    <div id="tab-fahrlehrer" class="tab-inhalt" style="display:none">
       {% if alle_fahrlehrer.count > 1 %}
         <div class="karte" style="margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; background:var(--flaeche-dunkel)">
           <div style="display:flex; align-items:center; gap:0.6rem">
-            <span style="font-size:1.1rem">👤</span>
+            <span style="font-size:1.1rem">🚗</span>
             <label for="fahrlehrer_select" style="font-weight:600; font-size:0.95rem">Ausgewählter Fahrlehrer:</label>
           </div>
           <form method="get" style="margin:0; display:flex; align-items:center; gap:0.5rem">
-            <select name="fahrlehrer" id="fahrlehrer_select" style="width:auto; padding:0.4rem 0.75rem; font-size:0.95rem; font-weight:600" onchange="window.location.href='?fahrlehrer=' + this.value + (window.location.hash || '#tab-profil');">
+            <select name="fahrlehrer" id="fahrlehrer_select" style="width:auto; padding:0.4rem 0.75rem; font-size:0.95rem; font-weight:600" onchange="window.location.href='?fahrlehrer=' + this.value + '#tab-fahrlehrer';">
               {% for person in alle_fahrlehrer %}
                 <option value="{{ person.slug }}" {% if person.pk == fahrlehrer.pk %}selected{% endif %}>
                   {{ person.name }}{% if not person.aktiv %} (inaktiv){% endif %}
@@ -61,7 +164,7 @@
 
       <div class="raster-zwei">
         <form class="karte js-auto-save-form" id="form-profil" method="post"
-              action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-profil" novalidate>
+              action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-fahrlehrer" novalidate>
           {% csrf_token %}
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
             <h2 style="margin:0">{{ fahrlehrer.name }}</h2>
@@ -101,48 +204,6 @@
               </button>
             </form>
           </div>
-
-          {% if VOIDAUTH_ENABLED %}
-          {# --- VoidAuth SSO Karte --- #}
-          {% load socialaccount %}
-          <div class="karte" style="margin-top:1rem">
-            <h2>🛡️ Single Sign-On (VoidAuth)</h2>
-            <p class="leer" style="margin-bottom:1rem; line-height:1.55">
-              Verknüpfen Sie Ihren Login mit VoidAuth, um sich mit nur einem Klick oder per Passkey anzumelden.
-            </p>
-
-            {% if social_account %}
-              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.75rem; border:1px solid var(--gruen); border-radius:var(--radius-klein); background:var(--gruen-hell);">
-                <div>
-                  <strong style="color:var(--gruen-dunkel); display:block;">✓ Mit VoidAuth verknüpft</strong>
-                  <span style="font-size:0.85rem; color:var(--text-leise)">
-                    SSO-UID: <code>{{ social_account.uid }}</code>
-                    {% if social_account.extra_data.preferred_username %}
-                      &middot; Benutzer: {{ social_account.extra_data.preferred_username }}
-                    {% endif %}
-                  </span>
-                </div>
-                <form method="post" action="{% url 'termine:disconnect_sso' %}" onsubmit="return confirm('Möchten Sie die Verknüpfung mit VoidAuth wirklich aufheben?');">
-                  {% csrf_token %}
-                  <button class="knopf knopf--leise knopf--klein" type="submit" style="color:var(--rot);">
-                    Verknüpfung aufheben
-                  </button>
-                </form>
-              </div>
-            {% else %}
-              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.75rem; border:1px solid var(--linie); border-radius:var(--radius-klein);">
-                <div>
-                  <strong>Noch nicht verknüpft</strong>
-                  <span style="display:block; font-size:0.85rem; color:var(--text-leise)">Verbinden Sie Ihr lokales Benutzerkonto mit VoidAuth.</span>
-                </div>
-                <a href="{% provider_login_url 'openid_connect' provider_id='voidauth' process='connect' %}"
-                   class="knopf knopf--klein">
-                  Jetzt mit VoidAuth verknüpfen
-                </a>
-              </div>
-            {% endif %}
-          </div>
-          {% endif %}
 
           {% if ist_inhaber %}
             <div class="karte" style="margin-top:1rem">
@@ -542,7 +603,7 @@
 
         function aktiviereTab(tabId) {
           if (!tabId || !document.getElementById(tabId)) {
-            tabId = 'tab-profil';
+            tabId = 'tab-mein-profil';
           }
           schalter.forEach(btn => {
             if (btn.getAttribute('data-tab') === tabId) {

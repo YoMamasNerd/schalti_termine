@@ -33,6 +33,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .forms import (
+    BenutzerProfilForm,
     FahrlehrerEinstellungenForm,
     FuehrerscheinklasseForm,
     GlobaleEinstellungenForm,
@@ -986,8 +987,41 @@ def einstellungen(request):
     globale_einst = FahrschulEinstellungen.get_solo()
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest" or "application/json" in request.headers.get("Accept", "")
 
+    from django.contrib.auth.forms import PasswordChangeForm
+    from django.contrib.auth import update_session_auth_hash
+
     if request.method == "POST":
-        if request.POST.get("form_art") == "global" and ist_inhaber:
+        form_art = request.POST.get("form_art")
+        if form_art == "user_profile":
+            user_form = BenutzerProfilForm(request.POST, instance=request.user)
+            if user_form.is_valid():
+                user_form.save()
+                if is_ajax:
+                    return JsonResponse({"ok": True, "nachricht": "Persönliche Profildaten gespeichert."})
+                messages.success(request, "Persönliche Daten erfolgreich gespeichert.")
+                return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}#tab-mein-profil")
+            if is_ajax:
+                return JsonResponse({"ok": False, "fehler": user_form.errors.as_text()}, status=400)
+            form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
+            globale_form = GlobaleEinstellungenForm(instance=globale_einst)
+            smtp_form = SmtpEinstellungenForm(instance=globale_einst)
+            password_form = PasswordChangeForm(user=request.user)
+        elif form_art == "password_change":
+            password_form = PasswordChangeForm(user=request.user, data=request.POST)
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)
+                if is_ajax:
+                    return JsonResponse({"ok": True, "nachricht": "Passwort erfolgreich geändert."})
+                messages.success(request, "Passwort erfolgreich geändert.")
+                return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}#tab-mein-profil")
+            if is_ajax:
+                return JsonResponse({"ok": False, "fehler": password_form.errors.as_text()}, status=400)
+            form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
+            globale_form = GlobaleEinstellungenForm(instance=globale_einst)
+            smtp_form = SmtpEinstellungenForm(instance=globale_einst)
+            user_form = BenutzerProfilForm(instance=request.user)
+        elif form_art == "global" and ist_inhaber:
             alter_horizont = globale_einst.horizont_wochen
             globale_form = GlobaleEinstellungenForm(request.POST, instance=globale_einst)
             if globale_form.is_valid():
@@ -1002,7 +1036,9 @@ def einstellungen(request):
                 return JsonResponse({"ok": False, "fehler": globale_form.errors.as_text()}, status=400)
             form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
             smtp_form = SmtpEinstellungenForm(instance=globale_einst)
-        elif request.POST.get("form_art") == "smtp" and ist_inhaber:
+            user_form = BenutzerProfilForm(instance=request.user)
+            password_form = PasswordChangeForm(user=request.user)
+        elif form_art == "smtp" and ist_inhaber:
             smtp_form = SmtpEinstellungenForm(request.POST, instance=globale_einst)
             if smtp_form.is_valid():
                 globale_einst = smtp_form.save()
@@ -1014,24 +1050,30 @@ def einstellungen(request):
                 return JsonResponse({"ok": False, "fehler": smtp_form.errors.as_text()}, status=400)
             form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
             globale_form = GlobaleEinstellungenForm(instance=globale_einst)
+            user_form = BenutzerProfilForm(instance=request.user)
+            password_form = PasswordChangeForm(user=request.user)
         else:
             globale_form = GlobaleEinstellungenForm(instance=globale_einst)
             smtp_form = SmtpEinstellungenForm(instance=globale_einst)
+            user_form = BenutzerProfilForm(instance=request.user)
+            password_form = PasswordChangeForm(user=request.user)
             form = FahrlehrerEinstellungenForm(
                 request.POST, instance=fahrlehrer, inhaber=ist_inhaber
             )
             if form.is_valid():
                 fahrlehrer = form.save()
                 if is_ajax:
-                    return JsonResponse({"ok": True, "nachricht": "Profil-Einstellungen automatisch gespeichert."})
+                    return JsonResponse({"ok": True, "nachricht": "Fahrlehrer-Einstellungen automatisch gespeichert."})
                 messages.success(request, "Einstellungen gespeichert.")
-                return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}#tab-profil")
+                return redirect(f"{reverse('termine:einstellungen')}?fahrlehrer={fahrlehrer.slug}#tab-fahrlehrer")
             if is_ajax:
                 return JsonResponse({"ok": False, "fehler": form.errors.as_text()}, status=400)
     else:
         form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
         globale_form = GlobaleEinstellungenForm(instance=globale_einst)
         smtp_form = SmtpEinstellungenForm(instance=globale_einst)
+        user_form = BenutzerProfilForm(instance=request.user)
+        password_form = PasswordChangeForm(user=request.user)
 
     jetzt = timezone.now()
     alle_sperren = list(
@@ -1066,6 +1108,8 @@ def einstellungen(request):
             "fsm_sperren_count": fsm_sperren_count,
             "terminarten": Terminart.objects.all(),
             "social_account": social_account,
+            "user_form": user_form,
+            "password_form": password_form,
         },
     )
 

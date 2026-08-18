@@ -394,3 +394,23 @@ class SmtpEinstellungenForm(forms.ModelForm):
             self.add_error("email_use_ssl", "Bitte aktivieren Sie entweder STARTTLS (Port 587) oder SSL/TLS (Port 465), nicht beides gleichzeitig.")
         return daten
 
+
+class BenutzerProfilForm(forms.ModelForm):
+    """Persönliche Profildaten des angemeldeten Benutzers."""
+
+    class Meta:
+        from django.contrib.auth.models import User
+        model = User
+        fields = ["first_name", "last_name", "email"]
+        labels = {
+            "first_name": "Vorname",
+            "last_name": "Nachname",
+            "email": "E-Mail-Adresse",
+        }
+        widgets = {
+            "first_name": forms.TextInput(attrs={"autocomplete": "given-name", "placeholder": "Vorname"}),
+            "last_name": forms.TextInput(attrs={"autocomplete": "family-name", "placeholder": "Nachname"}),
+            "email": forms.EmailInput(attrs={"autocomplete": "email", "placeholder": "name@beispiel.de"}),
+        }
+
+
