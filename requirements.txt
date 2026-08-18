@@ -9,4 +9,5 @@ psycopg[binary]==3.3.4
 django-allauth>=65.15.0
 cryptography>=50.0.0
 pyjwt[crypto]>=2.8.0
+requests>=2.31.0
 
