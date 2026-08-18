@@ -27,7 +27,8 @@ services:
       - default
       - fsm-network
     ports:
-      - "10.0.0.4:8000:8000"
+      - "10.0.0.4:8001:8000"
+      - "127.0.0.1:8001:8000"
     # Die Deployment-Prüfungen laufen zuerst: Zeigt SITE_BASE_URL noch auf
     # localhost oder fehlt der Mailversand, bricht der Start ab, statt später
     # unbrauchbare Bestätigungslinks zu verschicken.
