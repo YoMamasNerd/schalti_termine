@@ -25,13 +25,15 @@ logger = logging.getLogger(__name__)
 
 
 def get_from_email() -> str:
-    """Liefert die konfigurierte Absenderadresse (DB vor settings/.env)."""
+    """Liefert die konfigurierte Absenderadresse aus den FahrschulEinstellungen."""
     try:
         from ..models import FahrschulEinstellungen
 
         einst = FahrschulEinstellungen.get_solo()
         if einst.email_from:
             return einst.email_from
+        if einst.email_user:
+            return einst.email_user
     except Exception:
         pass
     return getattr(settings, "DEFAULT_FROM_EMAIL", "mail@fahrschule-schaltwerk.de")
@@ -46,7 +48,7 @@ def get_kontakt_email() -> str:
 
 
 def get_mail_connection(fail_silently: bool = False):
-    """Erzeugt eine Django-Mail-Connection basierend auf DB- oder Umgebungseinstellungen."""
+    """Erzeugt eine Django-Mail-Connection basierend auf den FahrschulEinstellungen."""
     try:
         from ..models import FahrschulEinstellungen
 
@@ -56,7 +58,7 @@ def get_mail_connection(fail_silently: bool = False):
         return get_connection(fail_silently=fail_silently)
 
     # Wenn in der DB ein Host hinterlegt ist, nutzen wir SMTP mit diesen Werten:
-    if cfg.get("host") and cfg.get("quelle") == "datenbank":
+    if cfg.get("host"):
         return get_connection(
             backend="django.core.mail.backends.smtp.EmailBackend",
             host=cfg["host"],
@@ -69,7 +71,7 @@ def get_mail_connection(fail_silently: bool = False):
             fail_silently=fail_silently,
         )
 
-    # Andernfalls Standard-Backend (z. B. locmem im Testlauf, console oder SMTP aus settings)
+    # Andernfalls Standard-Backend (z. B. locmem im Testlauf oder console)
     return get_connection(fail_silently=fail_silently)
 
 

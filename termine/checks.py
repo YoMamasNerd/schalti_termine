@@ -36,7 +36,7 @@ ENTWICKLUNGSSCHLUESSEL = "unsicher-nur-fuer-entwicklung"
 
 # Geheimnisse, die aus der Umgebung kommen und deshalb nicht in den Settings
 # stehen, wo eine Prüfung sie sonst fände.
-GEHEIMNISSE_AUS_DER_UMGEBUNG = ("POSTGRES_PASSWORD", "EMAIL_HOST_PASSWORD")
+GEHEIMNISSE_AUS_DER_UMGEBUNG = ("POSTGRES_PASSWORD",)
 
 
 @register(Tags.security, deploy=True)
@@ -77,44 +77,34 @@ def pruefe_oeffentliche_adresse(app_configs, **kwargs):
 
 @register(Tags.security, deploy=True)
 def pruefe_mailversand(app_configs, **kwargs):
-    """Ohne funktionierenden Mailversand ist keine Buchung abschließbar."""
+    """Prüft, ob in den Fahrschul-Einstellungen ein SMTP-Server hinterlegt ist."""
     if settings.DEBUG:
         return []
 
     meldungen = []
+    try:
+        from .models import FahrschulEinstellungen
 
-    if settings.EMAIL_BACKEND.endswith("console.EmailBackend"):
-        meldungen.append(
-            Error(
-                "E-Mails werden auf die Konsole geschrieben statt versendet.",
-                hint="Ohne Versand erhält niemand den Bestätigungslink, und keine "
-                "Buchung kommt zustande. Setzen Sie EMAIL_HOST und die zugehörigen "
-                "Zugangsdaten in der .env.",
-                id="termine.E002",
-            )
-        )
+        einst = FahrschulEinstellungen.get_solo()
+        mailserver = einst.email_host or ""
+    except Exception:
+        return []
 
-    mailserver = getattr(settings, "EMAIL_HOST", "") or ""
-    if any(domaene in mailserver for domaene in BEISPIEL_DOMAENEN):
-        meldungen.append(
-            Error(
-                f"EMAIL_HOST steht noch auf einem Beispielserver ({mailserver!r}).",
-                hint="Die Installation fährt damit hoch, aber der Versand scheitert bei "
-                "jeder Buchung – und weil der Bestätigungslink nie ankommt, kommt keine "
-                "Buchung zustande. Tragen Sie den SMTP-Server Ihres Anbieters ein.",
-                id="termine.E003",
-            )
-        )
-
-    absender = settings.DEFAULT_FROM_EMAIL or ""
-    if any(domaene in absender for domaene in BEISPIEL_DOMAENEN):
+    if not mailserver:
         meldungen.append(
             Warning(
-                f"DEFAULT_FROM_EMAIL steht noch auf einer Beispieladresse ({absender!r}).",
-                hint="Viele Mailserver verwerfen Nachrichten mit einer Absenderadresse, "
-                "deren Domain ihnen nicht gehört. Tragen Sie die echte Adresse der "
-                "Fahrschule ein.",
+                "Es ist noch kein SMTP-Server in den Fahrschul-Einstellungen hinterlegt.",
+                hint="Richten Sie die SMTP-Zugangsdaten in der Verwaltung unter "
+                "/intern/einstellungen/ ein, damit Buchungs- und Bestätigungs-E-Mails versendet werden.",
                 id="termine.W002",
+            )
+        )
+    elif any(domaene in mailserver for domaene in BEISPIEL_DOMAENEN):
+        meldungen.append(
+            Error(
+                f"Der SMTP-Server steht noch auf einem Beispielserver ({mailserver!r}).",
+                hint="Tragen Sie in den Einstellungen unter /intern/einstellungen/ den echten SMTP-Server ein.",
+                id="termine.E003",
             )
         )
 

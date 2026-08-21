@@ -93,21 +93,17 @@ ist Absicht – siehe [Wenn der Start abbricht](#wenn-der-start-abbricht).
 > dann sind alle Buchungen weg. Für den Betrieb mit Docker gehört `POSTGRES_DB`
 > immer in die `.env`.
 
-### E-Mail
+### E-Mail & SMTP
 
 Ohne funktionierenden Versand kommt **keine einzige Buchung zustande**: Der
 Kunde bestätigt seinen Termin über einen Link in der E-Mail. Bekommt er die Mail
 nicht, verfällt die Reservierung nach 30 Minuten.
 
-| Feld | Was hinein muss |
-| --- | --- |
-| `EMAIL_HOST` | Der SMTP-Server des Anbieters, z. B. `smtp.strato.de`. |
-| `EMAIL_PORT` | Meist `587` (STARTTLS) oder `465` (SSL). |
-| `EMAIL_HOST_USER` | Der Postfachname, meist die vollständige Adresse. |
-| `EMAIL_HOST_PASSWORD` | Das Postfach-Passwort. |
-| `EMAIL_USE_TLS` | `true` bei Port 587. |
-| `EMAIL_USE_SSL` | `true` **statt** `EMAIL_USE_TLS`, wenn der Anbieter Port 465 verlangt. Nie beide auf `true`. |
-| `DEFAULT_FROM_EMAIL` | Die Absenderadresse, z. B. `Fahrschule Muster <termine@meine-fahrschule.de>`. Nimm eine Adresse eurer eigenen Domain – viele Mailserver verwerfen Nachrichten mit fremder Absenderdomain. |
+> **Wichtig:** Die SMTP-Zugangsdaten werden nicht in der `.env` hinterlegt, sondern
+> bequem und zentral in der Verwaltungsoberfläche unter **/intern/einstellungen/**
+> (Reiter *„Schnittstellen & System“*). Dort können die Verbindung und der Mailversand
+> direkt per Live-Test geprüft werden.
+
 
 ### Buchungsregeln
 

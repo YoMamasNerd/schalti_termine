@@ -86,7 +86,7 @@ class FahrschulEinstellungen(models.Model):
         "SMTP-Server (Host)",
         max_length=255,
         blank=True,
-        help_text="z. B. smtp.strato.de, mail.meine-fahrschule.de oder smtp.gmail.com. Leer = Fallback auf .env",
+        help_text="z. B. smtp.strato.de, mail.meine-fahrschule.de oder smtp.gmail.com.",
     )
     email_port = models.PositiveIntegerField(
         "SMTP-Port",
@@ -136,9 +136,7 @@ class FahrschulEinstellungen(models.Model):
         return obj
 
     def get_effective_email_config(self) -> dict:
-        """Liefert die effektive E-Mail-/SMTP-Konfiguration (DB vor .env/settings)."""
-        from django.conf import settings
-
+        """Liefert die E-Mail-/SMTP-Konfiguration aus der Datenbank."""
         if self.email_host:
             return {
                 "host": self.email_host,
@@ -147,19 +145,19 @@ class FahrschulEinstellungen(models.Model):
                 "password": self.email_password or "",
                 "use_tls": self.email_use_tls,
                 "use_ssl": self.email_use_ssl,
-                "from_email": self.email_from or getattr(settings, "DEFAULT_FROM_EMAIL", "termine@example.org"),
+                "from_email": self.email_from or self.email_user or "mail@fahrschule-schaltwerk.de",
                 "backend": "django.core.mail.backends.smtp.EmailBackend",
                 "quelle": "datenbank",
             }
         return {
-            "host": getattr(settings, "EMAIL_HOST", ""),
-            "port": getattr(settings, "EMAIL_PORT", 587),
-            "user": getattr(settings, "EMAIL_HOST_USER", ""),
-            "password": getattr(settings, "EMAIL_HOST_PASSWORD", ""),
-            "use_tls": getattr(settings, "EMAIL_USE_TLS", True),
-            "use_ssl": getattr(settings, "EMAIL_USE_SSL", False),
-            "from_email": getattr(settings, "DEFAULT_FROM_EMAIL", "termine@example.org"),
-            "backend": getattr(settings, "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"),
-            "quelle": "env",
+            "host": "",
+            "port": 587,
+            "user": "",
+            "password": "",
+            "use_tls": True,
+            "use_ssl": False,
+            "from_email": self.email_from or "mail@fahrschule-schaltwerk.de",
+            "backend": "django.core.mail.backends.console.EmailBackend",
+            "quelle": "datenbank",
         }
 

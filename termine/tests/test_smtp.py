@@ -25,11 +25,13 @@ class SmtpModellUndFormTest(TestCase):
     def setUp(self):
         self.einst = FahrschulEinstellungen.get_solo()
 
-    def test_standard_fallback_auf_env(self):
+    def test_standard_ohne_host(self):
         self.einst.email_host = ""
         self.einst.save()
         cfg = self.einst.get_effective_email_config()
-        self.assertEqual(cfg["quelle"], "env")
+        self.assertEqual(cfg["quelle"], "datenbank")
+        self.assertEqual(cfg["host"], "")
+        self.assertEqual(cfg["backend"], "django.core.mail.backends.console.EmailBackend")
 
     def test_db_konfiguration_hat_vorrang(self):
         self.einst.email_host = "smtp.schaltwerk.de"

@@ -377,7 +377,7 @@ class SmtpEinstellungenForm(forms.ModelForm):
             "email_from": forms.TextInput(attrs={"placeholder": "z. B. Fahrschule Schaltwerk <termine@fahrschule-schaltwerk.de>"}),
         }
         help_texts = {
-            "email_host": "Der SMTP-Server Ihres Mailanbieters. Wenn leer, gelten die Werte aus der .env-Datei.",
+            "email_host": "Der SMTP-Server Ihres Mailanbieters (z. B. smtp.strato.de).",
             "email_port": "Standard: 587 (STARTTLS) oder 465 (SSL/TLS).",
             "email_user": "Benutzername oder E-Mail-Adresse für die Authentifizierung.",
             "email_password": "Das Passwort für Ihr Postfach oder ein anwendungsspezifisches App-Passwort.",

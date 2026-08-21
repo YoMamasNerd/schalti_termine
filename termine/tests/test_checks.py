@@ -4,7 +4,7 @@ import os
 from unittest import mock
 
 from django.apps import apps
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from termine.checks import (
     pruefe_mailversand,
@@ -12,9 +12,7 @@ from termine.checks import (
     pruefe_platzhalter,
     pruefe_reservierungsdauer,
 )
-
-KONSOLE = "django.core.mail.backends.console.EmailBackend"
-SMTP = "django.core.mail.backends.smtp.EmailBackend"
+from termine.models import FahrschulEinstellungen
 
 
 def ids(meldungen):
@@ -52,25 +50,32 @@ class OeffentlicheAdresse(SimpleTestCase):
         self.assertEqual(pruefe_oeffentliche_adresse(None), [])
 
 
-class Mailversand(SimpleTestCase):
-    @override_settings(DEBUG=True, EMAIL_BACKEND=KONSOLE)
-    def test_konsole_ist_bei_debug_in_ordnung(self):
+class Mailversand(TestCase):
+    def setUp(self):
+        self.einst = FahrschulEinstellungen.get_solo()
+
+    @override_settings(DEBUG=True)
+    def test_bei_debug_wird_nicht_gemeckert(self):
+        self.einst.email_host = ""
+        self.einst.save()
         self.assertEqual(pruefe_mailversand(None), [])
 
-    @override_settings(DEBUG=False, EMAIL_BACKEND=KONSOLE)
-    def test_konsole_im_betrieb_ist_ein_fehler(self):
-        self.assertIn("termine.E002", ids(pruefe_mailversand(None)))
-
-    @override_settings(
-        DEBUG=False, EMAIL_BACKEND=SMTP, DEFAULT_FROM_EMAIL="termine@example.org"
-    )
-    def test_beispieladresse_wird_bemaengelt(self):
+    @override_settings(DEBUG=False)
+    def test_ohne_smtp_host_gibt_es_eine_warnung(self):
+        self.einst.email_host = ""
+        self.einst.save()
         self.assertIn("termine.W002", ids(pruefe_mailversand(None)))
 
-    @override_settings(
-        DEBUG=False, EMAIL_BACKEND=SMTP, DEFAULT_FROM_EMAIL="termine@fahrschule.de"
-    )
+    @override_settings(DEBUG=False)
+    def test_beispielserver_ist_ein_fehler(self):
+        self.einst.email_host = "smtp.example.org"
+        self.einst.save()
+        self.assertIn("termine.E003", ids(pruefe_mailversand(None)))
+
+    @override_settings(DEBUG=False)
     def test_echte_konfiguration_ist_still(self):
+        self.einst.email_host = "mail.fahrschule-schaltwerk.de"
+        self.einst.save()
         self.assertEqual(pruefe_mailversand(None), [])
 
 
@@ -82,18 +87,6 @@ class Reservierungsdauer(SimpleTestCase):
     @override_settings(RESERVATION_MINUTES=30)
     def test_uebliche_frist_ist_still(self):
         self.assertEqual(pruefe_reservierungsdauer(None), [])
-
-
-class BeispielserverAlsMailserver(SimpleTestCase):
-    """EMAIL_HOST aus der Beispieldatei: startet, versendet aber nie."""
-
-    @override_settings(DEBUG=False, EMAIL_BACKEND=SMTP, EMAIL_HOST="smtp.example.org")
-    def test_platzhalter_ist_ein_fehler(self):
-        self.assertIn("termine.E003", ids(pruefe_mailversand(None)))
-
-    @override_settings(DEBUG=False, EMAIL_BACKEND=SMTP, EMAIL_HOST="mail.fahrschule.de")
-    def test_echter_server_ist_still(self):
-        self.assertNotIn("termine.E003", ids(pruefe_mailversand(None)))
 
 
 class UnveraenderteGeheimnisse(SimpleTestCase):
@@ -122,13 +115,3 @@ class UnveraenderteGeheimnisse(SimpleTestCase):
             meldungen = pruefe_platzhalter(None)
         self.assertIn("termine.E005", ids(meldungen))
         self.assertIn("POSTGRES_PASSWORD", meldungen[0].msg)
-
-    @override_settings(DEBUG=False, SECRET_KEY="ein-langer-echt-zufaelliger-wert-xyz")
-    def test_beide_geheimnisse_stehen_in_einer_meldung(self):
-        with mock.patch.dict(
-            os.environ,
-            {"POSTGRES_PASSWORD": "bitte-aendern", "EMAIL_HOST_PASSWORD": "bitte-aendern"},
-        ):
-            meldungen = pruefe_platzhalter(None)
-        self.assertEqual(len(meldungen), 1)
-        self.assertIn("EMAIL_HOST_PASSWORD", meldungen[0].msg)
