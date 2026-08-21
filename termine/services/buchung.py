@@ -265,7 +265,17 @@ def abgelaufene_reservierungen_freigeben() -> int:
 
 def erinnerungen_versenden(stunden_vorher: int | None = None) -> int:
     """Verschickt Erinnerungsmails für bestätigte Termine kurz vor dem Termin."""
-    stunden_vorher = stunden_vorher or settings.REMINDER_HOURS_BEFORE
+    if stunden_vorher is None:
+        try:
+            from ..models.einstellungen import FahrschulEinstellungen
+            einst = FahrschulEinstellungen.get_solo()
+            stunden_vorher = einst.erinnerung_stunden_vorher
+        except Exception:
+            stunden_vorher = getattr(settings, "REMINDER_HOURS_BEFORE", 24)
+
+    if stunden_vorher is not None and stunden_vorher <= 0:
+        return 0
+
     jetzt = timezone.now()
     faellig = Buchung.objects.filter(
         status=Buchung.Status.BESTAETIGT,

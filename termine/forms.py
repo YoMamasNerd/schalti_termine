@@ -267,6 +267,7 @@ class GlobaleEinstellungenForm(forms.ModelForm):
             "bundesland",
             "vorlauf_stunden",
             "horizont_wochen",
+            "erinnerung_stunden_vorher",
             "aktive_fuehrerscheinklassen",
             "fsm_theorie_blockiert_beratung",
         ]
@@ -274,6 +275,7 @@ class GlobaleEinstellungenForm(forms.ModelForm):
             "bundesland": "Bestimmt die gesetzlichen Feiertage der Fahrschule (z. B. Berlin).",
             "vorlauf_stunden": "Termine, die früher als dieser Vorlauf beginnen, sind nicht mehr buchbar.",
             "horizont_wochen": "Wie weit im Voraus Kunden buchen können und der Generator Termine anlegt.",
+            "erinnerung_stunden_vorher": "Wie viele Stunden vor dem Beratungstermin Kunden automatisch per E-Mail erinnert werden (z. B. 24, 0 = deaktiviert).",
             "fsm_theorie_blockiert_beratung": "Verhindert Beratungstermine für alle Fahrlehrer während laufendem Theorieunterricht (gemeinsamer Raum).",
         }
 
@@ -281,6 +283,8 @@ class GlobaleEinstellungenForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if "bundesland" in self.fields:
             self.fields["bundesland"].required = False
+        if "erinnerung_stunden_vorher" in self.fields:
+            self.fields["erinnerung_stunden_vorher"].required = False
         if self.instance and self.instance.pk:
             vorhanden = self.instance.aktive_fuehrerscheinklassen or []
             self.initial.setdefault("aktive_fuehrerscheinklassen", vorhanden)
@@ -290,6 +294,14 @@ class GlobaleEinstellungenForm(forms.ModelForm):
         if not val and self.instance and self.instance.pk:
             return self.instance.bundesland or "BE"
         return val or "BE"
+
+    def clean_erinnerung_stunden_vorher(self):
+        val = self.cleaned_data.get("erinnerung_stunden_vorher")
+        if val is None:
+            if self.instance and self.instance.pk:
+                return self.instance.erinnerung_stunden_vorher
+            return 24
+        return val
 
     def clean_aktive_fuehrerscheinklassen(self):
         return self.cleaned_data.get("aktive_fuehrerscheinklassen") or []

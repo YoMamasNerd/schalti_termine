@@ -148,6 +148,38 @@ class Erinnerungen(JobBasis):
         jobs.erinnerungen()
         self.assertEqual(len(django_mail.outbox), 0)
 
+    def test_beruecksichtigt_einstellungen_erinnerung_stunden(self):
+        from termine.models import FahrschulEinstellungen
+
+        einst = FahrschulEinstellungen.get_solo()
+        einst.erinnerung_stunden_vorher = 48
+        einst.save()
+
+        termin = self.termin(stunden_voraus=36)
+        termin.status = Termin.Status.GEBUCHT
+        termin.save()
+        buchung = self.buchung(termin)
+
+        django_mail.outbox.clear()
+        jobs.erinnerungen()
+        self.assertEqual(len(django_mail.outbox), 1)
+
+        # Wenn auf 12 Stunden gestellt:
+        django_mail.outbox.clear()
+        einst.erinnerung_stunden_vorher = 12
+        einst.save()
+
+        termin2 = self.termin(stunden_voraus=20)
+        termin2.status = Termin.Status.GEBUCHT
+        termin2.save()
+        buchung2 = self.buchung(termin2)
+
+        jobs.erinnerungen()
+        self.assertEqual(len(django_mail.outbox), 0)
+        buchung2.refresh_from_db()
+        self.assertIsNone(buchung2.erinnerung_am)
+
+
 
 class Datenpflege(JobBasis):
     def test_anonymisiert_alte_buchungen(self):

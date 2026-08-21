@@ -55,6 +55,12 @@ class FahrschulEinstellungen(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(52)],
         help_text="Wie viele Wochen im Voraus aus den Rhythmus-Regeln Termine erzeugt und angeboten werden.",
     )
+    erinnerung_stunden_vorher = models.PositiveIntegerField(
+        "Erinnerung vor Termin (Stunden)",
+        default=24,
+        blank=True,
+        help_text="Wie viele Stunden vor dem Beratungstermin eine automatische Erinnerungs-E-Mail an den Kunden gesendet wird (z. B. 24 für einen Tag vorher, 0 = deaktiviert).",
+    )
     aktive_fuehrerscheinklassen = models.JSONField(
         "Verfügbare Führerscheinklassen",
         default=list,
