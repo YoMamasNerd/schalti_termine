@@ -23,7 +23,13 @@
         </span>
         <span class="marke-name">{{ SITE_NAME }}</span>
       </a>
-      {% block navigation %}{% endblock %}
+      {% block navigation %}
+        {% if user.is_authenticated %}
+          {% if user.is_staff or user.fahrlehrer %}
+            {% include "staff/_navigation.html" %}
+          {% endif %}
+        {% endif %}
+      {% endblock %}
     </div>
   </header>
 

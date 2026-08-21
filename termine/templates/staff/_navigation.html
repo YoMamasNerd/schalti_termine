@@ -1,0 +1,41 @@
+{% load navigation %}
+<details class="menue">
+  <summary class="menue-schalter" aria-label="Menü">
+    <svg class="menue-strich" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <path d="M4 7h16M4 12h16M4 17h16"></path>
+    </svg>
+    <svg class="menue-kreuz" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18"></path>
+    </svg>
+  </summary>
+
+  <nav class="menue-inhalt" aria-label="Interner Bereich">
+    {% aktiv 'dashboard' as hier %}
+    <a class="{{ hier }}" {% if hier %}aria-current="page"{% endif %}
+       href="{% url 'termine:dashboard' %}">Übersicht</a>
+
+    {% aktiv 'tagesplanung' 'termine_anlegen' 'sperrzeit_anlegen' 'generieren' as hier %}
+    <a class="{{ hier }}" {% if hier %}aria-current="page"{% endif %}
+       href="{% url 'termine:tagesplanung' %}">Tagesplanung</a>
+
+    {% aktiv 'regeln' 'regel_neu' 'regel_bearbeiten' as hier %}
+    <a class="{{ hier }}" {% if hier %}aria-current="page"{% endif %}
+       href="{% url 'termine:regeln' %}">Rhythmus-Regeln</a>
+
+    {% aktiv 'buchungen' as hier %}
+    <a class="{{ hier }}" {% if hier %}aria-current="page"{% endif %}
+       href="{% url 'termine:buchungen' %}">Buchungen</a>
+
+    {% aktiv 'einstellungen' 'terminarten' 'terminart_neu' 'terminart_bearbeiten' 'fahrlehrer_neu' 'fsm_einstellungen' as hier %}
+    <a class="{{ hier }}" {% if hier %}aria-current="page"{% endif %}
+       href="{% url 'termine:einstellungen' %}">Einstellungen</a>
+
+    {% if user.is_superuser %}<a href="/django-admin/">Stammdaten</a>{% endif %}
+    <form class="menue-abmelden" method="post" action="{% url 'termine:logout' %}">
+      {% csrf_token %}
+      <button type="submit" class="knopf knopf--leise knopf--klein">Abmelden</button>
+    </form>
+  </nav>
+</details>

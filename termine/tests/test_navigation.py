@@ -64,10 +64,16 @@ class AktiverPunkt(TestCase):
         antwort = self.client.get(reverse("termine:buchungen"))
         self.assertContains(antwort, 'aria-current="page"', count=1)
 
-    def test_oeffentliche_seite_hat_keine_interne_navigation(self):
+    def test_oeffentliche_seite_hat_keine_interne_navigation_fuer_nicht_angemeldete(self):
         self.client.logout()
         antwort = self.client.get(reverse("termine:start"))
         self.assertNotContains(antwort, "menue-schalter")
+
+    def test_oeffentliche_seite_zeigt_interne_navigation_fuer_angemeldete_mitarbeiter(self):
+        self.client.force_login(self.chef)
+        antwort = self.client.get(reverse("termine:start"))
+        self.assertContains(antwort, "menue-schalter")
+        self.assertContains(antwort, "Interner Bereich")
 
 
 class OhneRequest(SimpleTestCase):
