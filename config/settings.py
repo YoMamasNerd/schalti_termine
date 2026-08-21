@@ -189,6 +189,21 @@ SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
+VOIDAUTH_BUERO_GROUPS = [
+    g.strip().lower()
+    for g in os.environ.get(
+        "VOIDAUTH_BUERO_GROUPS", "buero,admin,office,leitung"
+    ).split(",")
+    if g.strip()
+]
+VOIDAUTH_FAHRLEHRER_GROUPS = [
+    g.strip().lower()
+    for g in os.environ.get(
+        "VOIDAUTH_FAHRLEHRER_GROUPS", "fahrlehrer,instructor,lehrer"
+    ).split(",")
+    if g.strip()
+]
+
 if VOIDAUTH_ENABLED:
     SOCIALACCOUNT_PROVIDERS = {
         "openid_connect": {

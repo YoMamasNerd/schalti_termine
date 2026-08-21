@@ -143,8 +143,22 @@ class FahrlehrerSiehtNurSichSelbst(TestCase):
         self.assertEqual(antwort.status_code, 403)
         self.assertFalse(Fahrlehrer.objects.filter(name="Heimlich").exists())
 
-    def test_terminarten_darf_ein_fahrlehrer_dagegen_pflegen(self):
-        # Terminarten sind Stammdaten der Fahrschule, keine persönlichen Daten.
-        # Genau das war der Anlass, sie aus dem Admin zu holen.
-        self.assertEqual(self.client.get(reverse("termine:terminarten")).status_code, 200)
-        self.assertEqual(self.client.get(reverse("termine:terminart_neu")).status_code, 200)
+    def test_terminarten_und_klassen_nur_fuer_inhaber_oder_buero(self):
+        self.assertEqual(self.client.get(reverse("termine:terminarten")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("termine:terminart_neu")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("termine:klassen")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("termine:klasse_neu")).status_code, 403)
+
+    def test_globale_regeln_und_smtp_nur_fuer_inhaber(self):
+        # Fahrlehrer darf keine globalen Einstellungen per POST überschreiben
+        antwort_global = self.client.post(
+            reverse("termine:einstellungen"),
+            {"form_art": "global", "bundesland": "BY", "vorlauf_stunden": 12, "horizont_wochen": 6},
+        )
+        self.assertEqual(antwort_global.status_code, 403)
+
+        antwort_smtp = self.client.post(
+            reverse("termine:einstellungen"),
+            {"form_art": "smtp", "email_host": "smtp.attack.org"},
+        )
+        self.assertEqual(antwort_smtp.status_code, 403)

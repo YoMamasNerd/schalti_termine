@@ -842,7 +842,7 @@ def regel_loeschen(request, pk: int):
 # deshalb darf sie hier jeder pflegen, der den internen Bereich sieht.
 
 
-@mitarbeiter
+@inhaber
 def terminartenliste(request):
     terminarten = Terminart.objects.annotate(
         anzahl_termine=Count("termine", distinct=True),
@@ -851,7 +851,7 @@ def terminartenliste(request):
     return render(request, "staff/terminarten.html", {"terminarten": terminarten})
 
 
-@mitarbeiter
+@inhaber
 def terminart_bearbeiten(request, pk: int | None = None):
     terminart = get_object_or_404(Terminart, pk=pk) if pk else None
 
@@ -880,7 +880,7 @@ def terminart_bearbeiten(request, pk: int | None = None):
     )
 
 
-@mitarbeiter
+@inhaber
 @require_POST
 def terminart_loeschen(request, pk: int):
     """Löscht eine Terminart – aber nur eine, die noch nirgends hängt.
@@ -914,7 +914,7 @@ def terminart_loeschen(request, pk: int):
 # --- Führerscheinklassen (FEK) ---------------------------------------------
 
 
-@mitarbeiter
+@inhaber
 def klassenliste(request):
     """Übersicht aller Führerscheinklassen mit Bearbeitungs- und Löschmöglichkeiten."""
     klassen = Fuehrerscheinklasse.objects.all().order_by("reihenfolge", "code")
@@ -932,7 +932,7 @@ def klassenliste(request):
     return render(request, "staff/klassen.html", {"klassen": klassen})
 
 
-@mitarbeiter
+@inhaber
 def klasse_bearbeiten(request, pk: int | None = None):
     klasse = get_object_or_404(Fuehrerscheinklasse, pk=pk) if pk else None
 
@@ -952,7 +952,7 @@ def klasse_bearbeiten(request, pk: int | None = None):
     )
 
 
-@mitarbeiter
+@inhaber
 @require_POST
 def klasse_loeschen(request, pk: int):
     klasse = get_object_or_404(Fuehrerscheinklasse, pk=pk)
@@ -1021,7 +1021,9 @@ def einstellungen(request):
             globale_form = GlobaleEinstellungenForm(instance=globale_einst)
             smtp_form = SmtpEinstellungenForm(instance=globale_einst)
             user_form = BenutzerProfilForm(instance=request.user)
-        elif form_art == "global" and ist_inhaber:
+        elif form_art == "global":
+            if not ist_inhaber:
+                raise PermissionDenied("Nur Inhaber und Büro dürfen globale Buchungsregeln ändern.")
             alter_horizont = globale_einst.horizont_wochen
             globale_form = GlobaleEinstellungenForm(request.POST, instance=globale_einst)
             if globale_form.is_valid():
@@ -1038,7 +1040,9 @@ def einstellungen(request):
             smtp_form = SmtpEinstellungenForm(instance=globale_einst)
             user_form = BenutzerProfilForm(instance=request.user)
             password_form = PasswordChangeForm(user=request.user)
-        elif form_art == "smtp" and ist_inhaber:
+        elif form_art == "smtp":
+            if not ist_inhaber:
+                raise PermissionDenied("Nur Inhaber und Büro dürfen SMTP-Einstellungen ändern.")
             smtp_form = SmtpEinstellungenForm(request.POST, instance=globale_einst)
             if smtp_form.is_valid():
                 globale_einst = smtp_form.save()
@@ -1283,7 +1287,7 @@ def fahrlehrer_neu(request):
     return render(request, "staff/fahrlehrer_formular.html", {"form": form})
 
 
-@mitarbeiter
+@inhaber
 def fsm_einstellungen(request):
     """Verwaltung der Verknüpfungen zwischen lokalen Fahrlehrern und dem Fahrschulmanager (FSM)."""
     if not getattr(settings, "FSM_SYNC_ENABLED", False):

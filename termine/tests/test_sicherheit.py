@@ -180,3 +180,54 @@ class AnmeldungLeitetNichtNachDraussen(Basis):
         )
         self.assertEqual(antwort.status_code, 302)
         self.assertNotIn("boese.example.org", antwort["Location"])
+
+
+class VoidAuthGruppenSynchronisationTest(TestCase):
+    def test_buero_gruppe_setzt_is_staff(self):
+        from unittest.mock import MagicMock
+        from termine.social_adapter import VoidAuthSocialAccountAdapter
+
+        user = get_user_model().objects.create_user("buero_user", email="buero@example.org")
+        user.is_staff = False
+        user.save()
+
+        sociallogin = MagicMock()
+        sociallogin.account.extra_data = {
+            "groups": ["buero"],
+            "email": "buero@example.org",
+        }
+
+        adapter = VoidAuthSocialAccountAdapter()
+        adapter._sync_user_profile_and_groups(user, sociallogin)
+
+        user.refresh_from_db()
+        self.assertTrue(user.is_staff)
+
+    def test_fahrlehrer_gruppe_verknuepft_profil_ohne_staff_rechte(self):
+        from unittest.mock import MagicMock
+        from termine.social_adapter import VoidAuthSocialAccountAdapter
+
+        lehrer = Fahrlehrer.objects.create(name="Max Mustermann", email="max@example.org")
+        user = get_user_model().objects.create_user("max_user", first_name="Max", last_name="Mustermann", email="max@example.org")
+        user.is_staff = True
+        user.save()
+
+        sociallogin = MagicMock()
+        sociallogin.account.extra_data = {
+            "groups": ["fahrlehrer"],
+            "name": "Max Mustermann",
+            "email": "max@example.org",
+        }
+
+        adapter = VoidAuthSocialAccountAdapter()
+        adapter._sync_user_profile_and_groups(user, sociallogin)
+
+        user.refresh_from_db()
+        lehrer.refresh_from_db()
+
+        # is_staff sollte auf False gesetzt werden
+        self.assertFalse(user.is_staff)
+        # Fahrlehrer sollte mit Benutzer verknüpft sein
+        self.assertEqual(lehrer.benutzer, user)
+        self.assertEqual(user.fahrlehrer, lehrer)
+

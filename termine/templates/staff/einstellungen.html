@@ -29,16 +29,20 @@
       <button type="button" class="tab-schalter" data-tab="tab-fahrlehrer">
         🚗 Fahrlehrer-Zeiten
       </button>
-      <button type="button" class="tab-schalter" data-tab="tab-buchung">
-        🌐 Globale Buchungsregeln
-      </button>
+      {% if ist_inhaber %}
+        <button type="button" class="tab-schalter" data-tab="tab-buchung">
+          🌐 Globale Buchungsregeln
+        </button>
+      {% endif %}
       <button type="button" class="tab-schalter" data-tab="tab-urlaube">
         🏖️ Urlaube &amp; Sperrzeiten
         {% if sperrzeiten %}<span class="tab-badge">{{ sperrzeiten.count }}</span>{% endif %}
       </button>
-      <button type="button" class="tab-schalter" data-tab="tab-system">
-        ⚙️ Schnittstellen &amp; System
-      </button>
+      {% if ist_inhaber %}
+        <button type="button" class="tab-schalter" data-tab="tab-system">
+          ⚙️ Schnittstellen &amp; System
+        </button>
+      {% endif %}
     </div>
 
     {# --- TAB 1: Mein Benutzerkonto --- #}
@@ -143,7 +147,7 @@
 
     {# --- TAB 2: Fahrlehrer & Kalender --- #}
     <div id="tab-fahrlehrer" class="tab-inhalt" style="display:none">
-      {% if alle_fahrlehrer.count > 1 %}
+      {% if ist_inhaber and alle_fahrlehrer.count > 1 %}
         <div class="karte" style="margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; background:var(--flaeche-dunkel)">
           <div style="display:flex; align-items:center; gap:0.6rem">
             <span style="font-size:1.1rem">🚗</span>
@@ -220,16 +224,16 @@
       </div>
     </div>
 
-    {# --- TAB 2: Globale Buchungsregeln --- #}
-    <div id="tab-buchung" class="tab-inhalt" style="display:none">
-      <div class="raster-zwei">
-        <div class="karte">
-          <h2>🌐 Buchungsfenster (Fahrschulweit)</h2>
-          <p class="leer" style="margin-bottom:1rem; line-height:1.55">
-            Gilt zentral für alle Fahrlehrer: Mindest-Vorlauf und Planungshorizont bestimmen das Buchungsfenster für Kunden auf der Webseite.
-          </p>
+    {% if ist_inhaber %}
+      {# --- TAB 2: Globale Buchungsregeln --- #}
+      <div id="tab-buchung" class="tab-inhalt" style="display:none">
+        <div class="raster-zwei">
+          <div class="karte">
+            <h2>🌐 Buchungsfenster (Fahrschulweit)</h2>
+            <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+              Gilt zentral für alle Fahrlehrer: Mindest-Vorlauf und Planungshorizont bestimmen das Buchungsfenster für Kunden auf der Webseite.
+            </p>
 
-          {% if ist_inhaber %}
             <form class="js-auto-save-form" id="form-global" method="post" action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-buchung" novalidate>
               {% csrf_token %}
               <input type="hidden" name="form_art" value="global">
@@ -240,85 +244,70 @@
                 <button class="knopf" type="submit">Buchungsfenster speichern</button>
               </div>
             </form>
-          {% else %}
-            <dl style="font-size:0.95rem; line-height:1.6">
-              <dt><strong>Standard-Bundesland:</strong> {{ globale_einstellungen.get_bundesland_display }}</dt>
-              <dd style="margin:0 0 0.8rem; color:var(--text-leise)">
-                Bestimmt die gesetzlichen Feiertage der Fahrschule.
-              </dd>
-              <dt><strong>Mindest-Vorlauf:</strong> {{ globale_einstellungen.vorlauf_stunden }} Stunden</dt>
-              <dd style="margin:0 0 0.8rem; color:var(--text-leise)">
-                So kurzfristig wird online kein Termin mehr angeboten.
-              </dd>
-              <dt><strong>Planungshorizont:</strong> {{ globale_einstellungen.horizont_wochen }} Wochen</dt>
-              <dd style="margin:0; color:var(--text-leise)">
-                Kunden können Termine bis einschließlich <strong>{{ buchbar_bis|date:"SHORT_DATE_FORMAT" }}</strong> buchen.
-              </dd>
-            </dl>
-          {% endif %}
-        </div>
-
-        <div class="karte">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem">
-            <h2 style="margin:0">📋 Terminarten</h2>
-            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:terminarten' %}">
-              Verwalten &rarr;
-            </a>
-          </div>
-          <p class="leer" style="margin-bottom:1rem; line-height:1.55">
-            Definieren Sie, welche Beratungstermine und Längen für Interessenten zur Auswahl stehen.
-          </p>
-
-          <div class="tabelle-huelle">
-            <table class="liste">
-              <thead><tr><th>Terminart</th><th>Dauer</th><th>Status</th></tr></thead>
-              <tbody>
-                {% for art in terminarten %}
-                  <tr>
-                    <td><strong>{{ art.name }}</strong></td>
-                    <td>{{ art.dauer_minuten }} Min.</td>
-                    <td>
-                      {% if art.aktiv %}
-                        <span class="status status--gebucht" style="font-size:0.75rem">Aktiv</span>
-                      {% else %}
-                        <span class="status status--entfallen" style="font-size:0.75rem">Inaktiv</span>
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% empty %}
-                  <tr><td colspan="3" class="leer">Noch keine Terminart angelegt.</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
           </div>
 
-          <p class="knopfreihe" style="margin-top:1rem">
-            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:terminart_neu' %}">
-              + Neue Terminart anlegen
-            </a>
-          </p>
-        </div>
+          <div class="karte">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem">
+              <h2 style="margin:0">📋 Terminarten</h2>
+              <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:terminarten' %}">
+                Verwalten &rarr;
+              </a>
+            </div>
+            <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+              Definieren Sie, welche Beratungstermine und Längen für Interessenten zur Auswahl stehen.
+            </p>
 
-        <div class="karte" style="margin-top:1rem">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem">
-            <h2 style="margin:0">🚗 Führerscheinklassen (FEK)</h2>
-            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:klassen' %}">
-              Klassen verwalten &rarr;
+            <div class="tabelle-huelle">
+              <table class="liste">
+                <thead><tr><th>Terminart</th><th>Dauer</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for art in terminarten %}
+                    <tr>
+                      <td><strong>{{ art.name }}</strong></td>
+                      <td>{{ art.dauer_minuten }} Min.</td>
+                      <td>
+                        {% if art.aktiv %}
+                          <span class="status status--gebucht" style="font-size:0.75rem">Aktiv</span>
+                        {% else %}
+                          <span class="status status--entfallen" style="font-size:0.75rem">Inaktiv</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% empty %}
+                    <tr><td colspan="3" class="leer">Noch keine Terminart angelegt.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <p class="knopfreihe" style="margin-top:1rem">
+              <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:terminart_neu' %}">
+                + Neue Terminart anlegen
+              </a>
+            </p>
+          </div>
+
+          <div class="karte" style="margin-top:1rem">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem">
+              <h2 style="margin:0">🚗 Führerscheinklassen (FEK)</h2>
+              <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:klassen' %}">
+                Klassen verwalten &rarr;
+              </a>
+            </div>
+            <p class="leer" style="line-height:1.55; margin-bottom:1rem">
+              Verwalten Sie die verfügbaren Fahrerlaubnisklassen, fügen Sie neue hinzu oder passen Sie Bezeichnungen an.
+            </p>
+            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:klasse_neu' %}">
+              + Neue Klasse anlegen
             </a>
           </div>
-          <p class="leer" style="line-height:1.55; margin-bottom:1rem">
-            Verwalten Sie die verfügbaren Fahrerlaubnisklassen, fügen Sie neue hinzu oder passen Sie Bezeichnungen an.
-          </p>
-          <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:klasse_neu' %}">
-            + Neue Klasse anlegen
-          </a>
         </div>
       </div>
-    </div>
+    {% endif %}
 
     {# --- TAB 3: Urlaube & Sperrzeiten --- #}
     <div id="tab-urlaube" class="tab-inhalt" style="display:none">
-      {% if alle_fahrlehrer.count > 1 %}
+      {% if ist_inhaber and alle_fahrlehrer.count > 1 %}
         <div class="karte" style="margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; background:var(--flaeche-dunkel)">
           <div style="display:flex; align-items:center; gap:0.6rem">
             <span style="font-size:1.1rem">🏖️</span>
@@ -375,7 +364,7 @@
             </div>
           {% endif %}
 
-          {% if alle_fahrlehrer.count > 1 and alle_lehrer_sperren %}
+          {% if ist_inhaber and alle_fahrlehrer.count > 1 and alle_lehrer_sperren %}
             <div style="margin-top:1.5rem; border-top:1px solid var(--linie); padding-top:1rem">
               <h3 style="margin:0 0 0.6rem; font-size:0.95rem">👥 Alle Team-Urlaube im Überblick:</h3>
               <div class="tabelle-huelle">
@@ -425,10 +414,10 @@
       </div>
     </div>
 
-    {# --- TAB 4: Schnittstellen & System --- #}
-    <div id="tab-system" class="tab-inhalt" style="display:none">
-      <div class="raster-zwei">
-        {% if ist_inhaber %}
+    {% if ist_inhaber %}
+      {# --- TAB 4: Schnittstellen & System --- #}
+      <div id="tab-system" class="tab-inhalt" style="display:none">
+        <div class="raster-zwei">
           <div class="karte" style="grid-column: 1 / -1">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem">
               <div>
@@ -515,23 +504,21 @@
               </div>
             </details>
           </div>
-        {% endif %}
 
-        {% if FSM_SYNC_ENABLED %}
-          <div class="karte">
-            <h2>🔌 Fahrschulmanager (FSM)</h2>
-            <p class="leer" style="line-height:1.55; margin-bottom:1rem">
-              Verknüpft die Online-Terminbuchung direkt mit dem Fahrschulmanager. Synchronisiert Fahrlehrer, blockiert Zeiten automatisch und trägt gebuchte Beratungstermine direkt in den Kalender ein.
-            </p>
-            <div class="knopfreihe">
-              <a class="knopf" href="{% url 'termine:fsm_einstellungen' %}">
-                FSM-Verknüpfung &amp; Sync verwalten &rarr;
-              </a>
+          {% if FSM_SYNC_ENABLED %}
+            <div class="karte">
+              <h2>🔌 Fahrschulmanager (FSM)</h2>
+              <p class="leer" style="line-height:1.55; margin-bottom:1rem">
+                Verknüpft die Online-Terminbuchung direkt mit dem Fahrschulmanager. Synchronisiert Fahrlehrer, blockiert Zeiten automatisch und trägt gebuchte Beratungstermine direkt in den Kalender ein.
+              </p>
+              <div class="knopfreihe">
+                <a class="knopf" href="{% url 'termine:fsm_einstellungen' %}">
+                  FSM-Verknüpfung &amp; Sync verwalten &rarr;
+                </a>
+              </div>
             </div>
-          </div>
-        {% endif %}
+          {% endif %}
 
-        {% if ist_inhaber %}
           <div class="karte">
             <h2>👥 Team &amp; Zugangsrechte</h2>
             <p class="leer" style="line-height:1.55; margin-bottom:1rem">
@@ -548,9 +535,9 @@
               {% endif %}
             </div>
           </div>
-        {% endif %}
+        </div>
       </div>
-    </div>
+    {% endif %}
 
     <style>
       @keyframes drehen {
