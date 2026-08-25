@@ -47,7 +47,7 @@ class BackendBasis(TestCase):
 
 class Zugriffsschutz(BackendBasis):
     def test_ohne_login_zur_anmeldung(self):
-        for name in ("termine:dashboard", "termine:tagesplanung", "termine:buchungen"):
+        for name in ("termine:dashboard", "termine:tagesplanung", "termine:buchungen", "termine:historie"):
             with self.subTest(seite=name):
                 antwort = self.client.get(reverse(name))
                 self.assertEqual(antwort.status_code, 302)
@@ -629,4 +629,87 @@ class Randfaelle(BackendBasis):
         antwort = self.client.post(reverse("termine:klasse_loeschen", args=[klasse.pk]))
         self.assertEqual(antwort.status_code, 302)
         self.assertFalse(Fuehrerscheinklasse.objects.filter(code="B78").exists())
+
+
+class HistorieTests(BackendBasis):
+    def setUp(self):
+        super().setUp()
+        self.client.login(username="chef", password="geheim123")
+        self.t1 = self.termin_fuer(self.anna, stunde=10)
+        self.t2 = self.termin_fuer(self.tom, stunde=14)
+
+    def test_historie_ansicht_laedt(self):
+        b1 = Buchung.objects.create(
+            termin=self.t1,
+            name="Max Mustermann",
+            email="max@example.org",
+            telefon="0170123456",
+            fuehrerscheinklasse="B",
+            status=Buchung.Status.BESTAETIGT,
+        )
+        b2 = Buchung.objects.create(
+            termin=self.t2,
+            name="Lisa Schmidt",
+            email="lisa@example.org",
+            telefon="0170987654",
+            status=Buchung.Status.STORNIERT,
+            storniert_am=timezone.now(),
+            storniert_von="kunde",
+            nachricht="Terminabsage wegen Krankheit",
+        )
+
+        antwort = self.client.get(reverse("termine:historie"))
+        self.assertEqual(antwort.status_code, 200)
+        self.assertContains(antwort, "Historie &amp; Aktivitäten")
+        self.assertContains(antwort, "Max Mustermann")
+        self.assertContains(antwort, "Lisa Schmidt")
+        self.assertContains(antwort, "Terminabsage wegen Krankheit")
+        self.assertEqual(len(antwort.context["ereignisse"]), 2)
+
+    def test_historie_filter_aktion(self):
+        Buchung.objects.create(
+            termin=self.t1,
+            name="Max Mustermann",
+            email="max@example.org",
+            status=Buchung.Status.BESTAETIGT,
+        )
+        Buchung.objects.create(
+            termin=self.t2,
+            name="Lisa Schmidt",
+            email="lisa@example.org",
+            status=Buchung.Status.STORNIERT,
+            storniert_am=timezone.now(),
+            storniert_von="fahrschule",
+        )
+
+        # Nur Stornos
+        resp_storno = self.client.get(reverse("termine:historie"), {"aktion": "storno"})
+        self.assertEqual(resp_storno.status_code, 200)
+        self.assertEqual(len(resp_storno.context["ereignisse"]), 1)
+        self.assertEqual(resp_storno.context["ereignisse"][0]["kunde_name"], "Lisa Schmidt")
+
+        # Nur Buchungen
+        resp_buchung = self.client.get(reverse("termine:historie"), {"aktion": "buchung"})
+        self.assertEqual(resp_buchung.status_code, 200)
+        self.assertEqual(len(resp_buchung.context["ereignisse"]), 1)
+        self.assertEqual(resp_buchung.context["ereignisse"][0]["kunde_name"], "Max Mustermann")
+
+    def test_historie_filter_suchbegriff(self):
+        Buchung.objects.create(
+            termin=self.t1,
+            name="Erika Musterfrau",
+            email="erika@example.org",
+            status=Buchung.Status.BESTAETIGT,
+        )
+        Buchung.objects.create(
+            termin=self.t2,
+            name="Hans Meier",
+            email="hans@example.org",
+            status=Buchung.Status.BESTAETIGT,
+        )
+
+        resp = self.client.get(reverse("termine:historie"), {"q": "Erika"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.context["ereignisse"]), 1)
+        self.assertEqual(resp.context["ereignisse"][0]["kunde_name"], "Erika Musterfrau")
 

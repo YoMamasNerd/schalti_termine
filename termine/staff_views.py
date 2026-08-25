@@ -879,6 +879,205 @@ def buchung_absagen(request, pk: int):
 
 
 @mitarbeiter
+def historie(request):
+    """Chronologischer Aktivitäts-Feed: Buchungen, Bestätigungen, Stornierungen und verfallene Termine."""
+    erlaubt = _erlaubte_fahrlehrer(request.user, auch_inaktive=True)
+    alle_fahrlehrer = list(erlaubt.order_by("reihenfolge", "name"))
+
+    gewaehlter_slug = request.GET.get("fahrlehrer", "")
+    gewaehlter_fl = erlaubt.filter(slug=gewaehlter_slug).first() if gewaehlter_slug else None
+    ziel_fahrlehrer = [gewaehlter_fl] if gewaehlter_fl else alle_fahrlehrer
+
+    aktion = request.GET.get("aktion", "alle")
+    zeitraum = request.GET.get("zeitraum", "30tage")
+    suchbegriff = request.GET.get("q", "").strip()
+
+    jetzt = timezone.now()
+    heute = timezone.localdate()
+    heute_start = lokal(heute, dt.time.min)
+
+    # Basis-Query für Buchungen
+    basis_buchungen = Buchung.objects.filter(
+        termin__fahrlehrer__in=ziel_fahrlehrer
+    ).select_related("termin", "termin__fahrlehrer", "termin__terminart")
+
+    # KPI-Berechnungen (letzte 7 Tage & Gesamt)
+    woche_start = jetzt - dt.timedelta(days=7)
+    kpi_buchungen_woche = Buchung.objects.filter(
+        termin__fahrlehrer__in=ziel_fahrlehrer,
+        erstellt_am__gte=woche_start,
+    ).count()
+    kpi_stornos_woche = Buchung.objects.filter(
+        termin__fahrlehrer__in=ziel_fahrlehrer,
+        storniert_am__gte=woche_start,
+    ).count()
+    kpi_gesamt_buchungen = Buchung.objects.filter(termin__fahrlehrer__in=ziel_fahrlehrer).count()
+    kpi_gesamt_stornos = Buchung.objects.filter(
+        termin__fahrlehrer__in=ziel_fahrlehrer, status=Buchung.Status.STORNIERT
+    ).count()
+    kpi_stornoquote = (
+        round((kpi_gesamt_stornos / kpi_gesamt_buchungen * 100), 1)
+        if kpi_gesamt_buchungen > 0
+        else 0.0
+    )
+    kpi_offen = Buchung.objects.filter(
+        termin__fahrlehrer__in=ziel_fahrlehrer,
+        status=Buchung.Status.OFFEN,
+        reserviert_bis__gt=jetzt,
+    ).count()
+
+    # Zeitraum-Filtergrenze
+    if zeitraum == "heute":
+        zeit_grenze = heute_start
+    elif zeitraum == "7tage":
+        zeit_grenze = jetzt - dt.timedelta(days=7)
+    elif zeitraum == "30tage":
+        zeit_grenze = jetzt - dt.timedelta(days=30)
+    else:
+        zeit_grenze = None
+
+    ereignisse = []
+
+    # 1. Buchungs-Ereignisse sammeln
+    if aktion in ("alle", "buchung"):
+        qs_b = basis_buchungen.exclude(status=Buchung.Status.STORNIERT)
+        if zeit_grenze:
+            qs_b = qs_b.filter(erstellt_am__gte=zeit_grenze)
+        if suchbegriff:
+            qs_b = qs_b.filter(
+                Q(name__icontains=suchbegriff)
+                | Q(email__icontains=suchbegriff)
+                | Q(telefon__icontains=suchbegriff)
+                | Q(nachricht__icontains=suchbegriff)
+            )
+
+        for b in qs_b.order_by("-erstellt_am")[:150]:
+            ist_bestaetigt = b.status == Buchung.Status.BESTAETIGT
+            ist_offen = b.status == Buchung.Status.OFFEN
+            ereignisse.append(
+                {
+                    "art": "buchung",
+                    "zeitpunkt": b.erstellt_am,
+                    "titel": (
+                        f"Buchung bestätigt: {b.name}"
+                        if ist_bestaetigt
+                        else (f"Buchung angefragt: {b.name}" if ist_offen else f"Buchung: {b.name}")
+                    ),
+                    "badge": "Bestätigt" if ist_bestaetigt else ("Offen" if ist_offen else "Gebucht"),
+                    "badge_class": "status--gebucht" if ist_bestaetigt else "status--reserviert",
+                    "buchung": b,
+                    "termin": b.termin,
+                    "fahrlehrer": b.termin.fahrlehrer,
+                    "terminart": b.termin.terminart.name,
+                    "termin_beginn": b.termin.beginn,
+                    "termin_ende": b.termin.ende,
+                    "kunde_name": b.name,
+                    "kunde_email": b.email,
+                    "kunde_telefon": b.telefon,
+                    "klasse": b.fuehrerscheinklasse,
+                    "nachricht": b.nachricht,
+                    "status": b.status,
+                }
+            )
+
+    # 2. Stornierungs-Ereignisse sammeln
+    if aktion in ("alle", "storno"):
+        qs_s = basis_buchungen.filter(
+            Q(status=Buchung.Status.STORNIERT) | Q(storniert_am__isnull=False)
+        )
+        if zeit_grenze:
+            qs_s = qs_s.filter(storniert_am__gte=zeit_grenze)
+        if suchbegriff:
+            qs_s = qs_s.filter(
+                Q(name__icontains=suchbegriff)
+                | Q(email__icontains=suchbegriff)
+                | Q(telefon__icontains=suchbegriff)
+                | Q(nachricht__icontains=suchbegriff)
+            )
+
+        for b in qs_s.order_by("-storniert_am")[:150]:
+            storno_zeit = b.storniert_am or b.erstellt_am
+            durch = "Online durch Kunde" if b.storniert_von == "kunde" else "Fahrschule / Büro"
+            ereignisse.append(
+                {
+                    "art": "storno",
+                    "zeitpunkt": storno_zeit,
+                    "titel": f"Buchung storniert: {b.name}",
+                    "badge": "Storniert",
+                    "badge_class": "status--storniert",
+                    "storniert_von": durch,
+                    "buchung": b,
+                    "termin": b.termin,
+                    "fahrlehrer": b.termin.fahrlehrer,
+                    "terminart": b.termin.terminart.name,
+                    "termin_beginn": b.termin.beginn,
+                    "termin_ende": b.termin.ende,
+                    "kunde_name": b.name,
+                    "kunde_email": b.email,
+                    "kunde_telefon": b.telefon,
+                    "klasse": b.fuehrerscheinklasse,
+                    "nachricht": b.nachricht,
+                    "status": b.status,
+                }
+            )
+
+    # 3. Verfallene Reservierungen sammeln
+    if aktion in ("alle", "verfallen"):
+        qs_v = basis_buchungen.filter(status=Buchung.Status.VERFALLEN)
+        if zeit_grenze:
+            qs_v = qs_v.filter(erstellt_am__gte=zeit_grenze)
+        if suchbegriff:
+            qs_v = qs_v.filter(
+                Q(name__icontains=suchbegriff)
+                | Q(email__icontains=suchbegriff)
+                | Q(telefon__icontains=suchbegriff)
+            )
+
+        for b in qs_v.order_by("-erstellt_am")[:100]:
+            verfall_zeit = b.reserviert_bis or b.erstellt_am
+            ereignisse.append(
+                {
+                    "art": "verfallen",
+                    "zeitpunkt": verfall_zeit,
+                    "titel": f"Reservierung verfallen: {b.name}",
+                    "badge": "Verfallen",
+                    "badge_class": "status--entfallen",
+                    "buchung": b,
+                    "termin": b.termin,
+                    "fahrlehrer": b.termin.fahrlehrer,
+                    "terminart": b.termin.terminart.name,
+                    "termin_beginn": b.termin.beginn,
+                    "termin_ende": b.termin.ende,
+                    "kunde_name": b.name,
+                    "kunde_email": b.email,
+                    "kunde_telefon": b.telefon,
+                    "klasse": b.fuehrerscheinklasse,
+                    "status": b.status,
+                }
+            )
+
+    # Chronologisch sortieren (neueste zuerst)
+    ereignisse.sort(key=lambda x: x["zeitpunkt"] or jetzt, reverse=True)
+
+    return render(
+        request,
+        "staff/historie.html",
+        {
+            "ereignisse": ereignisse[:200],
+            "alle_fahrlehrer": alle_fahrlehrer,
+            "gewaehlter_slug": gewaehlter_slug,
+            "aktion": aktion,
+            "zeitraum": zeitraum,
+            "q": suchbegriff,
+            "kpi_buchungen_woche": kpi_buchungen_woche,
+            "kpi_stornos_woche": kpi_stornos_woche,
+            "kpi_stornoquote": kpi_stornoquote,
+            "kpi_offen": kpi_offen,
+        },
+    )
+
+
+@mitarbeiter
 def regelliste(request):
     erlaubt = _erlaubte_fahrlehrer(request.user)
     regeln = (
@@ -1246,6 +1445,7 @@ def einstellungen(request):
             "alle_lehrer_sperren": alle_lehrer_sperren,
             "fsm_sperren_count": fsm_sperren_count,
             "terminarten": Terminart.objects.all(),
+            "klassen": Fuehrerscheinklasse.objects.all(),
             "social_account": social_account,
             "user_form": user_form,
             "password_form": password_form,

@@ -1,0 +1,186 @@
+{% extends "staff/base_staff.html" %}
+{% load navigation %}
+
+{% block titel %}Historie & Aktivitäten – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem">
+    <div>
+      <h1 style="margin:0 0 0.25rem">Historie &amp; Aktivitäten</h1>
+      <p class="leer" style="margin:0; font-size:0.92rem">
+        Lückenlose Übersicht aller gebuchten, bestätigten und stornierten Termine.
+      </p>
+    </div>
+  </div>
+
+  <!-- KPI Kennzahlen -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; margin-bottom:1.5rem">
+    <div class="karte" style="margin:0; padding:0.9rem 1.1rem; display:flex; align-items:center; gap:0.9rem">
+      <div style="width:40px; height:40px; border-radius:8px; background:var(--gruen-hell); color:var(--gruen-dunkel); display:flex; align-items:center; justify-content:center; font-size:1.2rem; font-weight:700">
+        ✓
+      </div>
+      <div>
+        <div style="font-size:1.4rem; font-weight:700; line-height:1.1">{{ kpi_buchungen_woche }}</div>
+        <div class="leer" style="font-size:0.85rem">Buchungen (letzte 7 Tage)</div>
+      </div>
+    </div>
+
+    <div class="karte" style="margin:0; padding:0.9rem 1.1rem; display:flex; align-items:center; gap:0.9rem">
+      <div style="width:40px; height:40px; border-radius:8px; background:var(--rot-hell); color:var(--rot); display:flex; align-items:center; justify-content:center; font-size:1.2rem; font-weight:700">
+        ✕
+      </div>
+      <div>
+        <div style="font-size:1.4rem; font-weight:700; line-height:1.1; color:var(--rot)">{{ kpi_stornos_woche }}</div>
+        <div class="leer" style="font-size:0.85rem">Stornos (letzte 7 Tage)</div>
+      </div>
+    </div>
+
+    <div class="karte" style="margin:0; padding:0.9rem 1.1rem; display:flex; align-items:center; gap:0.9rem">
+      <div style="width:40px; height:40px; border-radius:8px; background:var(--marke-hell); color:var(--marke-dunkel); display:flex; align-items:center; justify-content:center; font-size:1.2rem; font-weight:700">
+        %
+      </div>
+      <div>
+        <div style="font-size:1.4rem; font-weight:700; line-height:1.1">{{ kpi_stornoquote }} %</div>
+        <div class="leer" style="font-size:0.85rem">Stornoquote (Gesamt)</div>
+      </div>
+    </div>
+
+    {% if kpi_offen %}
+      <div class="karte" style="margin:0; padding:0.9rem 1.1rem; display:flex; align-items:center; gap:0.9rem; border-color:var(--gelb)">
+        <div style="width:40px; height:40px; border-radius:8px; background:var(--gelb-hell); color:var(--gelb); display:flex; align-items:center; justify-content:center; font-size:1.2rem; font-weight:700">
+          ⏳
+        </div>
+        <div>
+          <div style="font-size:1.4rem; font-weight:700; line-height:1.1; color:var(--gelb)">{{ kpi_offen }}</div>
+          <div class="leer" style="font-size:0.85rem">Wartet auf Bestätigung</div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Filter & Suchleiste -->
+  <div class="karte" style="padding:1rem 1.25rem; margin-bottom:1.5rem">
+    <form method="get" style="display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-end">
+      
+      {# Fahrlehrer Filter #}
+      <div style="flex:1 1 180px">
+        <label for="id_fahrlehrer" style="display:block; font-size:0.82rem; font-weight:600; text-transform:uppercase; letter-spacing:0.03em; color:var(--text-leise); margin-bottom:0.35rem">
+          Fahrlehrer
+        </label>
+        <select name="fahrlehrer" id="id_fahrlehrer" style="width:100%; padding:0.45rem 0.6rem">
+          <option value="">Alle Fahrlehrer</option>
+          {% for fl in alle_fahrlehrer %}
+            <option value="{{ fl.slug }}" {% if gewaehlter_slug == fl.slug %}selected{% endif %}>
+              {{ fl.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {# Aktion Filter #}
+      <div style="flex:1 1 160px">
+        <label for="id_aktion" style="display:block; font-size:0.82rem; font-weight:600; text-transform:uppercase; letter-spacing:0.03em; color:var(--text-leise); margin-bottom:0.35rem">
+          Ereignis-Typ
+        </label>
+        <select name="aktion" id="id_aktion" style="width:100%; padding:0.45rem 0.6rem">
+          <option value="alle" {% if aktion == "alle" %}selected{% endif %}>Alle Ereignisse</option>
+          <option value="buchung" {% if aktion == "buchung" %}selected{% endif %}>🟢 Nur Buchungen</option>
+          <option value="storno" {% if aktion == "storno" %}selected{% endif %}>🔴 Nur Stornierungen</option>
+          <option value="verfallen" {% if aktion == "verfallen" %}selected{% endif %}>⏳ Nur Verfallene</option>
+        </select>
+      </div>
+
+      {# Zeitraum Filter #}
+      <div style="flex:1 1 140px">
+        <label for="id_zeitraum" style="display:block; font-size:0.82rem; font-weight:600; text-transform:uppercase; letter-spacing:0.03em; color:var(--text-leise); margin-bottom:0.35rem">
+          Zeitraum
+        </label>
+        <select name="zeitraum" id="id_zeitraum" style="width:100%; padding:0.45rem 0.6rem">
+          <option value="heute" {% if zeitraum == "heute" %}selected{% endif %}>Heute</option>
+          <option value="7tage" {% if zeitraum == "7tage" %}selected{% endif %}>Letzte 7 Tage</option>
+          <option value="30tage" {% if zeitraum == "30tage" %}selected{% endif %}>Letzte 30 Tage</option>
+          <option value="alle" {% if zeitraum == "alle" %}selected{% endif %}>Gesamter Verlauf</option>
+        </select>
+      </div>
+
+      {# Suchfeld #}
+      <div style="flex:2 1 220px">
+        <label for="id_q" style="display:block; font-size:0.82rem; font-weight:600; text-transform:uppercase; letter-spacing:0.03em; color:var(--text-leise); margin-bottom:0.35rem">
+          Suche nach Name, E-Mail, Tel.
+        </label>
+        <input type="text" name="q" id="id_q" value="{{ q }}" placeholder="z. B. Max Mustermann" style="width:100%; padding:0.45rem 0.6rem">
+      </div>
+
+      <div>
+        <button type="submit" class="knopf">Filtern</button>
+        {% if gewaehlter_slug or aktion != "alle" or zeitraum != "30tage" or q %}
+          <a href="{% url 'termine:historie' %}" class="knopf knopf--leise" title="Filter zurücksetzen">Zurücksetzen</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Ereignis-Feed -->
+  <div class="ereignis-liste" style="display:flex; flex-direction:column; gap:0.75rem">
+    {% for e in ereignisse %}
+      <div class="karte" style="margin:0; padding:1rem 1.25rem; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; border-left:4px solid {% if e.art == 'storno' %}var(--rot){% elif e.status == 'bestaetigt' %}var(--gruen){% elif e.status == 'offen' %}var(--gelb){% else %}var(--linie){% endif %}">
+        
+        <div style="flex:1 1 300px">
+          <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.4rem; flex-wrap:wrap">
+            <span class="marke-status {% if e.art == 'storno' %}status-gebucht{% elif e.status == 'bestaetigt' %}status-frei{% elif e.status == 'offen' %}status-reserviert{% else %}status-frei{% endif %}" style="font-size:0.72rem">
+              {{ e.badge }}
+            </span>
+            <strong style="font-size:1.05rem">{{ e.kunde_name }}</strong>
+            {% if e.klasse %}
+              <span style="font-size:0.78rem; font-weight:700; background:var(--linie); padding:1px 6px; border-radius:4px">
+                Klasse {{ e.klasse }}
+              </span>
+            {% endif %}
+            {% if e.storniert_von %}
+              <span class="leer" style="font-size:0.78rem">
+                ({{ e.storniert_von }})
+              </span>
+            {% endif %}
+          </div>
+
+          <div style="font-size:0.9rem; line-height:1.5; color:var(--text)">
+            <span><strong>Termin:</strong> {{ e.terminart }} bei {{ e.fahrlehrer.name }}</span>
+            <span class="leer" style="margin:0 0.4rem">•</span>
+            <span>📅 {{ e.termin_beginn|date:"l, j. F Y" }}, {{ e.termin_beginn|date:"H:i" }}–{{ e.termin_ende|date:"H:i" }} Uhr</span>
+          </div>
+
+          {% if e.kunde_email or e.kunde_telefon %}
+            <div style="font-size:0.85rem; color:var(--text-leise); margin-top:0.25rem">
+              {% if e.kunde_email %}✉️ <a href="mailto:{{ e.kunde_email }}" style="color:inherit">{{ e.kunde_email }}</a>{% endif %}
+              {% if e.kunde_telefon %}<span style="margin:0 0.35rem">•</span>📞 {{ e.kunde_telefon }}{% endif %}
+            </div>
+          {% endif %}
+
+          {% if e.nachricht %}
+            <div style="margin-top:0.5rem; padding:0.4rem 0.6rem; background:color-mix(in srgb, var(--linie) 35%, transparent); border-radius:4px; font-size:0.85rem; font-style:italic">
+              💬 „{{ e.nachricht }}“
+            </div>
+          {% endif %}
+        </div>
+
+        <div style="text-align:right; flex:0 0 auto; display:flex; flex-direction:column; align-items:flex-end; gap:0.5rem">
+          <div style="font-size:0.8rem; color:var(--text-leise); white-space:nowrap">
+            🕒 {{ e.zeitpunkt|date:"d.m.Y H:i" }} Uhr
+          </div>
+          {% if e.buchung %}
+            <a href="{% url 'termine:buchung_detail' e.buchung.pk %}" class="knopf knopf--leise knopf--klein">
+              Details &amp; Aktionen ➔
+            </a>
+          {% endif %}
+        </div>
+
+      </div>
+    {% empty %}
+      <div class="karte" style="text-align:center; padding:2.5rem 1rem">
+        <p class="leer" style="font-size:1.05rem; margin-bottom:0.5rem">Keine Aktivitäten im gewählten Zeitraum gefunden.</p>
+        <p class="leer" style="font-size:0.88rem">Passen Sie die Filter oder den Zeitraum an.</p>
+      </div>
+    {% endfor %}
+  </div>
+
+{% endblock %}

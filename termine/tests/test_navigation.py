@@ -42,6 +42,8 @@ class AktiverPunkt(TestCase):
             ("termine:tagesplanung", "Tagesplanung"),
             ("termine:regeln", "Rhythmus-Regeln"),
             ("termine:buchungen", "Buchungen"),
+            ("termine:historie", "Historie"),
+            ("termine:einstellungen", "Einstellungen"),
         ):
             with self.subTest(seite=name):
                 antwort = self.client.get(reverse(name))
@@ -103,12 +105,14 @@ class StammdatenSichtbarkeit(TestCase):
         self.staff_user = get_user_model().objects.create_user("mitarbeiter", password="geheim123", is_staff=True)
         Fahrlehrer.objects.create(name="Mitarbeiter", benutzer=self.staff_user)
 
-    def test_stammdaten_fuer_superuser_sichtbar(self):
+    def test_stammdaten_in_einstellungen_fuer_inhaber_sichtbar(self):
         self.client.force_login(self.superuser)
-        antwort = self.client.get(reverse("termine:dashboard"))
-        self.assertContains(antwort, "Stammdaten")
+        antwort = self.client.get(reverse("termine:einstellungen"))
+        self.assertContains(antwort, "Stammdaten &amp; Kataloge")
+        self.assertContains(antwort, "Django-Admin")
 
-    def test_stammdaten_fuer_normalen_staff_unsichtbar(self):
+    def test_django_admin_fuer_normalen_staff_nicht_in_stammdaten(self):
         self.client.force_login(self.staff_user)
-        antwort = self.client.get(reverse("termine:dashboard"))
-        self.assertNotContains(antwort, "Stammdaten")
+        antwort = self.client.get(reverse("termine:einstellungen"))
+        self.assertContains(antwort, "Stammdaten &amp; Kataloge")
+        self.assertNotContains(antwort, "Django-Admin (Erweitert)")

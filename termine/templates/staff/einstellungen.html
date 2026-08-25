@@ -39,6 +39,9 @@
         {% if sperrzeiten %}<span class="tab-badge">{{ sperrzeiten.count }}</span>{% endif %}
       </button>
       {% if ist_inhaber %}
+        <button type="button" class="tab-schalter" data-tab="tab-stammdaten">
+          🗂️ Stammdaten &amp; Kataloge
+        </button>
         <button type="button" class="tab-schalter" data-tab="tab-system">
           ⚙️ Schnittstellen &amp; System
         </button>
@@ -415,7 +418,116 @@
     </div>
 
     {% if ist_inhaber %}
-      {# --- TAB 4: Schnittstellen & System --- #}
+      {# --- TAB 5: Stammdaten & Kataloge --- #}
+      <div id="tab-stammdaten" class="tab-inhalt" style="display:none">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:1.25rem">
+          
+          {# 1. Fahrlehrer #}
+          <div class="karte" style="margin:0; display:flex; flex-direction:column; justify-content:space-between">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem">
+                <h2 style="margin:0; font-size:1.15rem">🚗 Fahrlehrer ({{ alle_fahrlehrer.count }})</h2>
+                <a class="knopf knopf--klein" href="{% url 'termine:fahrlehrer_neu' %}">+ Neuer Fahrlehrer</a>
+              </div>
+              <p class="leer" style="font-size:0.88rem; margin-bottom:1rem">
+                Verwalten Sie das Team, Arbeitszeiten, Vorlaufzeiten und SSO-Zuordnungen.
+              </p>
+              <ul style="list-style:none; padding:0; margin:0; font-size:0.9rem">
+                {% for fl in alle_fahrlehrer %}
+                  <li style="display:flex; justify-content:space-between; align-items:center; padding:0.45rem 0; border-bottom:1px solid var(--linie)">
+                    <div>
+                      <strong>{{ fl.name }}</strong>
+                      <small class="leer" style="display:block; font-size:0.78rem">
+                        {{ fl.bundesland }} • Vorlauf {{ fl.vorlauf_stunden }}h • {% if fl.aktiv %}<span style="color:var(--gruen)">Aktiv</span>{% else %}<span style="color:var(--text-leise)">Inaktiv</span>{% endif %}
+                      </small>
+                    </div>
+                    <a href="{% url 'termine:einstellungen' %}?fahrlehrer={{ fl.slug }}#tab-fahrlehrer" class="knopf knopf--leise knopf--klein">Zeiten &amp; Regeln</a>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+
+          {# 2. Terminarten #}
+          <div class="karte" style="margin:0; display:flex; flex-direction:column; justify-content:space-between">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem">
+                <h2 style="margin:0; font-size:1.15rem">📋 Terminarten ({{ terminarten.count }})</h2>
+                <a class="knopf knopf--klein" href="{% url 'termine:terminart_neu' %}">+ Neue Terminart</a>
+              </div>
+              <p class="leer" style="font-size:0.88rem; margin-bottom:1rem">
+                Dauer und Bezeichnungen der buchbaren Termine (z. B. Erstberatung).
+              </p>
+              <ul style="list-style:none; padding:0; margin:0; font-size:0.9rem">
+                {% for ta in terminarten %}
+                  <li style="display:flex; justify-content:space-between; align-items:center; padding:0.45rem 0; border-bottom:1px solid var(--linie)">
+                    <div>
+                      <strong>{{ ta.name }}</strong>
+                      <small class="leer" style="display:block; font-size:0.78rem">
+                        {{ ta.dauer_minuten }} Min • {% if ta.aktiv %}<span style="color:var(--gruen)">Aktiv</span>{% else %}<span style="color:var(--text-leise)">Inaktiv</span>{% endif %}
+                      </small>
+                    </div>
+                    <a href="{% url 'termine:terminart_bearbeiten' ta.pk %}" class="knopf knopf--leise knopf--klein">Bearbeiten</a>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+            <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--linie)">
+              <a href="{% url 'termine:terminarten' %}" class="knopf knopf--leise" style="width:100%; text-align:center">Alle Terminarten verwalten</a>
+            </div>
+          </div>
+
+          {# 3. Führerscheinklassen #}
+          <div class="karte" style="margin:0; display:flex; flex-direction:column; justify-content:space-between">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem">
+                <h2 style="margin:0; font-size:1.15rem">🪪 Führerscheinklassen</h2>
+                <a class="knopf knopf--klein" href="{% url 'termine:klasse_neu' %}">+ Neue Klasse</a>
+              </div>
+              <p class="leer" style="font-size:0.88rem; margin-bottom:1rem">
+                Klassen, die Kunden bei der Online-Buchung auswählen können (A, B, B197, ...).
+              </p>
+              <ul style="list-style:none; padding:0; margin:0; font-size:0.9rem">
+                {% for kl in klassen %}
+                  <li style="display:flex; justify-content:space-between; align-items:center; padding:0.45rem 0; border-bottom:1px solid var(--linie)">
+                    <div>
+                      <strong>{{ kl.kuerzel }}</strong> – <span class="leer">{{ kl.titel }}</span>
+                    </div>
+                    <a href="{% url 'termine:klasse_bearbeiten' kl.pk %}" class="knopf knopf--leise knopf--klein">Bearbeiten</a>
+                  </li>
+                {% empty %}
+                  <li class="leer" style="padding:0.5rem 0">Keine Klassen angelegt (Standard: Freitext).</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--linie)">
+              <a href="{% url 'termine:klassen' %}" class="knopf knopf--leise" style="width:100%; text-align:center">Alle Klassen verwalten</a>
+            </div>
+          </div>
+
+          {# 4. Django Admin Stammdaten #}
+          {% if user.is_superuser %}
+            <div class="karte" style="margin:0; display:flex; flex-direction:column; justify-content:space-between; border-color:var(--linie)">
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem">
+                  <h2 style="margin:0; font-size:1.15rem">🛠️ Django-Admin (Erweitert)</h2>
+                </div>
+                <p class="leer" style="font-size:0.88rem; margin-bottom:1rem">
+                  Direkter Zugriff auf die Datenbank-Stammdaten, Benutzerkonten, Berechtigungen und Logs für Superuser.
+                </p>
+              </div>
+              <div style="margin-top:1rem">
+                <a href="/django-admin/" class="knopf knopf--leise" style="width:100%; text-align:center" target="_blank" rel="noopener">
+                  Django-Admin öffnen ↗
+                </a>
+              </div>
+            </div>
+          {% endif %}
+
+        </div>
+      </div>
+
+      {# --- TAB 6: Schnittstellen & System --- #}
       <div id="tab-system" class="tab-inhalt" style="display:none">
         <div class="raster-zwei">
           <div class="karte" style="grid-column: 1 / -1">

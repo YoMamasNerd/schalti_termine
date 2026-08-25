@@ -37,6 +37,7 @@ urlpatterns = [
     path("intern/planung/generieren/", staff_views.generieren, name="generieren"),
     path("intern/termin/<int:pk>/loeschen/", staff_views.termin_loeschen, name="termin_loeschen"),
     path("intern/buchungen/", staff_views.buchungsliste, name="buchungen"),
+    path("intern/historie/", staff_views.historie, name="historie"),
     path("intern/buchungen/<int:pk>/", staff_views.buchung_detail, name="buchung_detail"),
     path(
         "intern/buchungen/<int:pk>/verschieben/",
