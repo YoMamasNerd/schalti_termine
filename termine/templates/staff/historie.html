@@ -183,4 +183,28 @@
     {% endfor %}
   </div>
 
+  {# Pagination / Seiten-Navigation #}
+  {% if paginator.num_pages > 1 %}
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-top:1.5rem; padding:0.75rem 1rem; background:var(--flaeche); border:1px solid var(--linie); border-radius:var(--radius-klein)">
+      <div class="leer" style="font-size:0.88rem">
+        Eintrag <strong>{{ page_obj.start_index }}–{{ page_obj.end_index }}</strong> von <strong>{{ gesamt_anzahl }}</strong> (Seite {{ page_obj.number }} von {{ paginator.num_pages }})
+      </div>
+      <div style="display:flex; gap:0.4rem; align-items:center">
+        {% if page_obj.has_previous %}
+          <a href="?seite=1{% if filter_query %}&{{ filter_query }}{% endif %}" class="knopf knopf--leise knopf--klein" title="Erste Seite">« Erste</a>
+          <a href="?seite={{ page_obj.previous_page_number }}{% if filter_query %}&{{ filter_query }}{% endif %}" class="knopf knopf--leise knopf--klein">‹ Zurück</a>
+        {% endif %}
+
+        <span style="font-size:0.88rem; font-weight:600; padding:0 0.5rem">
+          Seite {{ page_obj.number }} / {{ paginator.num_pages }}
+        </span>
+
+        {% if page_obj.has_next %}
+          <a href="?seite={{ page_obj.next_page_number }}{% if filter_query %}&{{ filter_query }}{% endif %}" class="knopf knopf--leise knopf--klein">Weiter ›</a>
+          <a href="?seite={{ paginator.num_pages }}{% if filter_query %}&{{ filter_query }}{% endif %}" class="knopf knopf--leise knopf--klein" title="Letzte Seite">Letzte »</a>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
 {% endblock %}

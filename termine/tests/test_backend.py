@@ -713,3 +713,27 @@ class HistorieTests(BackendBasis):
         self.assertEqual(len(resp.context["ereignisse"]), 1)
         self.assertEqual(resp.context["ereignisse"][0]["kunde_name"], "Erika Musterfrau")
 
+    def test_historie_paginierung(self):
+        # 25 Buchungen erstellen
+        for i in range(25):
+            t = self.termin_fuer(self.anna, stunde=10, tage_voraus=10 + i)
+            Buchung.objects.create(
+                termin=t,
+                name=f"Schüler {i:02d}",
+                email=f"schueler{i}@example.org",
+                status=Buchung.Status.BESTAETIGT,
+            )
+
+        # Seite 1 (20 Einträge)
+        resp1 = self.client.get(reverse("termine:historie"), {"seite": 1})
+        self.assertEqual(resp1.status_code, 200)
+        self.assertEqual(len(resp1.context["ereignisse"]), 20)
+        self.assertTrue(resp1.context["page_obj"].has_next())
+        self.assertEqual(resp1.context["paginator"].num_pages, 2)
+
+        # Seite 2 (5 Einträge)
+        resp2 = self.client.get(reverse("termine:historie"), {"seite": 2})
+        self.assertEqual(resp2.status_code, 200)
+        self.assertEqual(len(resp2.context["ereignisse"]), 5)
+        self.assertTrue(resp2.context["page_obj"].has_previous())
+

@@ -23,6 +23,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count, Q
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -1059,11 +1060,31 @@ def historie(request):
     # Chronologisch sortieren (neueste zuerst)
     ereignisse.sort(key=lambda x: x["zeitpunkt"] or jetzt, reverse=True)
 
+    # Paginierung (20 Einträge pro Seite)
+    paginator = Paginator(ereignisse, 20)
+    seiten_nr = request.GET.get("seite", 1)
+    try:
+        seite = paginator.page(seiten_nr)
+    except PageNotAnInteger:
+        seite = paginator.page(1)
+    except EmptyPage:
+        seite = paginator.page(paginator.num_pages)
+
+    # Filter-Parameter ohne 'seite' für saubere Pagination-Links
+    query_dict = request.GET.copy()
+    if "seite" in query_dict:
+        del query_dict["seite"]
+    filter_query = query_dict.urlencode()
+
     return render(
         request,
         "staff/historie.html",
         {
-            "ereignisse": ereignisse[:200],
+            "ereignisse": seite.object_list,
+            "page_obj": seite,
+            "paginator": paginator,
+            "filter_query": filter_query,
+            "gesamt_anzahl": len(ereignisse),
             "alle_fahrlehrer": alle_fahrlehrer,
             "gewaehlter_slug": gewaehlter_slug,
             "aktion": aktion,
