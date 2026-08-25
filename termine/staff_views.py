@@ -372,7 +372,12 @@ def dashboard(request):
 
 def _ist_fahrstunde_sperre(s: Sperrzeit) -> bool:
     """Prüft, ob eine Sperrzeit eine FSM-Fahrstunde darstellt, die in Blöcken gebündelt werden soll."""
-    if s.herkunft != Sperrzeit.Herkunft.FSM:
+    ist_fsm = (
+        s.herkunft == Sperrzeit.Herkunft.FSM
+        or bool(s.fsm_id)
+        or (s.grund or "").strip().startswith("FSM:")
+    )
+    if not ist_fsm:
         return False
     dauer_sec = (s.ende - s.beginn).total_seconds()
     if dauer_sec >= 82800:
