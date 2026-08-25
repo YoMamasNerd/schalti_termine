@@ -124,6 +124,30 @@ def _gewaehlter_fahrlehrer(request, *, auch_inaktive: bool = False):
         gewaehlt = erlaubt.filter(slug=slug).first()
         if gewaehlt:
             return gewaehlt, erlaubt
+
+    # Standardmäßig den dem Benutzer zugeordneten Fahrlehrer wählen:
+    if hasattr(request.user, "fahrlehrer") and request.user.fahrlehrer:
+        if request.user.fahrlehrer in erlaubt:
+            return request.user.fahrlehrer, erlaubt
+
+    # Fallback: Suche nach E-Mail des Benutzers
+    if request.user.email:
+        user_fl = erlaubt.filter(email__iexact=request.user.email).first()
+        if user_fl:
+            return user_fl, erlaubt
+
+    # Fallback: Suche nach Name des Benutzers
+    u_first = (request.user.first_name or "").strip()
+    u_last = (request.user.last_name or "").strip()
+    if u_first and u_last:
+        name_fl = erlaubt.filter(name__icontains=u_first).filter(name__icontains=u_last).first()
+        if name_fl:
+            return name_fl, erlaubt
+    elif u_first:
+        name_fl = erlaubt.filter(name__icontains=u_first).first()
+        if name_fl:
+            return name_fl, erlaubt
+
     return erlaubt.first(), erlaubt
 
 
@@ -346,6 +370,24 @@ def dashboard(request):
     )
 
 
+def _ist_fahrstunde_sperre(s: Sperrzeit) -> bool:
+    """Prüft, ob eine Sperrzeit eine FSM-Fahrstunde darstellt, die in Blöcken gebündelt werden soll."""
+    if s.herkunft != Sperrzeit.Herkunft.FSM:
+        return False
+    dauer_sec = (s.ende - s.beginn).total_seconds()
+    if dauer_sec >= 82800:
+        return False
+    grund_low = (s.grund or "").strip().lower()
+    if (
+        "privat" in grund_low
+        or "urlaub" in grund_low
+        or "krank" in grund_low
+        or "theorieunterricht (raum belegt)" in grund_low
+    ):
+        return False
+    return True
+
+
 @mitarbeiter
 def tagesplanung(request):
     """Wochenansicht mit der Möglichkeit, jeden Tag einzeln zu planen."""
@@ -414,7 +456,93 @@ def tagesplanung(request):
                 }
             )
 
-        for s in tages_sperren:
+        # FSM-Fahrstunden zu kompakten Blöcken zusammenfassen
+        fahrstunden_sperren = [s for s in tages_sperren if _ist_fahrstunde_sperre(s)]
+        sonstige_sperren = [s for s in tages_sperren if not _ist_fahrstunde_sperre(s)]
+
+        fahrstunden_sperren.sort(key=lambda s: s.beginn)
+
+        # Zusammenhängende Fahrstunden-Blöcke bilden (Pausen <= 20 Min verschmelzen)
+        MAX_PAUSE_MINUTEN = 20
+        bloecke = []
+        aktueller_block = None
+
+        for s in fahrstunden_sperren:
+            s_beginn = timezone.localtime(s.beginn)
+            s_ende = timezone.localtime(s.ende)
+            grund_text = (s.grund or "").strip()
+            sauberer_grund = grund_text[4:].strip() if grund_text.startswith("FSM:") else grund_text
+
+            if aktueller_block is None:
+                aktueller_block = {
+                    "beginn": s_beginn,
+                    "ende": s_ende,
+                    "items": [{
+                        "sperre": s,
+                        "beginn": s_beginn,
+                        "ende": s_ende,
+                        "text": sauberer_grund or "Fahrstunde",
+                    }],
+                }
+            else:
+                pause_min = (s_beginn - aktueller_block["ende"]).total_seconds() / 60.0
+                if s_beginn <= aktueller_block["ende"] or (0 <= pause_min <= MAX_PAUSE_MINUTEN):
+                    if s_ende > aktueller_block["ende"]:
+                        aktueller_block["ende"] = s_ende
+                    aktueller_block["items"].append({
+                        "sperre": s,
+                        "beginn": s_beginn,
+                        "ende": s_ende,
+                        "text": sauberer_grund or "Fahrstunde",
+                    })
+                else:
+                    bloecke.append(aktueller_block)
+                    aktueller_block = {
+                        "beginn": s_beginn,
+                        "ende": s_ende,
+                        "items": [{
+                            "sperre": s,
+                            "beginn": s_beginn,
+                            "ende": s_ende,
+                            "text": sauberer_grund or "Fahrstunde",
+                        }],
+                    }
+
+        if aktueller_block:
+            bloecke.append(aktueller_block)
+
+        for b in bloecke:
+            anzahl = len(b["items"])
+            b_beginn_str = b["beginn"].strftime("%H:%M")
+            b_ende_str = b["ende"].strftime("%H:%M")
+
+            details_lines = [
+                f"{it['beginn'].strftime('%H:%M')}–{it['ende'].strftime('%H:%M')}: {it['text']}"
+                for it in b["items"]
+            ]
+            tooltip = "\n".join(details_lines)
+
+            if anzahl == 1:
+                titel = b["items"][0]["text"]
+                badge_label = "FSM"
+            else:
+                titel = f"{anzahl} Fahrstunden"
+                badge_label = f"FSM • {anzahl}x"
+
+            eintraege.append({
+                "art": "fahrstundenblock",
+                "zeit": b["beginn"],
+                "beginn_uhrzeit": b_beginn_str,
+                "ende_uhrzeit": b_ende_str,
+                "anzahl": anzahl,
+                "titel": titel,
+                "badge_label": badge_label,
+                "details_tooltip": tooltip,
+                "ist_fsm": True,
+                "ist_block": anzahl > 1,
+            })
+
+        for s in sonstige_sperren:
             s_beginn = timezone.localtime(s.beginn)
             s_ende = timezone.localtime(s.ende)
             ist_ganztaegig = (s.ende - s.beginn).total_seconds() >= 82800 or (
@@ -446,6 +574,8 @@ def tagesplanung(request):
                 "termine": tages_termine,
                 "eintraege": eintraege,
                 "sperren_count": len(tages_sperren),
+                "fahrstunden_count": len(fahrstunden_sperren),
+                "bloecke_count": len(bloecke),
                 "frei": sum(1 for t in tages_termine if t.status == Termin.Status.FREI),
                 "gebucht": sum(
                     1

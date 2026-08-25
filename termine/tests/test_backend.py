@@ -115,6 +115,43 @@ class Tagesplanung(BackendBasis):
         self.assertEqual(antwort.status_code, 200)
         self.assertContains(antwort, "Anna Berger")
 
+    def test_tagesplanung_vorauswahl_angemeldeter_fahrlehrer(self):
+        # Tom mit dem angemeldeten Chef-User verknüpfen (ohne ?fahrlehrer= muss Tom vorausgewählt werden)
+        self.tom.benutzer = self.chef
+        self.tom.save()
+
+        antwort = self.client.get(reverse("termine:tagesplanung"))
+        self.assertEqual(antwort.status_code, 200)
+        self.assertEqual(antwort.context["fahrlehrer"].pk, self.tom.pk)
+
+    def test_tagesplanung_fahrstunden_block_zusammenfassung(self):
+        tag = self.montag + dt.timedelta(days=1)
+        start1 = timezone.make_aware(dt.datetime.combine(tag, dt.time(8, 0)))
+        ende1 = timezone.make_aware(dt.datetime.combine(tag, dt.time(8, 45)))
+        start2 = timezone.make_aware(dt.datetime.combine(tag, dt.time(8, 45)))
+        ende2 = timezone.make_aware(dt.datetime.combine(tag, dt.time(9, 30)))
+        start3 = timezone.make_aware(dt.datetime.combine(tag, dt.time(9, 45)))
+        ende3 = timezone.make_aware(dt.datetime.combine(tag, dt.time(10, 30)))
+
+        Sperrzeit.objects.create(fahrlehrer=self.anna, beginn=start1, ende=ende1, grund="FSM: S -B Max", herkunft=Sperrzeit.Herkunft.FSM, fsm_id="fsm-1")
+        Sperrzeit.objects.create(fahrlehrer=self.anna, beginn=start2, ende=ende2, grund="FSM: PF -B Max", herkunft=Sperrzeit.Herkunft.FSM, fsm_id="fsm-2")
+        Sperrzeit.objects.create(fahrlehrer=self.anna, beginn=start3, ende=ende3, grund="FSM: S -B Lisa", herkunft=Sperrzeit.Herkunft.FSM, fsm_id="fsm-3")
+
+        antwort = self.client.get(reverse("termine:tagesplanung"), {"fahrlehrer": self.anna.slug, "woche": self.montag.isoformat()})
+        self.assertEqual(antwort.status_code, 200)
+
+        # Den Tag im Kontext suchen
+        tage = antwort.context["tage"]
+        dienstag_tag = next(t for t in tage if t["datum"] == tag)
+        block_eintraege = [e for e in dienstag_tag["eintraege"] if e["art"] == "fahrstundenblock"]
+
+        self.assertEqual(len(block_eintraege), 1)
+        block = block_eintraege[0]
+        self.assertEqual(block["beginn_uhrzeit"], "08:00")
+        self.assertEqual(block["ende_uhrzeit"], "10:30")
+        self.assertEqual(block["anzahl"], 3)
+        self.assertIn("3 Fahrstunden", block["titel"])
+
     def test_einzelnen_tag_beplanen(self):
         tag = self.montag + dt.timedelta(days=2)
 

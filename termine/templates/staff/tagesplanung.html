@@ -69,6 +69,15 @@
                   </form>
                 {% endif %}
               </div>
+            {% elif eintrag.art == "fahrstundenblock" %}
+              <div class="plan-slot plan-slot--sperre plan-slot--sperre-fsm plan-slot--fahrstundenblock"
+                   title="{{ eintrag.details_tooltip }}">
+                <span>
+                  <span class="badge-fsm">{{ eintrag.badge_label }}</span>
+                  <strong style="font-size:0.75rem; letter-spacing:-0.01em;">{{ eintrag.beginn_uhrzeit }}–{{ eintrag.ende_uhrzeit }}</strong>
+                  <span class="name">{{ eintrag.titel|truncatechars:28 }}</span>
+                </span>
+              </div>
             {% else %}
               <div class="plan-slot plan-slot--sperre {% if eintrag.ist_fsm %}plan-slot--sperre-fsm{% else %}plan-slot--sperre-urlaub{% endif %}"
                    title="{{ eintrag.titel }}">
