@@ -2,5 +2,50 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:best-practices"],
   "schedule": ["every weekend"],
-  "timezone": "Europe/Berlin"
+  "timezone": "Europe/Berlin",
+  "labels": ["dependencies"],
+  "assignees": ["YoMamasNerd"],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "schedule": ["at any time"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["uv"],
+      "groupName": "Python dependencies",
+      "addLabels": ["python"]
+    },
+    {
+      "matchManagers": ["custom.regex"],
+      "groupName": "CDN dependencies",
+      "addLabels": ["cdn"]
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^templates/.*\\.html$/", "/^.*/templates/.*\\.html$/"],
+      "matchStrings": ["bootstrap@(?<currentValue>[\\d.]+)/dist/css", "bootstrap@(?<currentValue>[\\d.]+)/dist/js"],
+      "depNameTemplate": "bootstrap",
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^templates/.*\\.html$/", "/^.*/templates/.*\\.html$/"],
+      "matchStrings": ["bootstrap-icons@(?<currentValue>[\\d.]+)"],
+      "depNameTemplate": "bootstrap-icons",
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^templates/.*\\.html$/", "/^.*/templates/.*\\.html$/"],
+      "matchStrings": ["htmx\\.org@(?<currentValue>[\\d.]+)"],
+      "depNameTemplate": "htmx.org",
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "npm"
+    }
+  ]
 }
