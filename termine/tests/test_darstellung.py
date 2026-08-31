@@ -14,6 +14,7 @@ Nachmittag – die beiden Fälle, in denen sich eine falsche Formatangabe
 from __future__ import annotations
 
 import datetime as dt
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -45,31 +46,39 @@ class DeutscheSchreibweise(TestCase):
     def erwartet(self, tag: dt.date) -> str:
         return f"{tag.day:02d}.{tag.month:02d}.{tag.year}"
 
-    def termin_am_nachmittag(self) -> Termin:
-        beginn = timezone.make_aware(dt.datetime.combine(self.tag, dt.time(14, 30)))
-        return Termin.objects.create(
-            fahrlehrer=self.anna,
-            terminart=self.art,
-            beginn=beginn,
-            ende=beginn + dt.timedelta(minutes=30),
+    def gebuchte_liste(self):
+        """Reserviert + bestätigt den Nachmittagstermin und liefert die Liste.
+
+        „Jetzt" steht dabei fest auf 08:00 Uhr des Vortags – sonst würde der
+        globale 24-Stunden-Vorlauf den Termin (morgen 14:30) ab ca. 14:30 Uhr
+        echter Tageszeit als zu kurzfristig ablehnen und beide Tests nur je
+        nach Tageszeit durchlaufen.
+        """
+        fest = timezone.make_aware(
+            dt.datetime.combine(self.tag - dt.timedelta(days=1), dt.time(8, 0))
         )
+        with patch("termine.services.buchung.timezone.now", return_value=fest), \
+             patch("termine.models.fahrlehrer.timezone.now", return_value=fest):
+            beginn = timezone.make_aware(dt.datetime.combine(self.tag, dt.time(14, 30)))
+            termin = Termin.objects.create(
+                fahrlehrer=self.anna,
+                terminart=self.art,
+                beginn=beginn,
+                ende=beginn + dt.timedelta(minutes=30),
+            )
+            buchung = buchungs_service.reservieren(
+                termin.pk, name="Lena Hoffmann", email="lena@example.org"
+            )
+            buchungs_service.bestaetigen(buchung)
 
     def test_buchungsliste_schreibt_den_tag_mit_fuehrender_null(self):
-        termin = self.termin_am_nachmittag()
-        buchung = buchungs_service.reservieren(
-            termin.pk, name="Lena Hoffmann", email="lena@example.org"
-        )
-        buchungs_service.bestaetigen(buchung)
+        self.gebuchte_liste()
 
         antwort = self.client.get(reverse("termine:buchungen"))
         self.assertContains(antwort, self.erwartet(self.tag))
 
     def test_buchungsliste_nutzt_die_vierundzwanzig_stunden_uhr(self):
-        termin = self.termin_am_nachmittag()
-        buchung = buchungs_service.reservieren(
-            termin.pk, name="Lena Hoffmann", email="lena@example.org"
-        )
-        buchungs_service.bestaetigen(buchung)
+        self.gebuchte_liste()
 
         antwort = self.client.get(reverse("termine:buchungen"))
         self.assertContains(antwort, "14:30")
