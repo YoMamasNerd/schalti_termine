@@ -290,26 +290,18 @@ def dashboard(request):
             })
         gitter.append(zeile)
 
-    # Termine am gewählten Tag
-    tages_termine_qs = (
-        Termin.objects.filter(
-            fahrlehrer__in=ziel_pks,
-            beginn__gte=lokal(gewaehlter_tag, dt.time.min),
-            beginn__lte=lokal(gewaehlter_tag, dt.time.max),
-            status__in=[Termin.Status.FREI, Termin.Status.RESERVIERT, Termin.Status.GEBUCHT],
-        )
-        .select_related("fahrlehrer", "terminart")
-        .prefetch_related("buchungen")
-        .order_by("beginn", "fahrlehrer__name")
-    )
-
+    # Termine am gewählten Tag – aus dem bereits geladenen Monatsbestand,
+    # statt dieselben Zeilen noch einmal aus der DB zu holen.
     tages_termine = []
-    for termin in tages_termine_qs:
+    for termin in termine_im_monat:
+        if timezone.localtime(termin.beginn).date() != gewaehlter_tag:
+            continue
         aktive_buchung = termin.buchungen.exclude(status=Buchung.Status.STORNIERT).first()
         tages_termine.append({
             "termin": termin,
             "buchung": aktive_buchung,
         })
+    tages_termine.sort(key=lambda e: (e["termin"].beginn, e["termin"].fahrlehrer.name))
 
     # Nächste bestätigte Buchungen
     naechste = (
@@ -329,17 +321,15 @@ def dashboard(request):
         beginn__gte=jetzt,
     ).count()
 
-    kpi_gebucht = Buchung.objects.filter(
+    kpi_stats = Buchung.objects.filter(
         termin__fahrlehrer__in=ziel_pks,
-        status=Buchung.Status.BESTAETIGT,
         termin__beginn__gte=jetzt,
-    ).count()
-
-    kpi_offen = Buchung.objects.filter(
-        termin__fahrlehrer__in=ziel_pks,
-        status=Buchung.Status.OFFEN,
-        termin__beginn__gte=jetzt,
-    ).count()
+    ).aggregate(
+        kpi_gebucht=Count("pk", filter=Q(status=Buchung.Status.BESTAETIGT)),
+        kpi_offen=Count("pk", filter=Q(status=Buchung.Status.OFFEN)),
+    )
+    kpi_gebucht = kpi_stats["kpi_gebucht"]
+    kpi_offen = kpi_stats["kpi_offen"]
 
     kollisionen = finde_kollisionen_rhythmus_regeln(ziel_fahrlehrer)
 

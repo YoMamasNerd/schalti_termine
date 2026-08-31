@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from functools import lru_cache
 
 from django.conf import settings
 from django.db import models
@@ -10,6 +11,12 @@ from django.utils import timezone
 from .common import neuer_token
 from .einstellungen import Fuehrerscheinklasse
 from .termin import Termin
+
+
+@lru_cache(maxsize=1)
+def _fuehrerscheinklasse_map() -> dict[str, str]:
+    """Alle aktiven Führerscheinklassen als Code→Anzeige-Map (einmal pro Request)."""
+    return {k.code: str(k) for k in Fuehrerscheinklasse.objects.all()}
 
 
 class Buchung(models.Model):
@@ -109,10 +116,9 @@ class Buchung(models.Model):
     def fuehrerscheinklasse_anzeige(self) -> str:
         if not self.fuehrerscheinklasse:
             return ""
-        klasse = Fuehrerscheinklasse.objects.filter(code=self.fuehrerscheinklasse).first()
-        if klasse:
-            return str(klasse)
-        return self.fuehrerscheinklasse
+        return _fuehrerscheinklasse_map().get(
+            self.fuehrerscheinklasse, self.fuehrerscheinklasse
+        )
 
     def get_fuehrerscheinklasse_display(self) -> str:
         return self.fuehrerscheinklasse_anzeige

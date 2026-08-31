@@ -40,39 +40,6 @@ def _datum_aus_get(request, name: str) -> dt.date | None:
         return None
 
 
-def _monat_aus_get(
-    request,
-    fahrlehrer: Fahrlehrer | None = None,
-    terminart: Terminart | None = None,
-) -> tuple[int, int]:
-    """Liest den anzuzeigenden Monat aus der URL.
-
-    Wurde kein Monat explizit übergeben, springt der Kalender automatisch
-    auf den ersten Monat, der einen freien Termin für die gewählte Auswahl hat.
-    Gibt es aktuell keine freien Termine, wird der aktuelle Monat gewählt.
-    """
-    roh = request.GET.get("monat")
-    if roh:
-        try:
-            jahr, monat = roh.split("-")
-            return int(jahr), int(monat)
-        except (ValueError, TypeError):
-            pass
-
-    tag_param = _datum_aus_get(request, "tag")
-    if tag_param:
-        return tag_param.year, tag_param.month
-
-    # Finde den ersten freien buchbaren Termin
-    erster_freier = freie_termine(fahrlehrer=fahrlehrer, terminart=terminart).first()
-    if erster_freier:
-        datum = timezone.localtime(erster_freier.beginn).date()
-        return datum.year, datum.month
-
-    heute = timezone.localdate()
-    return heute.year, heute.month
-
-
 def _auswahl(request, slug: str | None = None):
     """Fahrlehrer- und Terminart-Auswahl aus URL bzw. Query-Parametern."""
     fahrlehrer = None
@@ -108,18 +75,36 @@ def _basis_kontext(request, slug: str | None = None) -> dict:
     if fahrlehrer_implizit:
         fahrlehrer = alle_fahrlehrer[0]
 
-    jahr, monat = _monat_aus_get(request, fahrlehrer=fahrlehrer, terminart=terminart)
-    try:
-        gitter_von, gitter_bis = _monatsgrenzen(jahr, monat)
-    except (calendar.IllegalMonthError, ValueError):
-        heute = timezone.localdate()
-        jahr, monat = heute.year, heute.month
-        gitter_von, gitter_bis = _monatsgrenzen(jahr, monat)
+    tag_param = _datum_aus_get(request, "tag")
+    monat_roh = request.GET.get("monat")
 
-    termine = freie_termine(
-        fahrlehrer=fahrlehrer, terminart=terminart, von=gitter_von, bis=gitter_bis
-    )
-    nach_tag = termine_nach_tag(termine)
+    jahr, monat = None, None
+    if monat_roh:
+        try:
+            jahr, monat = map(int, monat_roh.split("-"))
+            _monatsgrenzen(jahr, monat)
+        except (ValueError, calendar.IllegalMonthError):
+            jahr, monat = None, None
+    elif tag_param:
+        jahr, monat = tag_param.year, tag_param.month
+
+    if jahr is None:
+        # Kein gültiger Monat in der URL: Der Kalender öffnet im Monat des
+        # ersten freien Termins und die Terminliste kommt aus derselben
+        # Abfrage – statt den Horizont zweimal abzufragen.
+        nach_tag = termine_nach_tag(freie_termine(fahrlehrer=fahrlehrer, terminart=terminart))
+        erster = min(nach_tag) if nach_tag else timezone.localdate()
+        jahr, monat = erster.year, erster.month
+        gitter_von, gitter_bis = _monatsgrenzen(jahr, monat)
+        nach_tag = {
+            tag: liste for tag, liste in nach_tag.items() if gitter_von <= tag <= gitter_bis
+        }
+    else:
+        gitter_von, gitter_bis = _monatsgrenzen(jahr, monat)
+        termine = freie_termine(
+            fahrlehrer=fahrlehrer, terminart=terminart, von=gitter_von, bis=gitter_bis
+        )
+        nach_tag = termine_nach_tag(termine)
 
     gewaehlter_tag = _datum_aus_get(request, "tag")
     if gewaehlter_tag is None or gewaehlter_tag not in nach_tag:
