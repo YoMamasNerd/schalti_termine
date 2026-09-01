@@ -446,6 +446,12 @@ def termine_manuell_anlegen(
         .filter(fahrlehrer=fahrlehrer, beginn__lt=fenster_ende, ende__gt=fenster_beginn)
         .values_list("beginn", "ende")
     )
+    # Auch von Hand dürfen keine Slots in Sperrzeiten entstehen.
+    sperren = list(
+        Sperrzeit.objects.filter(
+            fahrlehrer=fahrlehrer, beginn__lt=fenster_ende, ende__gt=fenster_beginn
+        ).values_list("beginn", "ende")
+    )
 
     neue: list[Termin] = []
     uebersprungen = 0
@@ -457,7 +463,7 @@ def termine_manuell_anlegen(
         vergangen += 1
     while cursor + dauer <= fenster_ende:
         beginn, ende = cursor, cursor + dauer
-        if any(_ueberschneidet(beginn, ende, b, e) for b, e in belegt):
+        if any(_ueberschneidet(beginn, ende, b, e) for b, e in belegt + sperren):
             uebersprungen += 1
         else:
             neue.append(

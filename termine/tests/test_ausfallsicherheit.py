@@ -30,7 +30,7 @@ class AusfallBasis(TestCase):
 
         self.art = Terminart.objects.create(name="Beratung", dauer_minuten=30)
         self.fahrlehrer = Fahrlehrer.objects.create(
-            name="Anna Berger", email="anna@example.org", bundesland="BW"
+            name="Anna Berger", email="anna@example.org", bundesland="BW", vorlauf_stunden=0
         )
         self.termin = self.neuer_termin()
 
