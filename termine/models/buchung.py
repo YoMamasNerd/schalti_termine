@@ -87,9 +87,15 @@ class Buchung(models.Model):
         return f"{self.name} – {self.termin}"
 
     def save(self, *args, **kwargs):
-        if self.email and not self.email_hash and self.email != "Gelöscht":
+        # Bei der Anonymisierung wird die E-Mail per bulk-update überschrieben,
+        # ohne save() zu rufen – der Hash bleibt bewusst erhalten, damit das
+        # Historien-Matching weiterhin funktioniert. Deshalb rührt save() den
+        # Hash auch nicht an, wenn der Datensatz als gelöscht markiert ist.
+        if self.email and self.name != "Gelöscht" and self.email != "Gelöscht":
             import hashlib
-            self.email_hash = hashlib.sha256(self.email.lower().strip().encode("utf-8")).hexdigest()
+            neuer_hash = hashlib.sha256(self.email.lower().strip().encode("utf-8")).hexdigest()
+            if neuer_hash != self.email_hash:
+                self.email_hash = neuer_hash
         super().save(*args, **kwargs)
 
     @property

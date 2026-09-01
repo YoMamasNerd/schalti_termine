@@ -197,6 +197,23 @@ def verschieben(
 
     if neuer_termin.status != Termin.Status.FREI:
         raise TerminNichtVerfuegbar("Der gewählte Ziel-Termin ist nicht mehr frei.")
+    # Buchungen dürfen nicht quer durch Fahrlehrer wandern: Der Kunde hat bei
+    # einem bestimmten Anbieter gebucht, und der Ziel-Termin gehört womöglich
+    # zu einem anderen Kalender, anderen Benachrichtigungen, anderem FSM.
+    if neuer_termin.fahrlehrer_id != alter_termin.fahrlehrer_id:
+        raise TerminNichtVerfuegbar(
+            "Der gewählte Ziel-Termin gehört zu einem anderen Fahrlehrer."
+        )
+    if neuer_termin.beginn < neuer_termin.fahrlehrer.fruehester_start():
+        raise TerminNichtVerfuegbar(
+            "Der gewählte Ziel-Termin liegt zu kurzfristig und ist nicht mehr buchbar."
+        )
+    if neuer_termin.beginn > neuer_termin.fahrlehrer.spaetester_start():
+        raise TerminNichtVerfuegbar(
+            "Der gewählte Ziel-Termin liegt weiter in der Zukunft, als zurzeit gebucht werden kann."
+        )
+    if neuer_termin.ist_gesperrt():
+        raise TerminNichtVerfuegbar("Der gewählte Ziel-Termin steht nicht zur Verfügung.")
 
     # Alter Termin wird wieder frei, falls er noch in der Zukunft liegt
     if alter_termin.beginn > timezone.now():
@@ -253,8 +270,12 @@ def abgelaufene_reservierungen_freigeben() -> int:
             aktuell.status = Buchung.Status.VERFALLEN
             aktuell.reserviert_bis = None
             aktuell.save(update_fields=["status", "reserviert_bis"])
+            # Nur zukünftige Termine dürfen wieder ins Angebot: Ein vergangener
+            # Termin als FREI wäre ein buchbarer Slot in der Vergangenheit.
             Termin.objects.filter(
-                pk=aktuell.termin_id, status=Termin.Status.RESERVIERT
+                pk=aktuell.termin_id,
+                status=Termin.Status.RESERVIERT,
+                beginn__gt=jetzt,
             ).update(status=Termin.Status.FREI)
             anzahl += 1
 

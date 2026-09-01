@@ -27,6 +27,7 @@ class BuchungsBasis(TestCase):
             name="Anna Berger",
             email="anna@example.org",
             bundesland="BW",
+            vorlauf_stunden=0,
         )
         self.termin = self.neuer_termin()
 

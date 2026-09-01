@@ -117,7 +117,10 @@ class Fahrlehrer(models.Model):
     def fruehester_start(self, jetzt: dt.datetime | None = None) -> dt.datetime:
         """Ab wann ein Termin frühestens buchbar ist (Mindest-Vorlauf)."""
         jetzt = jetzt or timezone.now()
-        vorlauf = FahrschulEinstellungen.get_solo().vorlauf_stunden
+        # Der Fahrlehrer kann nur einen längeren Vorlauf fordern als global
+        # eingestellt ist – nie einen kürzeren, damit das fahrschulweite
+        # Minimum gilt, egal wer am eigenen Kalender dreht.
+        vorlauf = max(self.vorlauf_stunden, FahrschulEinstellungen.get_solo().vorlauf_stunden)
         return jetzt + dt.timedelta(hours=vorlauf)
 
     def spaetester_start(self, heute: dt.date | None = None) -> dt.datetime:
