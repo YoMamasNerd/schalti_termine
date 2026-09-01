@@ -18,7 +18,7 @@
 
   <div class="karte">
     <div class="tabelle-huelle">
-      <table class="liste">
+      <table class="liste als-karten">
         <thead>
           <tr>
             <th>Fahrlehrer</th><th>Wochentage</th><th>Zeit</th><th>Rhythmus</th>
@@ -28,14 +28,14 @@
         <tbody>
           {% for regel in regeln %}
             <tr>
-              <td>{{ regel.fahrlehrer.name }}</td>
-              <td>{{ regel.wochentage_kurz }}</td>
-              <td>{{ regel.beginn|time:"H:i" }}–{{ regel.ende|time:"H:i" }}</td>
-              <td>
+              <td data-label="Fahrlehrer">{{ regel.fahrlehrer.name }}</td>
+              <td data-label="Wochentage">{{ regel.wochentage_kurz }}</td>
+              <td data-label="Zeit">{{ regel.beginn|time:"H:i" }}–{{ regel.ende|time:"H:i" }}</td>
+              <td data-label="Rhythmus">
                 {% if regel.intervall_wochen == 1 %}wöchentlich
                 {% else %}alle {{ regel.intervall_wochen }} Wochen{% endif %}
               </td>
-              <td>
+              <td data-label="Art / Zweck">
                 {% if regel.regel_art == "sperre" %}
                   <span class="marke-status" style="background:#fee2e2; color:#991b1b; font-size:0.75rem">Blocker</span>
                   {% if regel.grund %}<br><strong>{{ regel.grund }}</strong>{% endif %}
@@ -45,17 +45,17 @@
                   {% if regel.terminart %}<br><strong>{{ regel.terminart.name }}</strong><br><span class="leer">{{ regel.terminart.dauer_minuten }} Min.</span>{% endif %}
                 {% endif %}
               </td>
-              <td>
+              <td data-label="Gültig">
                 ab {{ regel.gueltig_ab|date:"SHORT_DATE_FORMAT" }}
                 {% if regel.gueltig_bis %}<br>bis {{ regel.gueltig_bis|date:"SHORT_DATE_FORMAT" }}{% endif %}
               </td>
-              <td>{% if regel.feiertage_auslassen %}auslassen{% else %}mitplanen{% endif %}</td>
-              <td>
+              <td data-label="Feiertage">{% if regel.feiertage_auslassen %}auslassen{% else %}mitplanen{% endif %}</td>
+              <td data-label="Status">
                 <span class="marke-status {% if regel.aktiv %}status-frei{% else %}status-gebucht{% endif %}">
                   {% if regel.aktiv %}aktiv{% else %}inaktiv{% endif %}
                 </span>
               </td>
-              <td>
+              <td class="ohne-label" style="text-align:right">
                 <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:regel_bearbeiten' regel.pk %}">Bearbeiten</a>
               </td>
             </tr>

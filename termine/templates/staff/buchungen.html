@@ -15,7 +15,7 @@
 
   <div class="karte">
     <div class="tabelle-huelle">
-      <table class="liste tabelle--kompakt">
+      <table class="liste tabelle--kompakt als-karten">
         <thead>
           <tr>
             <th style="width:26%">Termin</th>
@@ -28,7 +28,7 @@
         <tbody>
           {% for buchung in buchungen %}
             <tr>
-              <td>
+              <td data-label="Termin">
                 <a href="{% url 'termine:buchung_detail' buchung.pk %}" style="font-weight:700">
                   {{ buchung.termin.beginn_lokal|date:"d.m.Y" }} · {{ buchung.termin.beginn_lokal|date:"H:i" }}–{{ buchung.termin.ende_lokal|date:"H:i" }} Uhr
                 </a>
@@ -36,7 +36,7 @@
                   {{ buchung.termin.fahrlehrer.name }}{% if buchung.termin.terminart.name %} · {{ buchung.termin.terminart.name }}{% endif %}
                 </div>
               </td>
-              <td>
+              <td data-label="Kunde">
                 <a href="{% url 'termine:buchung_detail' buchung.pk %}" style="font-weight:700; color:var(--text)">
                   {{ buchung.name }}
                 </a>
@@ -49,7 +49,7 @@
                   {% endif %}
                 </div>
               </td>
-              <td>
+              <td data-label="Klasse / Notiz">
                 {% if buchung.fuehrerscheinklasse %}
                   <span class="abzeichen" title="{{ buchung.get_fuehrerscheinklasse_display }}" style="background:var(--marke-hell); color:var(--marke-dunkel); font-weight:600; padding:1px 6px; border-radius:3px; font-size:0.78rem">
                     Klasse {{ buchung.fuehrerscheinklasse }}
@@ -63,7 +63,7 @@
                   </div>
                 {% endif %}
               </td>
-              <td>
+              <td data-label="Status">
                 <span class="marke-status
                   {% if buchung.status == 'bestaetigt' %}status-frei
                   {% elif buchung.status == 'offen' %}status-reserviert
@@ -71,7 +71,7 @@
                   {{ buchung.get_status_display }}
                 </span>
               </td>
-              <td style="text-align:right; white-space:nowrap">
+              <td class="ohne-label" style="text-align:right; white-space:nowrap">
                 <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:buchung_detail' buchung.pk %}" style="padding:3px 8px; font-size:0.8rem">Details &rarr;</a>
               </td>
             </tr>

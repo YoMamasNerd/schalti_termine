@@ -503,6 +503,44 @@ table.tabelle--kompakt th {
   padding-bottom: 0.4rem;
 }
 
+/* Auf schmalen Screens stapeln sich Tabellenzeilen als Karten statt seitlich
+   zu scrollen. Die Beschriftung kommt aus dem data-label der Zelle. */
+@media (max-width: 760px) {
+  table.als-karten thead { display: none; }
+  table.als-karten, table.als-karten tbody {
+    display: block; width: 100%;
+  }
+  table.als-karten tr {
+    display: block;
+    border: 1px solid var(--linie);
+    border-radius: var(--radius-klein);
+    background: var(--flaeche);
+    padding: 0.55rem 0.7rem;
+    margin-bottom: 0.55rem;
+  }
+  table.als-karten tr > td:last-child { padding-bottom: 0; }
+  table.als-karten td {
+    display: block;
+    padding: 0.25rem 0;
+    border-bottom: none;
+  }
+  table.als-karten td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-leise);
+    margin-bottom: 0.05rem;
+  }
+  table.als-karten td[hidden]::before,
+  table.als-karten td.ohne-label::before { content: none; }
+  /* Leere Zellen (Platzhalter „—") gar nicht erst anzeigen */
+  table.als-karten td:empty { display: none; }
+  /* Kurzinfo-Felder eng zusammenrücken */
+  table.als-karten td br { display: none; }
+}
+
 /* --- Tagesplanung (Wochenraster) --- */
 
 .woche {
