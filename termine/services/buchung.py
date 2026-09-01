@@ -197,21 +197,11 @@ def verschieben(
 
     if neuer_termin.status != Termin.Status.FREI:
         raise TerminNichtVerfuegbar("Der gewählte Ziel-Termin ist nicht mehr frei.")
-    # Buchungen dürfen nicht quer durch Fahrlehrer wandern: Der Kunde hat bei
-    # einem bestimmten Anbieter gebucht, und der Ziel-Termin gehört womöglich
-    # zu einem anderen Kalender, anderen Benachrichtigungen, anderem FSM.
-    if neuer_termin.fahrlehrer_id != alter_termin.fahrlehrer_id:
-        raise TerminNichtVerfuegbar(
-            "Der gewählte Ziel-Termin gehört zu einem anderen Fahrlehrer."
-        )
-    if neuer_termin.beginn < neuer_termin.fahrlehrer.fruehester_start():
-        raise TerminNichtVerfuegbar(
-            "Der gewählte Ziel-Termin liegt zu kurzfristig und ist nicht mehr buchbar."
-        )
-    if neuer_termin.beginn > neuer_termin.fahrlehrer.spaetester_start():
-        raise TerminNichtVerfuegbar(
-            "Der gewählte Ziel-Termin liegt weiter in der Zukunft, als zurzeit gebucht werden kann."
-        )
+    # Beim Verschieben durch die Fahrschule gelten die Grenzen der öffentlichen
+    # Buchungsseite nicht: Der Ziel-Termin darf auch beim Kollegen liegen
+    # (Krankheitsvertretung) und kurzfristiger als der Mindest-Vorlauf sein.
+    # Geprüft bleibt nur die Sperrzeit – niemand soll auf einen blockierten
+    # Slot schieben, etwa auf eine Fahrstunde des Ziel-Fahrlehrers.
     if neuer_termin.ist_gesperrt():
         raise TerminNichtVerfuegbar("Der gewählte Ziel-Termin steht nicht zur Verfügung.")
 

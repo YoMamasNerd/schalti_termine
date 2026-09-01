@@ -13,9 +13,10 @@ from termine.tests.test_buchung import BuchungsBasis
 
 
 class VerschiebenValidierung(BuchungsBasis):
-    """verschieben() muss dasselbe Buchungsfenster prüfen wie reservieren()."""
+    """Verschieben ist intern großzügig: Vorlauf, Horizont und Fahrlehrer-Grenze
+    gelten nicht – nur FREI-Status und Sperrzeiten schützen den Ziel-Slot."""
 
-    def test_verschieben_ablehnung_zu_kurzfristig(self):
+    def test_verschieben_ignoriert_vorlauf(self):
         buchung = self.bestaetigen(self.reservieren())
         zu_kurz = Termin.objects.create(
             fahrlehrer=self.fahrlehrer,
@@ -25,18 +26,19 @@ class VerschiebenValidierung(BuchungsBasis):
             status=Termin.Status.FREI,
         )
 
-        with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
-            buchungs_service.verschieben(buchung, zu_kurz.pk)
+        self.mit_commit(buchungs_service.verschieben, buchung, zu_kurz.pk)
 
         buchung.refresh_from_db()
-        self.assertEqual(buchung.termin_id, self.termin.pk)
+        self.assertEqual(buchung.termin_id, zu_kurz.pk)
 
-    def test_verschieben_ablehnung_jenseits_horizont(self):
+    def test_verschieben_ignoriert_horizont(self):
         buchung = self.bestaetigen(self.reservieren())
         spaeter = self.neuer_termin(tage_voraus=400)
 
-        with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
-            buchungs_service.verschieben(buchung, spaeter.pk)
+        self.mit_commit(buchungs_service.verschieben, buchung, spaeter.pk)
+
+        buchung.refresh_from_db()
+        self.assertEqual(buchung.termin_id, spaeter.pk)
 
     def test_verschieben_ablehnung_gesperrt(self):
         buchung = self.bestaetigen(self.reservieren())
@@ -53,7 +55,7 @@ class VerschiebenValidierung(BuchungsBasis):
         buchung.refresh_from_db()
         self.assertEqual(buchung.termin_id, self.termin.pk)
 
-    def test_verschieben_ablehnung_fremder_fahrlehrer(self):
+    def test_verschieben_auf_fremden_fahrlehrer_als_vertretung(self):
         buchung = self.bestaetigen(self.reservieren())
         tom = Fahrlehrer.objects.create(
             name="Tom Keller", email="tom@example.org", bundesland="BE", vorlauf_stunden=1
@@ -69,11 +71,12 @@ class VerschiebenValidierung(BuchungsBasis):
             status=Termin.Status.FREI,
         )
 
-        with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
-            buchungs_service.verschieben(buchung, fremd.pk)
+        self.mit_commit(buchungs_service.verschieben, buchung, fremd.pk)
 
         buchung.refresh_from_db()
-        self.assertEqual(buchung.termin_id, self.termin.pk)
+        fremd.refresh_from_db()
+        self.assertEqual(buchung.termin_id, fremd.pk)
+        self.assertEqual(fremd.status, Termin.Status.GEBUCHT)
 
     def test_verschieben_auf_gueltigen_termin_funktioniert(self):
         buchung = self.bestaetigen(self.reservieren())
