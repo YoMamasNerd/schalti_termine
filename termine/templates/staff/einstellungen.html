@@ -79,7 +79,7 @@
           </form>
 
           {# Passwort ändern #}
-          <form class="karte" id="form-password-change" method="post" style="margin-top:1.25rem"
+          <form class="karte" id="form-password-change" method="post" autocomplete="off" style="margin-top:1.25rem"
                 action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-mein-profil" novalidate>
             {% csrf_token %}
             <input type="hidden" name="form_art" value="password_change">

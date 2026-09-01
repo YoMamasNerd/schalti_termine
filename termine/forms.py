@@ -385,7 +385,7 @@ class SmtpEinstellungenForm(forms.ModelForm):
             "email_host": forms.TextInput(attrs={"placeholder": "z. B. smtp.strato.de oder mail.meine-fahrschule.de"}),
             "email_port": forms.NumberInput(attrs={"placeholder": "587"}),
             "email_user": forms.TextInput(attrs={"placeholder": "z. B. info@meine-fahrschule.de"}),
-            "email_password": forms.PasswordInput(render_value=True, attrs={"placeholder": "Passwort des E-Mail-Postfachs"}),
+            "email_password": forms.PasswordInput(render_value=True, attrs={"placeholder": "Passwort des E-Mail-Postfachs", "autocomplete": "off"}),
             "email_from": forms.TextInput(attrs={"placeholder": "z. B. Fahrschule Schaltwerk <termine@fahrschule-schaltwerk.de>"}),
         }
         help_texts = {

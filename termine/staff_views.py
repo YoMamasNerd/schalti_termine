@@ -1335,6 +1335,20 @@ def einstellungen(request):
     from django.contrib.auth.forms import PasswordChangeForm
     from django.contrib.auth import update_session_auth_hash
 
+    class _PasswortAendernForm(PasswordChangeForm):
+        """Ohne Browser-Autofill: Sonst füllt der Browser die Passwortfelder
+        auf der Einstellungsseite vor und scrollt auf dem Handy dorthin.
+        Django setzt auf old_password zudem autofocus=True – das explizit
+        entfernen, genau das verursacht das Sprung-Verhalten."""
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.fields["old_password"].widget.attrs["autofocus"] = False
+            self.fields["old_password"].widget.attrs.pop("autofocus", None)
+            self.fields["old_password"].widget.attrs["autocomplete"] = "off"
+            self.fields["new_password1"].widget.attrs["autocomplete"] = "new-password"
+            self.fields["new_password2"].widget.attrs["autocomplete"] = "new-password"
+
     if request.method == "POST":
         form_art = request.POST.get("form_art")
         if form_art == "user_profile":
@@ -1350,9 +1364,9 @@ def einstellungen(request):
             form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
             globale_form = GlobaleEinstellungenForm(instance=globale_einst)
             smtp_form = SmtpEinstellungenForm(instance=globale_einst)
-            password_form = PasswordChangeForm(user=request.user)
+            password_form = _PasswortAendernForm(user=request.user)
         elif form_art == "password_change":
-            password_form = PasswordChangeForm(user=request.user, data=request.POST)
+            password_form = _PasswortAendernForm(user=request.user, data=request.POST)
             if password_form.is_valid():
                 user = password_form.save()
                 update_session_auth_hash(request, user)
@@ -1384,7 +1398,7 @@ def einstellungen(request):
             form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
             smtp_form = SmtpEinstellungenForm(instance=globale_einst)
             user_form = BenutzerProfilForm(instance=request.user)
-            password_form = PasswordChangeForm(user=request.user)
+            password_form = _PasswortAendernForm(user=request.user)
         elif form_art == "smtp":
             if not ist_inhaber:
                 raise PermissionDenied("Nur Inhaber und Büro dürfen SMTP-Einstellungen ändern.")
@@ -1400,12 +1414,12 @@ def einstellungen(request):
             form = FahrlehrerEinstellungenForm(instance=fahrlehrer, inhaber=ist_inhaber)
             globale_form = GlobaleEinstellungenForm(instance=globale_einst)
             user_form = BenutzerProfilForm(instance=request.user)
-            password_form = PasswordChangeForm(user=request.user)
+            password_form = _PasswortAendernForm(user=request.user)
         else:
             globale_form = GlobaleEinstellungenForm(instance=globale_einst)
             smtp_form = SmtpEinstellungenForm(instance=globale_einst)
             user_form = BenutzerProfilForm(instance=request.user)
-            password_form = PasswordChangeForm(user=request.user)
+            password_form = _PasswortAendernForm(user=request.user)
             form = FahrlehrerEinstellungenForm(
                 request.POST, instance=fahrlehrer, inhaber=ist_inhaber
             )
@@ -1422,7 +1436,7 @@ def einstellungen(request):
         globale_form = GlobaleEinstellungenForm(instance=globale_einst)
         smtp_form = SmtpEinstellungenForm(instance=globale_einst)
         user_form = BenutzerProfilForm(instance=request.user)
-        password_form = PasswordChangeForm(user=request.user)
+        password_form = _PasswortAendernForm(user=request.user)
 
     jetzt = timezone.now()
     alle_sperren = list(
