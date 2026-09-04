@@ -123,7 +123,9 @@ class BuchungenPflegen(KommandoBasis):
 
         ausgabe = self.rufe("buchungen_pflegen")
 
-        abgelaufen.refresh_from_db(); faellig.refresh_from_db(); alt.refresh_from_db()
+        abgelaufen.refresh_from_db()
+        faellig.refresh_from_db()
+        alt.refresh_from_db()
         self.assertEqual(abgelaufen.status, Buchung.Status.VERFALLEN)
         self.assertIsNotNone(faellig.erinnerung_am)
         self.assertEqual(alt.email, "")

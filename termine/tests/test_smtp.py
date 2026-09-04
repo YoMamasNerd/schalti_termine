@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import socket
-import ssl
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
-from django.core.mail.backends.smtp import EmailBackend
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.urls import reverse
 
 from termine.forms import SmtpEinstellungenForm
@@ -299,8 +297,7 @@ class SmtpViewsTest(TestCase):
         url = reverse("termine:einstellungen")
 
         # Nicht-Inhaber POST mit form_art=smtp wird ignoriert
-        antwort = self.client.post(
-            url,
+        self.client.post(            url,
             {
                 "form_art": "smtp",
                 "email_host": "hacked.smtp.org",

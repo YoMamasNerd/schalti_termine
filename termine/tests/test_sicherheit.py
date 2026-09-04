@@ -185,6 +185,7 @@ class AnmeldungLeitetNichtNachDraussen(Basis):
 class VoidAuthGruppenSynchronisationTest(TestCase):
     def test_buero_gruppe_setzt_is_staff(self):
         from unittest.mock import MagicMock
+
         from termine.social_adapter import VoidAuthSocialAccountAdapter
 
         user = get_user_model().objects.create_user("buero_user", email="buero@example.org")
@@ -205,6 +206,7 @@ class VoidAuthGruppenSynchronisationTest(TestCase):
 
     def test_fahrlehrer_gruppe_verknuepft_profil_ohne_staff_rechte(self):
         from unittest.mock import MagicMock
+
         from termine.social_adapter import VoidAuthSocialAccountAdapter
 
         lehrer = Fahrlehrer.objects.create(name="Max Mustermann", email="max@example.org")

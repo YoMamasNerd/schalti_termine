@@ -12,7 +12,7 @@ from __future__ import annotations
 import datetime as dt
 
 from django.core import mail as django_mail
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.utils import timezone
 
 from termine.models import Buchung, Fahrlehrer, Termin, Terminart

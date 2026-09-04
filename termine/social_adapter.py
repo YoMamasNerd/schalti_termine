@@ -1,6 +1,7 @@
 """Social account adapter for VoidAuth SSO integration in Schalti Termine."""
 
 import logging
+
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -47,17 +48,7 @@ class VoidAuthSocialAccountAdapter(DefaultSocialAccountAdapter):
                 ["buero", "admin", "office", "leitung"],
             )
         ]
-        lehrer_groups = [
-            str(g).lower().strip()
-            for g in getattr(
-                settings,
-                "VOIDAUTH_FAHRLEHRER_GROUPS",
-                ["fahrlehrer", "instructor", "lehrer"],
-            )
-        ]
-
         hat_buero_gruppe = any(bg in user_groups for bg in buero_groups)
-        hat_lehrer_gruppe = any(lg in user_groups for lg in lehrer_groups)
 
         # Wenn Gruppen im Token vorhanden sind, steuern sie is_staff:
         if user_groups:
