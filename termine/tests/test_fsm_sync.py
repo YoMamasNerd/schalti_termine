@@ -604,6 +604,7 @@ class FsmEinstellungenViewTests(TestCase):
 
     def test_aktualisiere_fsm_schedule(self):
         from django_q.models import Schedule
+
         from termine.services.fsm_sync import aktualisiere_fsm_schedule
 
         # 1. Auf 30 Minuten setzen

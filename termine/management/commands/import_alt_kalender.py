@@ -8,11 +8,10 @@ import re
 import urllib.request
 from zoneinfo import ZoneInfo
 
+import icalendar
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
-
-import icalendar
 
 from termine.models import Buchung, Fahrlehrer, Sperrzeit, Termin, Terminart
 

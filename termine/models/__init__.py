@@ -15,8 +15,8 @@ from __future__ import annotations
 from .buchung import Buchung
 from .common import (
     FUEHRERSCHEINKLASSEN,
-    WOCHENTAGE,
     WOCHENTAG_KURZ,
+    WOCHENTAGE,
     neuer_token,
 )
 from .einstellungen import FahrschulEinstellungen, Fuehrerscheinklasse

@@ -585,8 +585,8 @@ class Randfaelle(BackendBasis):
         self.assertEqual(termin2.status, Termin.Status.GEBUCHT)
 
     def test_fuehrerscheinklassen_crud(self):
-        from termine.models import Fuehrerscheinklasse
         from termine.forms import BuchungsForm
+        from termine.models import Fuehrerscheinklasse
 
         # 1. Listen-Ansicht
         antwort = self.client.get(reverse("termine:klassen"))

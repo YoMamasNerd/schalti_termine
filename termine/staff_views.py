@@ -49,8 +49,8 @@ from .models import (
     FUEHRERSCHEINKLASSEN,
     WOCHENTAG_KURZ,
     Buchung,
-    FahrschulEinstellungen,
     Fahrlehrer,
+    FahrschulEinstellungen,
     Fuehrerscheinklasse,
     RhythmusRegel,
     Sperrzeit,
@@ -1333,8 +1333,8 @@ def einstellungen(request):
     globale_einst = FahrschulEinstellungen.get_solo()
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest" or "application/json" in request.headers.get("Accept", "")
 
-    from django.contrib.auth.forms import PasswordChangeForm
     from django.contrib.auth import update_session_auth_hash
+    from django.contrib.auth.forms import PasswordChangeForm
 
     class _PasswortAendernForm(PasswordChangeForm):
         """Ohne Browser-Autofill: Sonst füllt der Browser die Passwortfelder

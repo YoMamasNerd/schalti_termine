@@ -1,10 +1,10 @@
 """Django-Einstellungen für Schalti Termine."""
 
+import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
-import os
-import sys
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 

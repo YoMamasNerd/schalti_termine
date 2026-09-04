@@ -119,8 +119,9 @@ class FahrlehrerSiehtNurSichSelbst(TestCase):
         self.assertEqual(antwort.context["fahrlehrer"], self.anna)
 
     def test_fremde_sperrzeit_liefert_404(self):
-        from django.utils import timezone
         import datetime as dt
+
+        from django.utils import timezone
 
         jetzt = timezone.now()
         fremd = Sperrzeit.objects.create(

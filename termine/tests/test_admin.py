@@ -152,7 +152,8 @@ class BuchungAbsagenAktion(AdminBasis):
         with self.captureOnCommitCallbacks(execute=True):
             self.aktion("buchung", "absagen", [buchung])
 
-        buchung.refresh_from_db(); termin.refresh_from_db()
+        buchung.refresh_from_db()
+        termin.refresh_from_db()
         self.assertEqual(buchung.status, Buchung.Status.STORNIERT)
         self.assertEqual(buchung.storniert_von, "fahrschule")
         self.assertEqual(termin.status, Termin.Status.FREI)
