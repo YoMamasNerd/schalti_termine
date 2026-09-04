@@ -61,8 +61,9 @@ class Fahrlehrer(models.Model):
         "Planungshorizont (Wochen)",
         default=4,
         validators=[MinValueValidator(1), MaxValueValidator(52)],
-        help_text="Wie viele Wochen im Voraus aus den Rhythmus-Regeln Termine "
-        "erzeugt und zur Buchung angeboten werden.",
+        help_text="Ohne Wirkung: Der Planungshorizont gilt fahrschulweit und "
+        "steht unter „Einstellungen“. Dieses Feld bleibt nur bestehen, damit "
+        "vorhandene Daten erhalten sind.",
     )
     feed_token = models.CharField(
         "Feed-Token",
@@ -124,7 +125,13 @@ class Fahrlehrer(models.Model):
         return jetzt + dt.timedelta(hours=vorlauf)
 
     def spaetester_start(self, heute: dt.date | None = None) -> dt.datetime:
-        """Bis wann ein Termin höchstens buchbar ist (Planungshorizont)."""
+        """Bis wann ein Termin höchstens buchbar ist (Planungshorizont).
+
+        Anders als der Mindest-Vorlauf ist der Horizont **eine** fahrschulweite
+        Zahl – das eigene Feld `horizont_wochen` wird bewusst nicht gelesen.
+        Sonst plante der Generator (der ebenfalls den globalen Wert nimmt) über
+        eine Grenze hinaus, hinter der Kunden nichts mehr buchen können.
+        """
         heute = heute or timezone.localdate()
         wochen = FahrschulEinstellungen.get_solo().horizont_wochen or settings.DEFAULT_HORIZON_WEEKS
         letzter_tag = heute + dt.timedelta(days=wochen * 7 - 1)

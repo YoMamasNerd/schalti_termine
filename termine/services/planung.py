@@ -549,8 +549,13 @@ def finde_kollisionen_rhythmus_regeln(
     kollisionen: list[RhythmusKollision] = []
 
     for fl in fahrlehrer_liste:
+        # Nur Angebots-Regeln: Eine Sperr-Regel *soll* den Kalender blockieren.
+        # Trüge sie versehentlich eine Terminart, meldete sie sich sonst als
+        # Kollision mit genau der Sperrzeit, die sie selbst erzeugt hat.
         regeln = list(
-            RhythmusRegel.objects.filter(fahrlehrer=fl, aktiv=True).select_related("terminart")
+            RhythmusRegel.objects.filter(
+                fahrlehrer=fl, aktiv=True, regel_art=RhythmusRegel.RegelArt.ANGEBOT
+            ).select_related("terminart")
         )
         if not regeln:
             continue

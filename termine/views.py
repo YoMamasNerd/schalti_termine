@@ -201,7 +201,7 @@ def buchen(request, termin_id: int):
         termin.beginn < termin.fahrlehrer.fruehester_start()
         or termin.beginn > termin.fahrlehrer.spaetester_start()
     )
-    if termin.status != Termin.Status.FREI or ausserhalb:
+    if termin.status != Termin.Status.FREI or ausserhalb or not termin.terminart.aktiv:
         return render(
             request,
             "termine/nicht_verfuegbar.html",

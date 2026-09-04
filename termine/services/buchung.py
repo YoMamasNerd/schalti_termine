@@ -61,6 +61,12 @@ def reservieren(
 
     if termin.status != Termin.Status.FREI:
         raise TerminNichtVerfuegbar("Dieser Termin ist inzwischen vergeben.")
+    # `Termin.objects.buchbar()` blendet Termine abgeschalteter Terminarten aus.
+    # Ohne dieselbe Prüfung hier käme man über die Adresse an einen Termin, den
+    # die Übersicht gar nicht mehr anbietet – der Haken „Aktiv“ wäre dann nur
+    # eine Empfehlung an die Anzeige.
+    if not termin.terminart.aktiv:
+        raise TerminNichtVerfuegbar("Diese Terminart wird zurzeit nicht angeboten.")
     if termin.beginn < termin.fahrlehrer.fruehester_start():
         raise TerminNichtVerfuegbar("Dieser Termin liegt zu kurzfristig und ist nicht mehr buchbar.")
     if termin.beginn > termin.fahrlehrer.spaetester_start():
@@ -219,16 +225,20 @@ def verschieben(
     Termin.objects.filter(pk=neuer_termin.pk).update(status=neuer_status)
     neuer_termin.status = neuer_status
 
-    # Bei FSM-Sync: Altes FSM-Event stornieren und auf neuem Termin eintragen
     war_bestaetigt = buchung.status == Buchung.Status.BESTAETIGT
-    if war_bestaetigt:
-        fsm_sync.async_storniere_in_fsm(buchung)
 
     buchung.termin = neuer_termin
     buchung.save(update_fields=["termin"])
 
     if war_bestaetigt:
         def _nach_verschieben():
+            # Erst das alte FSM-Ereignis auflösen, dann das neue eintragen –
+            # und beides erst nach dem Commit. Der Hintergrund-Auftrag liest
+            # den Termin frisch aus der Datenbank; würde er noch während der
+            # offenen Transaktion starten, sähe er den alten Termin als
+            # gebucht und löschte den FSM-Eintrag, statt ihn wieder auf „frei“
+            # zu setzen.
+            fsm_sync.async_storniere_termin_in_fsm(alter_termin)
             if benachrichtigen:
                 mail.buchung_verschoben_kunde(buchung, alter_beginn)
             fsm_sync.async_buche_in_fsm(buchung)
@@ -326,24 +336,33 @@ def daten_loeschen(buchung: Buchung) -> Buchung:
 
     Steht der Termin noch bevor und ist die Buchung aktiv, wird er zuvor
     storniert – sonst bliebe ein Termin belegt, zu dem niemand mehr zuzuordnen
-    wäre. Die Absage geht dabei den gewohnten Weg samt Benachrichtigung: Der
-    Kunde bekommt seine Stornobestätigung, der Fahrlehrer erfährt, dass sein
-    Termin wieder frei ist. Danach erst wird überschrieben – die Mail braucht
-    die Adresse ja noch.
+    wäre. Die Absage geht dabei samt Benachrichtigung raus: Der Kunde bekommt
+    seine Stornobestätigung, der Fahrlehrer erfährt, dass sein Termin wieder
+    frei ist. Danach erst wird überschrieben – die Mail braucht die Adresse ja
+    noch.
     """
     buchung = Buchung.objects.select_for_update().select_related("termin").get(pk=buchung.pk)
 
     if buchung.ist_aktiv and buchung.termin.beginn > timezone.now():
-        stornieren(buchung, von="kunde")
+        # Der gewohnte Weg schickt die Storno-Mails über die Warteschlange, und
+        # der Worker lädt die Buchung anhand ihrer Nummer neu – aus einer
+        # Datenbank, in der gleich „Gelöscht“ steht. Die Absage ginge dann an
+        # eine leere Adresse. Deshalb wird hier nicht benachrichtigt, sondern
+        # nach dem Commit direkt verschickt: Der Rückruf hält die Instanz fest,
+        # die Name und Adresse noch trägt.
+        storniert = stornieren(buchung, von="kunde", benachrichtigen=False)
+
+        def _absage_verschicken():
+            mail.storno_kunde(storniert, direkt=True)
+            mail.storno_fahrlehrer(storniert, direkt=True)
+
+        transaction.on_commit(_absage_verschicken)
 
     Buchung.objects.filter(pk=buchung.pk).update(**ANONYM, anonymisiert_am=timezone.now())
 
-    # Bewusst frisch geladen statt refresh_from_db(): Die Storno-Mails hängen
-    # als on_commit-Rückruf an der Instanz, die `stornieren` sich geholt hat,
-    # und die trägt die E-Mail-Adresse noch. Würde diese Instanz hier
-    # überschrieben, ginge die Absagebestätigung an eine leere Adresse – also
-    # gar nicht. Der Kunde bekäme nichts mehr zu sehen und nichts mehr zu
-    # lesen.
+    # Bewusst frisch geladen statt refresh_from_db(): Die überschriebenen Werte
+    # gehören in die Antwort, die festgehaltene Instanz oben aber weiterhin in
+    # die Absagemail.
     frisch = Buchung.objects.select_related("termin").get(pk=buchung.pk)
     logger.info("Buchung %s auf Kundenwunsch gelöscht", frisch.referenz)
     return frisch

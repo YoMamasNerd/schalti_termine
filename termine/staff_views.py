@@ -297,7 +297,12 @@ def dashboard(request):
     for termin in termine_im_monat:
         if timezone.localtime(termin.beginn).date() != gewaehlter_tag:
             continue
-        aktive_buchung = termin.buchungen.exclude(status=Buchung.Status.STORNIERT).first()
+        # Aus dem prefetch, nicht per Einzelabfrage – und mit derselben
+        # Abgrenzung wie `Termin.aktive_buchung`: Eine verfallene Reservierung
+        # ist keine Buchung mehr und stünde sonst als Kundenname am freien Slot.
+        aktive_buchung = next(
+            (b for b in termin.buchungen.all() if b.status in Buchung.AKTIVE_STATUS), None
+        )
         tages_termine.append({
             "termin": termin,
             "buchung": aktive_buchung,
@@ -608,6 +613,11 @@ def tagesplanung(request):
             "planungs_form": planungs_form,
             "sperr_form": sperr_form,
             "terminarten": Terminart.objects.filter(aktiv=True),
+            # Der Horizont gilt fahrschulweit. Stünde hier `fahrlehrer
+            # .horizont_wochen`, nennte die Seite eine Zahl, nach der niemand
+            # plant.
+            "horizont_wochen": FahrschulEinstellungen.get_solo().horizont_wochen
+            or settings.DEFAULT_HORIZON_WEEKS,
         },
     )
 
@@ -667,7 +677,9 @@ def sperrzeit_anlegen(request):
             beginn=lokal(daten["von_tag"], dt.time.min),
             ende=lokal(daten["bis_tag"], dt.time.max),
             grund=daten.get("grund", ""),
-            typ=daten.get("typ", Sperrzeit.Typ.SONSTIGE),
+            # Das Formularfeld ist optional und liefert dann "" – kein gültiger
+            # Wert für ein Auswahlfeld. `or` statt eines Vorgabewerts in `get`.
+            typ=daten.get("typ") or Sperrzeit.Typ.SONSTIGE,
         )
         # Freie Termine im gesperrten Zeitraum verschwinden sofort aus dem Angebot.
         geloescht, entfallen = termine_entfernen(
@@ -843,7 +855,10 @@ def buchung_verschieben(request, pk: int):
         return redirect("termine:buchung_detail", pk=buchung.pk)
 
     try:
-        buchungs_service.verschieben(buchung, int(neuer_termin_id))
+        # Rückgabe übernehmen: `verschieben` arbeitet auf einer eigenen,
+        # gesperrten Instanz. Die hiesige zeigte sonst weiter auf den alten
+        # Termin – und die Erfolgsmeldung nennte das alte Datum.
+        buchung = buchungs_service.verschieben(buchung, int(neuer_termin_id))
         messages.success(
             request,
             f"Termin für {buchung.name} erfolgreich auf {date_format(buchung.termin.beginn_lokal, 'SHORT_DATE_FORMAT')}, {buchung.termin.beginn_lokal:%H:%M} Uhr verschoben.",
@@ -1181,11 +1196,11 @@ def regel_loeschen(request, pk: int):
 
 # --- Terminarten -----------------------------------------------------------
 #
-# Bis hierher lagen die Terminarten im Django-Admin, also hinter `is_staff`.
-# Damit konnte ein Fahrlehrer zwar planen, aber nicht festlegen, *was* er
-# anbietet – und musste für jede neue Beratungsart beim Inhaber anfragen.
-# Terminarten sind Stammdaten der Fahrschule, keine persönlichen Daten;
-# deshalb darf sie hier jeder pflegen, der den internen Bereich sieht.
+# Bis hierher lagen die Terminarten im Django-Admin. Sie sind aus ihm
+# herausgelöst, damit die Fahrschule sie ohne Entwicklerhilfe pflegen kann –
+# die Zugriffsstufe bleibt aber dieselbe: Eine Terminart wirkt auf das
+# öffentliche Angebot *aller* Fahrlehrer, nicht auf den eigenen Kalender.
+# Deshalb `@inhaber` und nicht `@mitarbeiter`; `test_zugriff.py` hält das fest.
 
 
 @inhaber

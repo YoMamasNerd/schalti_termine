@@ -92,6 +92,12 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
 - Mails entstehen **ohne Request**, also ohne Kontextprozessor: Was der Fuß
   braucht, steht in `settings` (`IMPRESSUM_URL`, `DATENSCHUTZ_URL`) und wird in
   `_kontext()` dazugelegt.
+- Im Betrieb geht jede Mail über die Warteschlange, und der Worker **lädt die
+  Buchung anhand ihrer Nummer neu**. Wer eine Mail über einen Zustand
+  verschickt, den dieselbe Transaktion gerade zerstört, muss deshalb direkt
+  verschicken: `storno_kunde(…, direkt=True)` beim Löschen auf Kundenwunsch.
+  Im Testlauf (`IM_TESTLAUF`) fällt der Umweg weg – ein Test, der diesen Pfad
+  meint, muss ihn ausdrücklich einschalten.
 
 ### Einbettung
 
@@ -140,8 +146,10 @@ Der Django-Admin ist **nicht** mehr der Ort für den täglichen Bedarf. Im
 internen Bereich liegen:
 
 - **Terminarten** (`/intern/terminarten/`) – Stammdaten der ganzen Fahrschule,
-  deshalb für jeden Mitarbeiter, nicht nur für den Inhaber. Das URL-Kürzel
-  steht **nicht** im Formular: Es steckt in verteilten Links (`?art=…`) und
+  aus dem Django-Admin herausgelöst, aber weiterhin **nur für den Inhaber**:
+  Eine Terminart wirkt auf das öffentliche Angebot aller Fahrlehrer, nicht auf
+  den eigenen Kalender – dieselbe Grenze wie bei `aktiv`/`reihenfolge`.
+  `test_zugriff.py` hält das fest. Das URL-Kürzel steht **nicht** im Formular: Es steckt in verteilten Links (`?art=…`) und
   überlebt eine Umbenennung. Die `farbe` fehlt, weil sie nirgends angezeigt
   wird – kein Bedienfeld ohne Wirkung.
 - **Einstellungen** (`/intern/einstellungen/`) – Kontakt, Beschreibung,
@@ -163,9 +171,14 @@ Login und Fahrlehrer, der Blick in einzelne Datensätze.
 - Termine sind **konkrete Zeilen in der Datenbank**, keine bei jedem Aufruf
   durchgerechneten Regeln.
 - `horizont_wochen` ist **eine** Zahl für beides: wie weit der Generator plant
-  und wie weit Kunden buchen können. Durchgesetzt wird sie an denselben drei
-  Stellen wie der Mindest-Vorlauf – `Termin.objects.buchbar()`, die
-  `buchen`-View und `buchung.reservieren()`. Ohne die letzten beiden wäre sie
+  und wie weit Kunden buchen können. Und zwar **eine fahrschulweite** Zahl,
+  aus `FahrschulEinstellungen`. `Fahrlehrer.horizont_wochen` gibt es noch,
+  wird aber nirgends gelesen – nur der Mindest-Vorlauf ist pro Fahrlehrer
+  einstellbar (und dort nur nach oben, siehe `fruehester_start`). Wer die Zahl
+  irgendwo anzeigt, nimmt den globalen Wert; das Fahrlehrer-Feld nennte sonst
+  eine Zahl, nach der niemand plant.
+  Durchgesetzt wird sie an denselben drei Stellen wie der Mindest-Vorlauf –
+  `Termin.objects.buchbar()`, die `buchen`-View und `buchung.reservieren()`. Ohne die letzten beiden wäre sie
   nur eine Empfehlung an den Generator, und ein direkter Aufruf käme daran
   vorbei.
 - Der Horizont **verkürzt** nichts rückwirkend: Schon erzeugte Termine
@@ -184,6 +197,12 @@ Login und Fahrlehrer, der Blick in einzelne Datensätze.
 - Deckt eine Regel einen entfallenen Zeitpunkt wieder ab, wird der Termin
   wiederbelebt – ein zweiter zur selben Uhrzeit ginge wegen des Unique-Index
   ohnehin nicht.
+- Der Haken **„Aktiv“ an der Terminart** ist keine Empfehlung an die Anzeige:
+  `buchbar()`, die `buchen`-View **und** `reservieren()` blenden abgeschaltete
+  Terminarten aus. Sonst käme man über einen alten Link am Angebot vorbei.
+- **Kollisionsprüfung nur über Angebots-Regeln.** Eine Sperr-Regel soll den
+  Kalender blockieren; sie meldete sich sonst als Konflikt mit genau der
+  Sperrzeit, die sie selbst erzeugt hat.
 
 ### Datenschutz
 
@@ -252,9 +271,12 @@ coverage run manage.py test termine && coverage report
 
 - `main` trägt den stabilen Stand. Entwickelt wird auf einem eigenen Branch,
   der erst nach grüner Testsuite dorthin zurückfließt.
-- Stand: 311 Tests, 98 % Zeilenabdeckung. Neue Funktionen kommen mit Tests –
-  der Schwerpunkt liegt dort, wo ein Fehler unbemerkt bliebe (Jobs, Kommandos,
-  Ausfallpfade des Mailversands).
+- Stand: 409 Tests, 81 % Zeilenabdeckung. Der Kern (Buchung, Planung, Views,
+  Modelle) liegt über 90 %; die Lücke steckt fast ganz in den später
+  dazugekommenen Teilen: `services/fsm_sync.py` (62 %), `social_adapter.py`
+  (44 %) und `management/commands/import_alt_kalender.py` (0 %). Neue
+  Funktionen kommen mit Tests – der Schwerpunkt liegt dort, wo ein Fehler
+  unbemerkt bliebe (Jobs, Kommandos, Ausfallpfade des Mailversands).
 - Commit-Nachrichten auf Deutsch, im Stil der bestehenden Historie: erst was
   das Problem war, dann was die Änderung tut.
 - Screenshots für die README liegen als Dateien unter `docs/bilder/` – GitHub
