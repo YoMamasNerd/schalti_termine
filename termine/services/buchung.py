@@ -267,6 +267,9 @@ def abgelaufene_reservierungen_freigeben() -> int:
                 status=Termin.Status.RESERVIERT,
                 beginn__gt=jetzt,
             ).update(status=Termin.Status.FREI)
+            # Der Kunde soll wissen, dass seine Reservierung weg ist – sonst
+            # wartet er vergeblich auf eine Bestätigung, die nie kommt.
+            mail.reservierung_verfallen(aktuell)
             anzahl += 1
 
     if anzahl:

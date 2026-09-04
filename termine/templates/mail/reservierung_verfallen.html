@@ -1,0 +1,30 @@
+{% extends "mail/_geruest.html" %}
+
+{% block titel %}Ihre Reservierung ist abgelaufen{% endblock %}
+{% block vorschau %}Der reservierte Termin wurde wieder freigegeben – jetzt neu buchen.{% endblock %}
+{% block ueberschrift %}Reservierung abgelaufen{% endblock %}
+
+{% block inhalt %}
+<p class="m-text" style="margin:0 0 16px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.55; color:#2b5883;">
+  Hallo {{ buchung.name }},
+</p>
+<p class="m-text" style="margin:0 0 20px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.55; color:#2b5883;">
+  Ihr reservierter Termin ist abgelaufen, weil die Buchung nicht rechtzeitig
+  per Link bestätigt wurde:
+</p>
+
+{% include "mail/_karte_termin.html" %}
+
+<p class="m-text" style="margin:0 0 20px; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.55; color:#2b5883;">
+  Der Termin ist jetzt wieder frei – andere können ihn buchen. Wenn er Ihnen
+  noch passt, sichern Sie ihn sich am besten bald:
+</p>
+
+{% include "mail/_knopf.html" with url=buchungen_url text="Termin auswählen" %}
+
+<p class="m-leise" style="margin:0; font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:13px; line-height:1.6; color:#4d6b87;">
+  Diese E-Mail kam, weil die Bestätigung in Ihrer Anfrage-Mail ausblieb. Falls
+  Sie die Buchung längst über den Link bestätigt haben, können Sie diese
+  Nachricht ignorieren.
+</p>
+{% endblock %}

@@ -1,0 +1,19 @@
+Hallo {{ buchung.name }},
+
+Ihr reservierter Termin ist abgelaufen, weil die Buchung nicht rechtzeitig
+per Link bestätigt wurde:
+
+  Wann:      {{ beginn|date:"l, j. F Y" }}, {{ beginn|date:"H:i" }} bis {{ ende|date:"H:i" }} Uhr
+  Was:       {{ terminart.name }}
+
+Der Termin ist jetzt wieder frei – andere können ihn buchen. Wenn er Ihnen
+noch passt, sichern Sie ihn sich am besten bald:
+
+{{ buchungen_url }}
+
+Diese E-Mail kam, weil die Bestätigung in Ihrer Anfrage-Mail ausblieb. Falls
+Sie die Buchung längst über den Link bestätigt haben, können Sie diese
+Nachricht ignorieren.
+
+Viele Grüße
+{{ site_name }}
