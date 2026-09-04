@@ -248,6 +248,17 @@ def _direkt_erinnerung(buchung) -> bool:
     )
 
 
+def _direkt_reservierung_verfallen(buchung) -> bool:
+    """Der Kunde hat den Bestätigungslink nicht geklickt – Reservierung verfallen."""
+    return _senden(
+        betreff=f"Reservierung abgelaufen: {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
+        template="reservierung_verfallen",
+        empfaenger=[buchung.email],
+        kontext=_kontext(buchung),
+        antwort_an=None,
+    )
+
+
 def _direkt_buchung_verschoben_kunde(buchung, alter_beginn: dt.datetime | str) -> bool:
     """Benachrichtigung an den Kunden über einen verschobenen Termin."""
     if isinstance(alter_beginn, str):
@@ -269,6 +280,7 @@ _MAIL_FUNKTIONEN_DIREKT = {
     "storno_kunde": _direkt_storno_kunde,
     "storno_fahrlehrer": _direkt_storno_fahrlehrer,
     "erinnerung": _direkt_erinnerung,
+    "reservierung_verfallen": _direkt_reservierung_verfallen,
     "buchung_verschoben_kunde": _direkt_buchung_verschoben_kunde,
 }
 
@@ -295,6 +307,10 @@ def storno_fahrlehrer(buchung) -> bool:
 
 def erinnerung(buchung) -> bool:
     return _im_hintergrund_oder_direkt("erinnerung", buchung)
+
+
+def reservierung_verfallen(buchung) -> bool:
+    return _im_hintergrund_oder_direkt("reservierung_verfallen", buchung)
 
 
 def buchung_verschoben_kunde(buchung, alter_beginn: dt.datetime) -> bool:

@@ -71,6 +71,7 @@ class MailBasis(TestCase):
             mail_service.storno_kunde,
             mail_service.storno_fahrlehrer,
             mail_service.erinnerung,
+            mail_service.reservierung_verfallen,
         )
 
 

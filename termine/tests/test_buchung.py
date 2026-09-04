@@ -145,6 +145,41 @@ class DoppelOptIn(BuchungsBasis):
         self.assertEqual(buchung.status, Buchung.Status.VERFALLEN)
         self.assertEqual(self.termin.status, Termin.Status.FREI)
 
+    def test_abgelaufene_reservierung_benachrichtigt_den_kunden(self):
+        buchung = self.reservieren()
+        buchung.reserviert_bis = timezone.now() - dt.timedelta(minutes=1)
+        buchung.save()
+        django_mail.outbox.clear()  # Bestätigungsanforderung zählt nicht mit
+
+        self.assertEqual(buchungs_service.abgelaufene_reservierungen_freigeben(), 1)
+
+        self.assertEqual(len(django_mail.outbox), 1)
+        mail = django_mail.outbox[0]
+        self.assertEqual(mail.to, [buchung.email])
+        self.assertIn("abgelaufen", mail.subject)
+        self.assertIn(buchung.name, mail.body)
+        self.assertIn("http", mail.body)  # Link zum Neubuchen
+
+    def test_verfall_mit_mehreren_buchungen_sendet_eine_mail_pro_buchung(self):
+        zweiter = Termin.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            terminart=self.art,
+            beginn=self.termin.beginn + dt.timedelta(days=1),
+            ende=self.termin.beginn + dt.timedelta(days=1, minutes=30),
+            status=Termin.Status.FREI,
+        )
+        b1 = self.reservieren()
+        b2 = self.reservieren(zweiter, email="zweit@example.org")
+        django_mail.outbox.clear()
+        for b in (b1, b2):
+            b.reserviert_bis = timezone.now() - dt.timedelta(minutes=1)
+            b.save()
+
+        self.assertEqual(buchungs_service.abgelaufene_reservierungen_freigeben(), 2)
+        self.assertEqual(len(django_mail.outbox), 2)
+        empfaenger = {mail.to[0] for mail in django_mail.outbox}
+        self.assertEqual(empfaenger, {b1.email, b2.email})
+
     def test_bestaetigte_buchung_laeuft_nicht_ab(self):
         self.bestaetigen(self.reservieren())
 
