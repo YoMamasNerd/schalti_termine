@@ -545,8 +545,7 @@ class RobusteParameter(BuchungsBasis):
 
         # Alle aktuellen Termine löschen
         Termin.objects.all().delete()
-        heute = timezone.localdate()
-
+        timezone.localdate()
         # Horizont erweitern
         einst = FahrschulEinstellungen.get_solo()
         einst.horizont_wochen = 12

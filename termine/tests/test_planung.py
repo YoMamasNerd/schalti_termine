@@ -372,8 +372,7 @@ class SperrzeitRegelnTests(BasisDaten):
             aktiv=True,
         )
 
-        bericht = generiere_termine(self.fahrlehrer, wochen=2, ab=self.montag)
-
+        generiere_termine(self.fahrlehrer, wochen=2, ab=self.montag)
         # Sperrzeit muss existieren
         sperre = Sperrzeit.objects.filter(
             fahrlehrer=self.fahrlehrer,

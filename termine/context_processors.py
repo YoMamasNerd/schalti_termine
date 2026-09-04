@@ -1,5 +1,4 @@
 from django.conf import settings
-from django.urls import reverse
 
 from .services.mail import get_kontakt_email
 

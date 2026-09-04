@@ -12,7 +12,6 @@ from django.core.cache import cache
 from django.test import SimpleTestCase, override_settings
 
 from termine.services.fsm_client import (
-    FsmApiError,
     FsmAuthError,
     FsmClient,
     FsmError,

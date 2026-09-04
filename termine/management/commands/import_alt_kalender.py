@@ -122,7 +122,6 @@ class Command(BaseCommand):
                 end = end.replace(tzinfo=berlin_tz)
 
             desc = str(component.get("description", "")).strip()
-            loc = str(component.get("location", "")).strip()
             uid = str(component.get("uid", "")).strip()
 
             kunde_name = ""

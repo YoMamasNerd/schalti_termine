@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from termine.models import Buchung, Fahrlehrer, Sperrzeit, Termin, Terminart
 from termine.services import buchung as buchung_service
-from termine.services.fsm_client import FsmClient, FsmError, FsmTermin
+from termine.services.fsm_client import FsmClient, FsmTermin
 from termine.services.fsm_sync import (
     buche_in_fsm,
     storniere_in_fsm,
@@ -511,11 +511,9 @@ class FsmEinstellungenViewTests(TestCase):
 
     @override_settings(FSM_SYNC_ENABLED=False)
     def test_sperrzeit_sync_ignoriert_wenn_fsm_deaktiviert(self):
-        from termine.services.fsm_sync import exportiere_sperrzeit_nach_fsm
 
         jetzt = timezone.now()
-        sperre = Sperrzeit.objects.create(
-            fahrlehrer=self.fahrlehrer,
+        Sperrzeit.objects.create(            fahrlehrer=self.fahrlehrer,
             beginn=jetzt + dt.timedelta(days=5),
             ende=jetzt + dt.timedelta(days=6),
             grund="Urlaub",
@@ -534,7 +532,6 @@ class FsmEinstellungenViewTests(TestCase):
     @override_settings(FSM_SYNC_ENABLED=True)
     def test_theorieunterricht_blockiert_alle_fahrlehrer(self):
         from termine.models import FahrschulEinstellungen
-        from termine.services.fsm_sync import sync_alle_fahrlehrer
 
         # 2 Fahrlehrer
         einstellungen = FahrschulEinstellungen.get_solo()

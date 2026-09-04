@@ -158,8 +158,7 @@ class Erinnerungen(JobBasis):
         termin = self.termin(stunden_voraus=36)
         termin.status = Termin.Status.GEBUCHT
         termin.save()
-        buchung = self.buchung(termin)
-
+        self.buchung(termin)
         django_mail.outbox.clear()
         jobs.erinnerungen()
         self.assertEqual(len(django_mail.outbox), 1)

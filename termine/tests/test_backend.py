@@ -639,16 +639,14 @@ class HistorieTests(BackendBasis):
         self.t2 = self.termin_fuer(self.tom, stunde=14)
 
     def test_historie_ansicht_laedt(self):
-        b1 = Buchung.objects.create(
-            termin=self.t1,
+        Buchung.objects.create(            termin=self.t1,
             name="Max Mustermann",
             email="max@example.org",
             telefon="0170123456",
             fuehrerscheinklasse="B",
             status=Buchung.Status.BESTAETIGT,
         )
-        b2 = Buchung.objects.create(
-            termin=self.t2,
+        Buchung.objects.create(            termin=self.t2,
             name="Lisa Schmidt",
             email="lisa@example.org",
             telefon="0170987654",
