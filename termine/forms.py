@@ -268,6 +268,7 @@ class GlobaleEinstellungenForm(forms.ModelForm):
             "vorlauf_stunden",
             "horizont_wochen",
             "erinnerung_stunden_vorher",
+            "reservierung_minuten",
             "aktive_fuehrerscheinklassen",
             "fsm_theorie_blockiert_beratung",
         ]
@@ -276,6 +277,7 @@ class GlobaleEinstellungenForm(forms.ModelForm):
             "vorlauf_stunden": "Termine, die früher als dieser Vorlauf beginnen, sind nicht mehr buchbar.",
             "horizont_wochen": "Wie weit im Voraus Kunden buchen können und der Generator Termine anlegt.",
             "erinnerung_stunden_vorher": "Wie viele Stunden vor dem Beratungstermin Kunden automatisch per E-Mail erinnert werden (z. B. 24, 0 = deaktiviert).",
+            "reservierung_minuten": "Wie lange Kunden Zeit haben, ihre Buchung per E-Mail-Link zu bestätigen (5 bis 1440, leer = 30 Minuten Standard).",
             "fsm_theorie_blockiert_beratung": "Verhindert Beratungstermine für alle Fahrlehrer während laufendem Theorieunterricht (gemeinsamer Raum).",
         }
 

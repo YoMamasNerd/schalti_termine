@@ -61,6 +61,16 @@ class FahrschulEinstellungen(models.Model):
         blank=True,
         help_text="Wie viele Stunden vor dem Beratungstermin eine automatische Erinnerungs-E-Mail an den Kunden gesendet wird (z. B. 24 für einen Tag vorher, 0 = deaktiviert).",
     )
+    reservierung_minuten = models.PositiveIntegerField(
+        "Bestätigungsfrist (Minuten)",
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(5), MaxValueValidator(1440)],
+        help_text=(
+            "Wie lange Kunden Zeit haben, ihre Buchung per E-Mail-Link zu bestätigen "
+            "(5 bis 1440). Leer = der Wert aus RESERVATION_MINUTES (Standard 30)."
+        ),
+    )
     aktive_fuehrerscheinklassen = models.JSONField(
         "Verfügbare Führerscheinklassen",
         default=list,
@@ -140,6 +150,15 @@ class FahrschulEinstellungen(models.Model):
     def get_solo(cls) -> "FahrschulEinstellungen":
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+    @property
+    def reservierungsdauer_minuten(self) -> int:
+        """Effektive Bestätigungsfrist: DB-Wert oder Fallback auf die Settings."""
+        if self.reservierung_minuten:
+            return self.reservierung_minuten
+        from django.conf import settings
+
+        return settings.RESERVATION_MINUTES
 
     def get_effective_email_config(self) -> dict:
         """Liefert die E-Mail-/SMTP-Konfiguration aus der Datenbank."""

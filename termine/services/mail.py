@@ -180,7 +180,11 @@ def _im_hintergrund_oder_direkt(funktions_name: str, buchung, **kwargs) -> bool:
 
 def _direkt_bestaetigung_anfordern(buchung) -> bool:
     """Schritt 1 des Double-Opt-in: Link zum Bestätigen der Buchung."""
-    kontext = _kontext(buchung, minuten=settings.RESERVATION_MINUTES)
+    from ..models.einstellungen import FahrschulEinstellungen
+
+    kontext = _kontext(
+        buchung, minuten=FahrschulEinstellungen.get_solo().reservierungsdauer_minuten
+    )
     return _senden(
         betreff=f"Bitte bestätigen: Ihr Beratungstermin am {timezone.localtime(buchung.termin.beginn):%d.%m.%Y um %H:%M} Uhr",
         template="bestaetigung_anfordern",
