@@ -165,6 +165,39 @@ class RechtlicheLinks(MailBasis):
         self.assertIn("Datenschutz", html)
 
 
+class OeffentlicheLinks(MailBasis):
+    """Kundenmails dürfen nur auf öffentliche Seiten verweisen: Ein Link in
+    den internen Bereich (Login) wäre für den Kunden eine Sackgasse."""
+
+    KUNDEN_VERSANDER = (
+        mail_service.bestaetigung_anfordern,
+        mail_service.buchung_bestaetigt_kunde,
+        mail_service.storno_kunde,
+        mail_service.erinnerung,
+        mail_service.reservierung_verfallen,
+        mail_service.buchung_verschoben_kunde,
+    )
+
+    def test_kundenmails_verlinken_nur_oeffentliche_ansichten(self):
+        for versenden in self.KUNDEN_VERSANDER:
+            with self.subTest(versenden.__name__):
+                django_mail.outbox.clear()
+                # buchung_verschoben_kunde braucht den alten Beginn dazu
+                if versenden is mail_service.buchung_verschoben_kunde:
+                    versenden(self.buchung, alter_beginn=timezone.now())
+                else:
+                    versenden(self.buchung)
+                _, text, html = self.letzte()
+                self.assertNotIn("/intern/", text)
+                self.assertNotIn("/intern/", html)
+
+    def test_verfallen_mail_verlinkt_auf_die_terminauswahl(self):
+        mail_service.reservierung_verfallen(self.buchung)
+        _, text, html = self.letzte()
+        self.assertIn(self.buchung.buchen_url, text)
+        self.assertIn(self.buchung.buchen_url, html)
+
+
 class InterneMail(MailBasis):
     def test_die_fahrlehrermail_zeigt_die_angaben_des_interessenten(self):
         mail_service.buchung_bestaetigt_fahrlehrer(self.buchung)
