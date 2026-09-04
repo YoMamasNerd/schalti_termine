@@ -22,6 +22,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from ..models import Buchung, Termin
+from ..models.einstellungen import FahrschulEinstellungen
 from . import fsm_sync, mail
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,7 @@ def reservieren(
         raise TerminNichtVerfuegbar("Dieser Termin steht nicht mehr zur Verfügung.")
 
     jetzt = timezone.now()
+    einst = FahrschulEinstellungen.get_solo()
     try:
         buchung = Buchung.objects.create(
             termin=termin,
@@ -86,7 +88,7 @@ def reservieren(
             fuehrerscheinklasse=fuehrerscheinklasse,
             nachricht=nachricht.strip(),
             status=Buchung.Status.OFFEN,
-            reserviert_bis=jetzt + dt.timedelta(minutes=settings.RESERVATION_MINUTES),
+            reserviert_bis=jetzt + dt.timedelta(minutes=einst.reservierungsdauer_minuten),
             einwilligung_am=jetzt,
         )
     except IntegrityError as exc:

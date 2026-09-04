@@ -594,3 +594,76 @@ class LogOhnePersonenbezug(BuchungsBasis):
         zeilen = "\n".join(protokoll.output)
         self.assertNotIn(buchung.email, zeilen)
         self.assertNotIn(buchung.name, zeilen)
+
+
+class ReservierungsdauerEinstellbar(BuchungsBasis):
+    """Die Bestätigungsfrist ist global konfigurierbar statt nur per ENV."""
+
+    def test_die_frist_aus_den_einstellungen_gilt(self):
+        from termine.models import FahrschulEinstellungen
+
+        einst = FahrschulEinstellungen.get_solo()
+        einst.reservierung_minuten = 120
+        einst.save()
+
+        with self.settings(RESERVATION_MINUTES=30):
+            buchung = self.reservieren()
+
+            self.assertAlmostEqual(
+                buchung.reserviert_bis,
+                timezone.now() + dt.timedelta(minutes=120),
+                delta=dt.timedelta(seconds=10),
+            )
+            self.assertIn("120 Minuten", django_mail.outbox[0].body)
+
+    def test_leeres_feld_faellt_auf_das_setting_zurueck(self):
+        from termine.models import FahrschulEinstellungen
+
+        einst = FahrschulEinstellungen.get_solo()
+        einst.reservierung_minuten = None
+        einst.save()
+
+        with self.settings(RESERVATION_MINUTES=45):
+            buchung = self.reservieren()
+
+            self.assertAlmostEqual(
+                buchung.reserviert_bis,
+                timezone.now() + dt.timedelta(minutes=45),
+                delta=dt.timedelta(seconds=10),
+            )
+            self.assertIn("45 Minuten", django_mail.outbox[0].body)
+
+    def test_frist_unter_fuenf_minuten_wird_abgewiesen(self):
+        from termine.forms import GlobaleEinstellungenForm
+        from termine.models import FahrschulEinstellungen
+
+        einst = FahrschulEinstellungen.get_solo()
+        form = GlobaleEinstellungenForm(
+            data={**self.globale_form_daten(), "reservierung_minuten": "3"},
+            instance=einst,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("reservierung_minuten", form.errors)
+
+    def test_frist_oberhalb_24_stunden_wird_abgewiesen(self):
+        from termine.forms import GlobaleEinstellungenForm
+        from termine.models import FahrschulEinstellungen
+
+        einst = FahrschulEinstellungen.get_solo()
+        form = GlobaleEinstellungenForm(
+            data={**self.globale_form_daten(), "reservierung_minuten": "1500"},
+            instance=einst,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("reservierung_minuten", form.errors)
+
+    def globale_form_daten(self) -> dict:
+        return {
+            "bundesland": "BE",
+            "vorlauf_stunden": "24",
+            "horizont_wochen": "4",
+            "erinnerung_stunden_vorher": "24",
+            "reservierung_minuten": "",
+            "aktive_fuehrerscheinklassen": [],
+            "fsm_theorie_blockiert_beratung": "",
+        }
