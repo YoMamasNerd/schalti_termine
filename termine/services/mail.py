@@ -297,11 +297,22 @@ def buchung_bestaetigt_fahrlehrer(buchung) -> bool:
     return _im_hintergrund_oder_direkt("buchung_bestaetigt_fahrlehrer", buchung)
 
 
-def storno_kunde(buchung) -> bool:
+def storno_kunde(buchung, *, direkt: bool = False) -> bool:
+    """`direkt=True` umgeht die Warteschlange und verschickt sofort.
+
+    Der Umweg über den Worker lädt die Buchung anhand ihrer Nummer neu. Beim
+    Löschen auf Kundenwunsch ist die Adresse dann schon überschrieben – die
+    Absage ginge ins Leere. Dort wird deshalb die Instanz verschickt, die die
+    Daten noch trägt.
+    """
+    if direkt:
+        return _direkt_storno_kunde(buchung)
     return _im_hintergrund_oder_direkt("storno_kunde", buchung)
 
 
-def storno_fahrlehrer(buchung) -> bool:
+def storno_fahrlehrer(buchung, *, direkt: bool = False) -> bool:
+    if direkt:
+        return _direkt_storno_fahrlehrer(buchung)
     return _im_hintergrund_oder_direkt("storno_fahrlehrer", buchung)
 
 

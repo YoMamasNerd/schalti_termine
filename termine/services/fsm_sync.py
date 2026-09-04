@@ -722,6 +722,25 @@ def async_buche_in_fsm(buchung: Buchung):
         return buche_in_fsm(buchung)
 
 
+def async_storniere_termin_in_fsm(termin: Termin):
+    """Wie `async_storniere_in_fsm`, aber ohne den Umweg über die Buchung.
+
+    Beim Verschieben hängt die Buchung schon am neuen Termin; aufzulösen ist
+    aber der alte. Deshalb wird er hier ausdrücklich übergeben.
+    """
+    if not is_fsm_aktiv_fuer_fahrlehrer(termin.fahrlehrer):
+        return None
+    if getattr(settings, "IM_TESTLAUF", False):
+        return _fsm_storno_task(termin.pk)
+    try:
+        from django_q.tasks import async_task
+
+        return async_task("termine.services.fsm_sync._fsm_storno_task", termin.pk)
+    except Exception:
+        logger.exception("Fehler beim Einreihen der FSM-Storno-Aufgabe – führe synchron aus")
+        return _fsm_storno_task(termin.pk)
+
+
 def async_storniere_in_fsm(buchung: Buchung):
     """Startet FSM-Storno asynchron über django-q."""
     if not is_fsm_aktiv_fuer_fahrlehrer(buchung.termin.fahrlehrer):

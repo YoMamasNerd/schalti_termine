@@ -14,8 +14,10 @@ class TerminQuerySet(models.QuerySet):
     def buchbar(self, jetzt: dt.datetime | None = None):
         """Freie Termine innerhalb des Buchungsfensters, die nicht gesperrt sind.
 
-        Das Fenster hat zwei Ränder, und beide hängen am einzelnen Fahrlehrer:
-        vorne der Mindest-Vorlauf, hinten der Planungshorizont.
+        Das Fenster hat zwei Ränder: vorne der Mindest-Vorlauf, der am
+        einzelnen Fahrlehrer hängen kann, hinten der fahrschulweite
+        Planungshorizont. Gruppiert wird trotzdem nach Fahrlehrer – zwei
+        Fahrlehrer mit verschiedenem Vorlauf ergeben zwei Fenster.
         """
         from django.db.models import Exists, OuterRef, Q
 

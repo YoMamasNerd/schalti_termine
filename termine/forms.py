@@ -281,6 +281,15 @@ class GlobaleEinstellungenForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Dieselbe Quelle wie im Buchungsformular. Stünde hier die fest
+        # verdrahtete Liste, wäre eine unter /intern/klassen/ angelegte eigene
+        # Klasse nicht ankreuzbar – und fiele, sobald überhaupt gefiltert wird,
+        # aus dem Buchungsformular heraus, obwohl sie dort angeboten wird.
+        from .models import Fuehrerscheinklasse
+
+        self.fields["aktive_fuehrerscheinklassen"].choices = (
+            Fuehrerscheinklasse.choices_fuer_auswahl()
+        )
         if "bundesland" in self.fields:
             self.fields["bundesland"].required = False
         if "erinnerung_stunden_vorher" in self.fields:
