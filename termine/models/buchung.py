@@ -119,6 +119,11 @@ class Buchung(models.Model):
         return f"{settings.SITE_BASE_URL}{reverse('termine:buchung', args=[self.token])}"
 
     @property
+    def buchen_url(self) -> str:
+        """Öffentliche Startseite mit Terminauswahl – für Kundenmails."""
+        return f"{settings.SITE_BASE_URL}{reverse('termine:start')}"
+
+    @property
     def fuehrerscheinklasse_anzeige(self) -> str:
         if not self.fuehrerscheinklasse:
             return ""
