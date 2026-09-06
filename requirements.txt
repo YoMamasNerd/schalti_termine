@@ -4,7 +4,7 @@ holidays==0.102
 icalendar==7.2.2
 python-dotenv==1.2.3
 whitenoise==6.12.0
-gunicorn==26.0.0
+gunicorn==26.2.0
 psycopg[binary]==3.3.5
 django-allauth>=65.15.0
 cryptography>=50.0.0
