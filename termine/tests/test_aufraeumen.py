@@ -14,6 +14,7 @@ irgendetwas rot leuchtet.
 from __future__ import annotations
 
 import datetime as dt
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -197,7 +198,8 @@ class Wiederbelebung(Basis):
 class Buchungshorizont(Basis):
     """Der Generator und die Anzeige „buchbar bis" müssen denselben Tag meinen."""
 
-    def test_letzter_angebotener_tag_stimmt_mit_dem_generator_ueberein(self):
+    @mock.patch("termine.services.planung.feiertage_im_zeitraum", return_value={})
+    def test_letzter_angebotener_tag_stimmt_mit_dem_generator_ueberein(self, _mock_feiertage):
         from termine.services.verfuegbarkeit import buchungshorizont
 
         self.anna.horizont_wochen = 4

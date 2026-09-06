@@ -7,8 +7,7 @@
   {% if tages_termine %}
     <div class="slots">
       {% for termin in tages_termine %}
-        <a class="slot" href="{% url 'termine:buchen' termin.pk %}"
-           {% if einbetten %}target="_blank" rel="noopener"{% endif %}>
+        <a class="slot" href="{% url 'termine:buchen' termin.pk %}">
           <span class="uhrzeit">{{ termin.beginn_lokal|date:"H:i" }}</span>
           <span class="meta">
             {{ termin.terminart.dauer_minuten }} Min.

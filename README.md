@@ -52,8 +52,7 @@ anhand des Bundeslands übersprungen.
 - Löschen der eigenen Daten über denselben Link, ohne Nachfrage bei der
   Fahrschule
 - Erinnerungsmail vor dem Termin
-- Die Terminauswahl lässt sich als Baustein in die Seite der Fahrschule
-  einbetten ([Anleitung](docs/EINBETTEN.md))
+- Eigenständige Web-Applikation im einheitlichen `schalti_ui`-Design, nahtlos von der Fahrschul-Website verlinkbar
 
 ### Für die Fahrschule (interner Bereich)
 

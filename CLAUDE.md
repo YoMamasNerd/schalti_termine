@@ -22,8 +22,8 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
 | Frage | Antwort |
 | --- | --- |
 | Backend | Django 5.2 |
-| Frontend | serverseitige Templates + htmx (eine Datei unter `static/js/`) |
-| Styling | handgeschriebenes CSS in `static/css/app.css`, **kein** Node-Build |
+| Frontend | serverseitige Templates + htmx (über `schalti_ui`) |
+| Styling | `schalti_ui` (Design-Tokens & Basis-Layout) + CSS in `static/css/app.css`, **kein** Node-Build |
 | Datenbank | PostgreSQL, SQLite genügt für Einzelplatz |
 | Hintergrundjobs | django-q2 (kein Redis), alternativ `cron` |
 | Feiertage | `holidays`, offline, alle 16 Bundesländer |
@@ -99,16 +99,11 @@ Rhythmus-Regeln Termine mehrere Wochen im Voraus aus.
   Im Testlauf (`IM_TESTLAUF`) fällt der Umweg weg – ein Test, der diesen Pfad
   meint, muss ihn ausdrücklich einschalten.
 
-### Einbettung
+### Bereitstellung als Standalone-Web-App
 
-- Die Terminauswahl gibt es unter `/einbetten/` ohne Kopf und Fuß.
-- Wer einrahmen darf, steht in `EMBED_ORIGINS`; leer = niemand. Umgesetzt über
-  `frame-ancestors` plus `xframe_options_exempt`, weil `X-Frame-Options` nur
-  eine Adresse kennt und die Fahrschule zwei hat (mit und ohne www).
-- **Das Buchungsformular bleibt außerhalb des Rahmens** (`target="_blank"`):
-  Es braucht Cookies, die Browser in fremden Rahmen blockieren. Nur der
-  Kalender liest und kommt ohne aus. Ausnahme wäre eine Unterdomain derselben
-  Domain – dann ginge auch das Formular im Rahmen.
+- Eigenständige Web-Applikation unter eigener (Sub-)Domain (z. B. `termine.fahrschule-schaltwerk.de`), verlinkt von der Haupt-Website per Button.
+- Kein Iframe-Einbetten (`/einbetten/` wurde bewusst entfernt, um Drittanbieter-Cookie-Blockaden und Layout-Jitter auf Mobilgeräten zu vermeiden).
+- Das Buchungsformular und der Kalender laufen nahtlos im selben Fenster.
 
 ### Zugriff und Login
 

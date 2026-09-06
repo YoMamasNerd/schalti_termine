@@ -44,12 +44,6 @@ CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "http://localhost:8000").rstrip("/")
 SITE_NAME = os.environ.get("SITE_NAME", "Fahrschule – Beratungstermine")
 
-# Seiten, die die Terminauswahl unter /einbetten/ in einen Rahmen setzen
-# dürfen, z. B. https://fahrschule-schaltwerk.de. Leer = niemand; die
-# Auswahl bleibt dann nur direkt aufrufbar. Bewusst eine ausdrückliche
-# Liste: Wer beliebige Einbettung zulässt, lädt zum Klickfang ein.
-EMBED_ORIGINS = env_list("EMBED_ORIGINS")
-
 # --- Fahrschulmanager (FSM) Integration ------------------------------------
 # Synchronisation von Beratungsterminen und Belegungszeiten über das zentrale FSM-Gateway.
 FSM_SYNC_ENABLED = env_bool("FSM_SYNC_ENABLED", default=False)
@@ -65,6 +59,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django_q",
+    "schalti_ui",
     "termine",
     # Allauth & VoidAuth SSO
     "allauth",
@@ -164,7 +159,9 @@ IM_TESTLAUF = "test" in sys.argv
 if DEBUG or IM_TESTLAUF:
     STATICFILES_BACKEND = "django.contrib.staticfiles.storage.StaticFilesStorage"
 else:
-    STATICFILES_BACKEND = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    STATICFILES_BACKEND = "whitenoise.storage.CompressedStaticFilesStorage"
+
+WHITENOISE_MANIFEST_STRICT = False
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
