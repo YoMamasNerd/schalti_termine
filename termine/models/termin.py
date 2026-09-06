@@ -142,6 +142,10 @@ class Termin(models.Model):
             status__in=["offen", "bestaetigt"]
         ).first()
 
+    @property
+    def letzte_verfallene_buchung(self):
+        return self.buchungen.filter(status="verfallen").order_by("-erstellt_am").first()
+
     def ist_gesperrt(self) -> bool:
         return Sperrzeit.objects.filter(
             fahrlehrer=self.fahrlehrer, beginn__lt=self.ende, ende__gt=self.beginn

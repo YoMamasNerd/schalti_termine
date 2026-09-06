@@ -613,6 +613,56 @@ class Randfaelle(BackendBasis):
         self.assertEqual(termin1.status, Termin.Status.GEBUCHT)
         self.assertIsNone(b.verfallen_am)
 
+    def test_dashboard_und_tagesplanung_zeigen_unbestaetigte_reservierungen(self):
+        # Termin 1: noch FREI, aber mit verfallener Reservierung
+        termin1 = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
+        b1 = Buchung.objects.create(
+            termin=termin1,
+            name="Kunde Unbestaetigt",
+            email="unbestaetigt@example.com",
+            telefon="0170999888",
+            status=Buchung.Status.VERFALLEN,
+            verfallen_am=timezone.now(),
+        )
+
+        # Termin 2: GEBUCHT von Person B, aber zuvor verfallen von Person A
+        termin2 = self.termin_fuer(self.anna, tage_voraus=1, stunde=11)
+        termin2.status = Termin.Status.GEBUCHT
+        termin2.save()
+        b_alt = Buchung.objects.create(
+            termin=termin2,
+            name="Vorheriger Kunde",
+            email="alt@example.com",
+            status=Buchung.Status.VERFALLEN,
+            verfallen_am=timezone.now(),
+        )
+        b_neu = Buchung.objects.create(
+            termin=termin2,
+            name="Echter Kunde",
+            email="echt@example.com",
+            status=Buchung.Status.BESTAETIGT,
+        )
+
+        # 1. Dashboard aufrufen
+        tag_str = termin1.tag.isoformat()
+        resp_dash = self.client.get(reverse("termine:dashboard"), {"tag": tag_str})
+        self.assertEqual(resp_dash.status_code, 200)
+
+        # Anstehende verfallene Tabelle
+        self.assertIn(b1, resp_dash.context["anstehende_verfallene"])
+        self.assertContains(resp_dash, "Anstehende unbestätigte Reservierungen")
+        self.assertContains(resp_dash, "Kunde Unbestaetigt")
+
+        # Tageskarten-Anzeige
+        self.assertContains(resp_dash, "Unbestätigt reserviert von:")
+        self.assertContains(resp_dash, "Vorher unbestätigt von:")
+
+        # 2. Tagesplanung aufrufen
+        resp_plan = self.client.get(reverse("termine:tagesplanung"), {"woche": tag_str, "fahrlehrer": self.anna.slug})
+        self.assertEqual(resp_plan.status_code, 200)
+        self.assertContains(resp_plan, "Kunde Unbestaetigt")
+        self.assertContains(resp_plan, "zuvor: Vorheriger Kunde")
+
     def test_fuehrerscheinklassen_crud(self):
         from termine.forms import BuchungsForm
         from termine.models import Fuehrerscheinklasse

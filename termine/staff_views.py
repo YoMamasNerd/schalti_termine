@@ -303,9 +303,16 @@ def dashboard(request):
         aktive_buchung = next(
             (b for b in termin.buchungen.all() if b.status in Buchung.AKTIVE_STATUS), None
         )
+        verfallene = [
+            b for b in sorted(termin.buchungen.all(), key=lambda x: x.erstellt_am, reverse=True)
+            if b.status == Buchung.Status.VERFALLEN
+        ]
+        letzte_verfallene = verfallene[0] if verfallene else None
+
         tages_termine.append({
             "termin": termin,
             "buchung": aktive_buchung,
+            "verfallene_buchung": letzte_verfallene,
         })
     tages_termine.sort(key=lambda e: (e["termin"].beginn, e["termin"].fahrlehrer.name))
 
@@ -318,6 +325,17 @@ def dashboard(request):
         )
         .select_related("termin", "termin__terminart", "termin__fahrlehrer")
         .order_by("termin__beginn")[:8]
+    )
+
+    # Anstehende verfallene Buchungen (Frist abgelaufen, Kunde kommt evtl. trotzdem)
+    anstehende_verfallene = list(
+        Buchung.objects.filter(
+            status=Buchung.Status.VERFALLEN,
+            termin__fahrlehrer__in=ziel_pks,
+            termin__beginn__gte=jetzt,
+        )
+        .select_related("termin", "termin__terminart", "termin__fahrlehrer")
+        .order_by("termin__beginn")[:10]
     )
 
     # KPIs
@@ -359,6 +377,7 @@ def dashboard(request):
             "gewaehlter_tag": gewaehlter_tag,
             "tages_termine": tages_termine,
             "naechste_buchungen": naechste,
+            "anstehende_verfallene": anstehende_verfallene,
             "kpi_frei": kpi_frei,
             "kpi_gebucht": kpi_gebucht,
             "kpi_offen": kpi_offen,
@@ -444,6 +463,9 @@ def tagesplanung(request):
         eintraege = []
         for t in tages_termine:
             buchung = t.aktive_buchung
+            verfallene = next(
+                (b for b in sorted(t.buchungen.all(), key=lambda x: x.erstellt_am, reverse=True) if b.status == Buchung.Status.VERFALLEN), None
+            )
             eintraege.append(
                 {
                     "art": "termin",
@@ -455,6 +477,7 @@ def tagesplanung(request):
                     "detail": buchung.name if buchung else "",
                     "termin": t,
                     "buchung": buchung,
+                    "verfallene_buchung": verfallene,
                 }
             )
 

@@ -209,6 +209,9 @@
                     <span class="abzeichen abzeichen--info" style="background:var(--marke-hell); color:var(--marke-dunkel); padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:600">Gebucht</span>
                   {% elif item.termin.status == 'frei' %}
                     <span class="abzeichen abzeichen--erfolg" style="background:var(--gruen-hell); color:var(--gruen-dunkel); padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:600">Frei</span>
+                    {% if item.verfallene_buchung %}
+                      <span class="abzeichen" style="background:var(--gelb-hell); color:var(--gelb); padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:600" title="Kunde hat E-Mail-Bestätigung nicht abgeschlossen">⚠️ Unbestätigt</span>
+                    {% endif %}
                   {% elif item.termin.status == 'reserviert' %}
                     <span class="abzeichen abzeichen--warnung" style="background:var(--gelb-hell); color:var(--gelb); padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:600">Wartet auf E-Mail-Bestätigung</span>
                   {% endif %}
@@ -250,6 +253,39 @@
                       „{{ item.buchung.nachricht|truncatewords:20 }}“
                     </div>
                   {% endif %}
+                  {% if item.verfallene_buchung %}
+                    <div style="margin-top:0.35rem; padding:0.25rem 0.5rem; background:var(--flaeche-dunkler); border-radius:4px; font-size:0.8rem; color:var(--text-leise)">
+                      ⚠️ Vorher unbestätigt von: <a href="{% url 'termine:buchung_detail' item.verfallene_buchung.pk %}" style="font-weight:600; color:inherit">{{ item.verfallene_buchung.name }}</a>
+                    </div>
+                  {% endif %}
+                </div>
+              {% elif item.verfallene_buchung %}
+                <div style="margin-top:0.5rem; padding:0.5rem 0.75rem; background:color-mix(in srgb, var(--gelb) 12%, var(--flaeche)); border:1px solid var(--gelb); border-radius:6px; font-size:0.88rem">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem">
+                    <div>
+                      ⚠️ <strong>Unbestätigt reserviert von:</strong>
+                      <a href="{% url 'termine:buchung_detail' item.verfallene_buchung.pk %}"><strong>{{ item.verfallene_buchung.name }}</strong></a>
+                      {% if item.verfallene_buchung.fuehrerscheinklasse %}
+                        <span class="leer">({{ item.verfallene_buchung.get_fuehrerscheinklasse_display }})</span>
+                      {% endif %}
+                    </div>
+                    <a class="knopf knopf--klein knopf--primaer" href="{% url 'termine:buchung_detail' item.verfallene_buchung.pk %}" style="font-size:0.78rem; padding:2px 8px">
+                      Jetzt einbuchen &rarr;
+                    </a>
+                  </div>
+                  <div style="display:flex; gap:0.8rem; margin-top:0.25rem; font-size:0.82rem">
+                    {% if item.verfallene_buchung.telefon %}
+                      <span>📞 <a href="tel:{{ item.verfallene_buchung.telefon }}">{{ item.verfallene_buchung.telefon }}</a></span>
+                    {% endif %}
+                    {% if item.verfallene_buchung.email %}
+                      <span>✉️ <a href="mailto:{{ item.verfallene_buchung.email }}">{{ item.verfallene_buchung.email }}</a></span>
+                    {% endif %}
+                  </div>
+                  {% if item.verfallene_buchung.nachricht %}
+                    <div style="margin-top:0.25rem; font-style:italic; font-size:0.8rem; color:var(--text-leise)">
+                      „{{ item.verfallene_buchung.nachricht|truncatewords:15 }}“
+                    </div>
+                  {% endif %}
                 </div>
               {% endif %}
             </div>
@@ -263,6 +299,67 @@
       {% endif %}
     </div>
   </div>
+
+  {% if anstehende_verfallene %}
+    <!-- Anstehende unbestätigte Termine (Kunde kommt evtl. trotzdem) -->
+    <div class="karte" style="border-left:4px solid var(--gelb); margin-bottom:1.5rem">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem">
+        <h2 style="margin:0; font-size:1.1rem; color:var(--text); display:flex; align-items:center; gap:0.5rem">
+          ⚠️ Anstehende unbestätigte Reservierungen ({{ anstehende_verfallene|length }})
+        </h2>
+        <span class="leer" style="font-size:0.85rem">Frist abgelaufen – Kunde erscheint evtl. trotzdem</span>
+      </div>
+      <p style="margin-bottom:0.75rem; font-size:0.88rem; color:var(--text-leise)">
+        Diese Kunden haben den Bestätigungslink nicht rechtzeitig geklickt. Der Slot wurde wieder freigegeben. Falls der Kunde dennoch erscheint, können Sie ihn mit einem Klick verbindlich einbuchen:
+      </p>
+      <div class="tabelle-huelle">
+        <table class="liste" style="font-size:0.88rem">
+          <thead>
+            <tr>
+              <th>Wann</th>
+              <th>Kunde</th>
+              <th>Kontakt</th>
+              <th>Terminart</th>
+              <th>Fahrlehrer</th>
+              <th>Slot-Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for buchung in anstehende_verfallene %}
+              <tr>
+                <td><strong>{{ buchung.termin.beginn_lokal|date:"D, j. M Y, H:i" }} Uhr</strong></td>
+                <td>
+                  <a href="{% url 'termine:buchung_detail' buchung.pk %}"><strong>{{ buchung.name }}</strong></a>
+                  {% if buchung.fuehrerscheinklasse %}<br><span class="leer">{{ buchung.get_fuehrerscheinklasse_display }}</span>{% endif %}
+                </td>
+                <td>
+                  {% if buchung.telefon %}<a href="tel:{{ buchung.telefon }}">📞 {{ buchung.telefon }}</a><br>{% endif %}
+                  {% if buchung.email %}<a href="mailto:{{ buchung.email }}">✉️ {{ buchung.email }}</a>{% endif %}
+                </td>
+                <td>{{ buchung.termin.terminart.name }}</td>
+                <td>{{ buchung.termin.fahrlehrer.name }}</td>
+                <td>
+                  {% if buchung.termin.status == 'frei' %}
+                    <span class="abzeichen" style="background:var(--gruen-hell); color:var(--gruen-dunkel); font-size:0.75rem; font-weight:600">Noch frei</span>
+                  {% elif buchung.termin.status == 'gebucht' %}
+                    <span class="abzeichen" style="background:var(--marke-hell); color:var(--marke-dunkel); font-size:0.75rem; font-weight:600">Anderweitig belegt</span>
+                  {% else %}
+                    <span class="abzeichen" style="font-size:0.75rem">{{ buchung.termin.get_status_display }}</span>
+                  {% endif %}
+                </td>
+                <td style="text-align:right">
+                  <a class="knopf knopf--klein knopf--primaer" href="{% url 'termine:buchung_detail' buchung.pk %}" style="font-size:0.78rem">
+                    Einbuchen / Details &rarr;
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
 
   <!-- Nächste anstehende Buchungen Tabelle -->
   <div class="karte">

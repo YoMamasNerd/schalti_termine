@@ -49,6 +49,11 @@
                       {% else %}
                         <strong>{{ eintrag.detail }}</strong>
                       {% endif %}
+                      {% if eintrag.verfallene_buchung %}
+                        <span style="display:block; font-size:0.7rem; color:var(--text-leise); font-weight:normal" title="Vorher unbestätigt reserviert von {{ eintrag.verfallene_buchung.name }}">
+                          (⚠️ zuvor: {{ eintrag.verfallene_buchung.name }})
+                        </span>
+                      {% endif %}
                     </span>
                   {% elif eintrag.status == "reserviert" %}
                     <span class="name">
@@ -59,7 +64,14 @@
                       {% endif %}
                     </span>
                   {% else %}
-                    <span class="name">{{ eintrag.titel }} (frei)</span>
+                    <span class="name">
+                      {{ eintrag.titel }} (frei)
+                      {% if eintrag.verfallene_buchung %}
+                        <span style="display:block; font-size:0.72rem; color:var(--gelb); font-weight:700; margin-top:2px" title="Reservierung nicht bestätigt von {{ eintrag.verfallene_buchung.name }}">
+                          ⚠️ <a href="{% url 'termine:buchung_detail' eintrag.verfallene_buchung.pk %}" style="color:inherit; text-decoration:underline">{{ eintrag.verfallene_buchung.name }}</a>
+                        </span>
+                      {% endif %}
+                    </span>
                   {% endif %}
                 </span>
                 {% if eintrag.status == "frei" %}
