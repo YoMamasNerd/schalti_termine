@@ -95,6 +95,11 @@
   text-decoration: none;
 }
 
+/* Besucher ohne Anmeldung sehen keine leere mobile Navigation */
+.schalti-header:not(:has(.schalti-nav-links li)) .schalti-nav-toggler {
+  display: none !important;
+}
+
 * { box-sizing: border-box; }
 
 body {

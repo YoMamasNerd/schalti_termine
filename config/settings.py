@@ -255,7 +255,7 @@ Q_CLUSTER = {
     "bulk": 10,
     "orm": "default",
     "catch_up": False,
-    "sync": IM_TESTLAUF,
+    "sync": env_bool("DJANGO_Q_SYNC", default=DEBUG or IM_TESTLAUF),
 }
 
 # --- Sicherheit ------------------------------------------------------------

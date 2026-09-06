@@ -21,17 +21,6 @@
 {% block nav_items %}
   {% if user.is_authenticated and user.is_staff or user.is_authenticated and user.fahrlehrer %}
     {% include "staff/_navigation.html" %}
-  {% else %}
-    <li>
-      <a href="{% url 'termine:start' %}" class="schalti-nav-pill" {% if request.resolver_match.url_name == 'start' %}aria-current="page"{% endif %}>
-        Termin buchen
-      </a>
-    </li>
-    <li>
-      <a href="{% url 'termine:login' %}" class="schalti-nav-pill" {% if request.resolver_match.url_name == 'login' %}aria-current="page"{% endif %}>
-        Fahrschul-Login
-      </a>
-    </li>
   {% endif %}
 {% endblock %}
 
