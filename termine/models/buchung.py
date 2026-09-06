@@ -57,6 +57,7 @@ class Buchung(models.Model):
     storniert_von = models.CharField(
         "Storniert von", max_length=20, blank=True, help_text="kunde oder fahrschule"
     )
+    verfallen_am = models.DateTimeField("Verfallen am", null=True, blank=True)
     erinnerung_am = models.DateTimeField(null=True, blank=True)
     einwilligung_am = models.DateTimeField(
         "Datenschutz-Einwilligung", null=True, blank=True

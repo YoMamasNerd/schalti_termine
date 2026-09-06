@@ -143,6 +143,8 @@ class DoppelOptIn(BuchungsBasis):
         self.termin.refresh_from_db()
         self.assertEqual(anzahl, 1)
         self.assertEqual(buchung.status, Buchung.Status.VERFALLEN)
+        self.assertIsNotNone(buchung.verfallen_am)
+        self.assertIsNone(buchung.reserviert_bis)
         self.assertEqual(self.termin.status, Termin.Status.FREI)
 
     def test_abgelaufene_reservierung_benachrichtigt_den_kunden(self):

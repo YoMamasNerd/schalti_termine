@@ -270,8 +270,9 @@ def abgelaufene_reservierungen_freigeben() -> int:
             if aktuell.status != Buchung.Status.OFFEN or not aktuell.ist_abgelaufen:
                 continue
             aktuell.status = Buchung.Status.VERFALLEN
+            aktuell.verfallen_am = jetzt
             aktuell.reserviert_bis = None
-            aktuell.save(update_fields=["status", "reserviert_bis"])
+            aktuell.save(update_fields=["status", "verfallen_am", "reserviert_bis"])
             # Nur zukünftige Termine dürfen wieder ins Angebot: Ein vergangener
             # Termin als FREI wäre ein buchbarer Slot in der Vergangenheit.
             Termin.objects.filter(

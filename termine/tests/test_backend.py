@@ -735,3 +735,54 @@ class HistorieTests(BackendBasis):
         self.assertEqual(len(resp2.context["ereignisse"]), 5)
         self.assertTrue(resp2.context["page_obj"].has_previous())
 
+    def test_verfallene_buchung_erscheint_nur_als_verfallen_und_nicht_als_buchung(self):
+        jetzt = timezone.now()
+        Buchung.objects.create(
+            termin=self.t1,
+            name="Verfallener Kunde",
+            email="verfallen@example.org",
+            status=Buchung.Status.VERFALLEN,
+            verfallen_am=jetzt,
+        )
+        Buchung.objects.create(
+            termin=self.t2,
+            name="Echter Kunde",
+            email="echt@example.org",
+            status=Buchung.Status.BESTAETIGT,
+        )
+
+        resp_alle = self.client.get(reverse("termine:historie"))
+        self.assertEqual(resp_alle.status_code, 200)
+        ereignisse = resp_alle.context["ereignisse"]
+        # Genau 2 Ereignisse: 1x echte Buchung, 1x Verfall (KEINE Doppelung als "Buchung")
+        self.assertEqual(len(ereignisse), 2)
+        arten = {e["art"]: e for e in ereignisse}
+        self.assertIn("buchung", arten)
+        self.assertIn("verfallen", arten)
+        self.assertEqual(arten["buchung"]["kunde_name"], "Echter Kunde")
+        self.assertEqual(arten["verfallen"]["kunde_name"], "Verfallener Kunde")
+
+        # Filter "Nur Buchungen" darf den verfallenen Kunden nicht enthalten
+        resp_buchung = self.client.get(reverse("termine:historie"), {"aktion": "buchung"})
+        self.assertEqual(len(resp_buchung.context["ereignisse"]), 1)
+        self.assertEqual(resp_buchung.context["ereignisse"][0]["kunde_name"], "Echter Kunde")
+
+        # Filter "Nur Verfallene" liefert nur den Verfall
+        resp_verfallen = self.client.get(reverse("termine:historie"), {"aktion": "verfallen"})
+        self.assertEqual(len(resp_verfallen.context["ereignisse"]), 1)
+        self.assertEqual(resp_verfallen.context["ereignisse"][0]["kunde_name"], "Verfallener Kunde")
+
+    def test_buchung_detail_zeigt_verfallen_am(self):
+        jetzt = timezone.now()
+        buchung = Buchung.objects.create(
+            termin=self.t1,
+            name="Verfallener Kunde",
+            email="verfallen@example.org",
+            status=Buchung.Status.VERFALLEN,
+            verfallen_am=jetzt,
+        )
+        resp = self.client.get(reverse("termine:buchung_detail", args=[buchung.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Verfallen am:")
+        self.assertContains(resp, "Bestätigungsfrist abgelaufen")
+

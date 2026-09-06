@@ -947,7 +947,9 @@ def historie(request):
 
     # 1. Buchungs-Ereignisse sammeln
     if aktion in ("alle", "buchung"):
-        qs_b = basis_buchungen.exclude(status=Buchung.Status.STORNIERT)
+        qs_b = basis_buchungen.exclude(
+            status__in=[Buchung.Status.STORNIERT, Buchung.Status.VERFALLEN]
+        )
         if zeit_grenze:
             qs_b = qs_b.filter(erstellt_am__gte=zeit_grenze)
         if suchbegriff:
@@ -1032,7 +1034,10 @@ def historie(request):
     if aktion in ("alle", "verfallen"):
         qs_v = basis_buchungen.filter(status=Buchung.Status.VERFALLEN)
         if zeit_grenze:
-            qs_v = qs_v.filter(erstellt_am__gte=zeit_grenze)
+            qs_v = qs_v.filter(
+                Q(verfallen_am__gte=zeit_grenze)
+                | Q(verfallen_am__isnull=True, erstellt_am__gte=zeit_grenze)
+            )
         if suchbegriff:
             qs_v = qs_v.filter(
                 Q(name__icontains=suchbegriff)
@@ -1040,8 +1045,8 @@ def historie(request):
                 | Q(telefon__icontains=suchbegriff)
             )
 
-        for b in qs_v.order_by("-erstellt_am")[:100]:
-            verfall_zeit = b.reserviert_bis or b.erstellt_am
+        for b in qs_v.order_by("-verfallen_am", "-erstellt_am")[:100]:
+            verfall_zeit = b.verfallen_am or b.reserviert_bis or b.erstellt_am
             ereignisse.append(
                 {
                     "art": "verfallen",

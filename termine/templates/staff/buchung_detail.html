@@ -67,6 +67,13 @@
               {{ buchung.storniert_am|date:"SHORT_DATETIME_FORMAT" }} Uhr (von {{ buchung.storniert_von|default:"Kunde" }})
             </dd>
           {% endif %}
+
+          {% if buchung.verfallen_am %}
+            <dt style="color:var(--text-leise); font-weight:500">Verfallen am:</dt>
+            <dd style="margin:0; font-size:0.85rem; color:var(--text-leise)">
+              {{ buchung.verfallen_am|date:"SHORT_DATETIME_FORMAT" }} Uhr (Bestätigungsfrist abgelaufen)
+            </dd>
+          {% endif %}
         </dl>
       </div>
 
