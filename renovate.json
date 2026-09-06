@@ -20,9 +20,27 @@
       "matchManagers": ["custom.regex"],
       "groupName": "CDN dependencies",
       "addLabels": ["cdn"]
+    },
+    {
+      "matchDepNames": ["schalti_ui"],
+      "groupName": "schalti_ui Design System",
+      "addLabels": ["design-system"],
+      "schedule": ["at any time"]
     }
   ],
   "customManagers": [
+    {
+      "customType": "regex",
+      "description": "schalti_ui Git-Pin gegen den master-Branch tracken - oeffnet einen PR, sobald es dort einen neuen Commit gibt",
+      "managerFilePatterns": ["/^requirements\\.txt$/"],
+      "matchStrings": [
+        "schalti_ui @ git\\+https://github\\.com/YoMamasNerd/schalti_ui\\.git@(?<currentDigest>[a-f0-9]+)"
+      ],
+      "depNameTemplate": "schalti_ui",
+      "packageNameTemplate": "https://github.com/YoMamasNerd/schalti_ui.git",
+      "datasourceTemplate": "git-refs",
+      "currentValueTemplate": "master"
+    },
     {
       "customType": "regex",
       "managerFilePatterns": ["/^templates/.*\\.html$/", "/^.*/templates/.*\\.html$/"],
