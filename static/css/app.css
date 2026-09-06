@@ -14,59 +14,90 @@
      für Text nicht. Für Zeigen und Fokus steht das dunklere #1f4467. */
 :root {
   /* Marke und Bedienung: Knöpfe, Links, aktiver Bereich, Auswahl */
-  --marke: #2b5883;
-  --marke-hell: #dbe8ef;
-  --marke-dunkel: #1f4467;
+  --marke: var(--schalti-marke, #2b5883);
+  --marke-hell: var(--schalti-marke-hell, #dbe8ef);
+  --marke-dunkel: var(--schalti-marke-dunkel, #1f4467);
   /* Schrift auf einer kräftig gefüllten Fläche – Marke oder Rot. */
-  --auf-akzent: #ffffff;
+  --auf-akzent: var(--schalti-auf-akzent, #ffffff);
 
-  /* Bedeutung „frei“ und „hat geklappt“ – bleibt grün, weil im Kalender
-     nichts so schnell verstanden wird wie ein grüner Tag. */
-  --gruen: #4a7c2f;
-  --gruen-hell: #d9ecc4;
-  --gruen-dunkel: #3f6329;
+  /* Bedeutung „frei“ und „hat geklappt“ – bleibt grün */
+  --gruen: var(--schalti-gruen, #4a7c2f);
+  --gruen-hell: var(--schalti-gruen-hell, #d9ecc4);
+  --gruen-dunkel: var(--schalti-gruen-dunkel, #3f6329);
 
-  --rot: #c72e2e;
-  --rot-hell: #fdecea;
-  --gelb: #8a6100;
-  --gelb-hell: #ffebb6;
+  --rot: var(--schalti-rot, #c72e2e);
+  --rot-hell: var(--schalti-rot-hell, #fdecea);
+  --gelb: var(--schalti-gelb, #8a6100);
+  --gelb-hell: var(--schalti-gelb-hell, #ffebb6);
 
-  --text: #2b5883;
-  --text-leise: #4d6b87;
-  --linie: #cfdbe2;
-  --flaeche: #ffffff;
-  --grund: #ebefe7;
+  --text: var(--schalti-text, #2b5883);
+  --text-leise: var(--schalti-text-leise, #4d6b87);
+  --linie: var(--schalti-linie, #cfdbe2);
+  --flaeche: var(--schalti-flaeche, #ffffff);
+  --grund: var(--schalti-grund, #ebefe7);
 
-  --radius: 10px;
-  --radius-klein: 6px;
-  --schatten: 0 1px 2px rgba(20, 30, 25, 0.06), 0 4px 12px rgba(20, 30, 25, 0.05);
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --radius: var(--schalti-radius, 10px);
+  --radius-klein: var(--schalti-radius-sm, 6px);
+  --schatten: var(--schalti-schatten, 0 1px 2px rgba(20, 30, 25, 0.06), 0 4px 12px rgba(20, 30, 25, 0.05));
+  --font: var(--sl-font-sans, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Die Fahrschulseite hat keine dunkle Fassung. Diese hier bleibt in
-       derselben Farbfamilie: blaugraue Flächen, der Akzent wird hell statt
-       dunkel – deshalb kippt --auf-akzent von Weiß auf Dunkel. */
-    --marke: #8fb9e3;
-    --marke-hell: #1d2c3a;
-    --marke-dunkel: #b9d5f0;
-    --auf-akzent: #10202e;
+    --marke: var(--schalti-marke, #8fb9e3);
+    --marke-hell: var(--schalti-marke-hell, #1d2c3a);
+    --marke-dunkel: var(--schalti-marke-dunkel, #b9d5f0);
+    --auf-akzent: var(--schalti-auf-akzent, #10202e);
 
-    --gruen: #8fc46a;
-    --gruen-hell: #1e2a17;
-    --gruen-dunkel: #a9d68a;
-    --rot: #f2b8b5;
-    --rot-hell: #3a2220;
-    --gelb: #e5c37c;
-    --gelb-hell: #33291480;
+    --gruen: var(--schalti-gruen, #8fc46a);
+    --gruen-hell: var(--schalti-gruen-hell, #1e2a17);
+    --gruen-dunkel: var(--schalti-gruen-dunkel, #a9d68a);
+    --rot: var(--schalti-rot, #f2b8b5);
+    --rot-hell: var(--schalti-rot-hell, #3a2220);
+    --gelb: var(--schalti-gelb, #e5c37c);
+    --gelb-hell: var(--schalti-gelb-hell, #33291480);
 
-    --text: #dde8ef;
-    --text-leise: #9db0be;
-    --linie: #2e3d48;
-    --flaeche: #1a242c;
-    --grund: #121a20;
+    --text: var(--schalti-text, #dde8ef);
+    --text-leise: var(--schalti-text-leise, #9db0be);
+    --linie: var(--schalti-linie, #2e3d48);
+    --flaeche: var(--schalti-flaeche, #1a242c);
+    --grund: var(--schalti-grund, #121a20);
   }
+}
+
+.sl-theme-dark {
+  --marke: var(--schalti-marke, #8fb9e3);
+  --marke-hell: var(--schalti-marke-hell, #1d2c3a);
+  --marke-dunkel: var(--schalti-marke-dunkel, #b9d5f0);
+  --auf-akzent: var(--schalti-auf-akzent, #10202e);
+
+  --gruen: var(--schalti-gruen, #8fc46a);
+  --gruen-hell: var(--schalti-gruen-hell, #1e2a17);
+  --gruen-dunkel: var(--schalti-gruen-dunkel, #a9d68a);
+  --rot: var(--schalti-rot, #f2b8b5);
+  --rot-hell: var(--schalti-rot-hell, #3a2220);
+  --gelb: var(--schalti-gelb, #e5c37c);
+  --gelb-hell: var(--schalti-gelb-hell, #33291480);
+
+  --text: var(--schalti-text, #dde8ef);
+  --text-leise: var(--schalti-text-leise, #9db0be);
+  --linie: var(--schalti-linie, #2e3d48);
+  --flaeche: var(--schalti-flaeche, #1a242c);
+  --grund: var(--schalti-grund, #121a20);
+}
+
+.tag:hover,
+.tag--frei:hover,
+.tag--gebucht:hover,
+.tag--gemischt:hover,
+.slot:hover,
+.schalti-nav-pill:hover {
+  text-decoration: none;
+}
+
+/* Besucher ohne Anmeldung sehen keine leere mobile Navigation */
+.schalti-header:not(:has(.schalti-nav-links li)) .schalti-nav-toggler {
+  display: none !important;
 }
 
 * { box-sizing: border-box; }

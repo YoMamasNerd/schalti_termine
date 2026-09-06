@@ -30,11 +30,16 @@ class AktiverPunkt(TestCase):
 
     def punkte(self, antwort) -> list[str]:
         """Die Beschriftungen aller als aktiv markierten Punkte."""
+        import re
         html = antwort.content.decode()
-        gefunden = []
-        for stueck in html.split('class="aktiv"')[1:]:
-            gefunden.append(stueck.split(">", 1)[1].split("<", 1)[0].strip())
-        return gefunden
+        return [
+            m.strip()
+            for m in re.findall(
+                r'<a[^>]*class="[^"]*\baktiv\b[^"]*"[^>]*>(.*?)</a>',
+                html,
+                re.DOTALL,
+            )
+        ]
 
     def test_jede_hauptseite_markiert_genau_sich_selbst(self):
         for name, beschriftung in (
@@ -69,13 +74,14 @@ class AktiverPunkt(TestCase):
     def test_oeffentliche_seite_hat_keine_interne_navigation_fuer_nicht_angemeldete(self):
         self.client.logout()
         antwort = self.client.get(reverse("termine:start"))
-        self.assertNotContains(antwort, "menue-schalter")
+        self.assertNotContains(antwort, "Tagesplanung")
+        self.assertNotContains(antwort, "Rhythmus-Regeln")
 
     def test_oeffentliche_seite_zeigt_interne_navigation_fuer_angemeldete_mitarbeiter(self):
         self.client.force_login(self.chef)
         antwort = self.client.get(reverse("termine:start"))
-        self.assertContains(antwort, "menue-schalter")
-        self.assertContains(antwort, "Interner Bereich")
+        self.assertContains(antwort, "Tagesplanung")
+        self.assertContains(antwort, "Rhythmus-Regeln")
 
 
 class OhneRequest(SimpleTestCase):

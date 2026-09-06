@@ -9,7 +9,7 @@ WORKDIR /app
 
 # Zeitzonendaten werden für die korrekte Sommerzeit-Umstellung gebraucht.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tzdata \
+    && apt-get install -y --no-install-recommends tzdata git curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
