@@ -209,6 +209,7 @@ class Buchungshorizont(Basis):
             beginn=dt.time(9, 0),
             ende=dt.time(10, 0),
             gueltig_ab=timezone.localdate(),
+            feiertage_auslassen=False,
         )
         generiere_termine(self.anna)
 
