@@ -34,3 +34,21 @@ jobs:
 
       - name: Tests
         run: python manage.py test -v 1
+
+  deploy:
+    needs: checks
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      # Der SSH-Key ist auf dem Server per "command=" in authorized_keys auf
+      # genau ein Skript (/home/termine/deploy.sh) beschraenkt - selbst bei
+      # Leak des Keys sind keine anderen Befehle auf dem Server ausfuehrbar.
+      - name: Deploy per SSH
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.SSH_HOST_FINGERPRINT }}
+          script: deploy
+
