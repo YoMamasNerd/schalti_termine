@@ -629,14 +629,14 @@ class Randfaelle(BackendBasis):
         termin2 = self.termin_fuer(self.anna, tage_voraus=1, stunde=11)
         termin2.status = Termin.Status.GEBUCHT
         termin2.save()
-        b_alt = Buchung.objects.create(
+        Buchung.objects.create(
             termin=termin2,
             name="Vorheriger Kunde",
             email="alt@example.com",
             status=Buchung.Status.VERFALLEN,
             verfallen_am=timezone.now(),
         )
-        b_neu = Buchung.objects.create(
+        Buchung.objects.create(
             termin=termin2,
             name="Echter Kunde",
             email="echt@example.com",
