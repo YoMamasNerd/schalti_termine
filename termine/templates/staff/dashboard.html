@@ -117,19 +117,19 @@
     <!-- Linke Spalte: Monatskalender -->
     <div class="karte" style="margin-bottom:0">
       <div class="kalender-kopf">
-        <a class="knopf knopf--leise knopf--klein"
+        <a class="knopf knopf--leise knopf--pfeil"
            href="?monat={{ vorheriger_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
            hx-get="?monat={{ vorheriger_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
            hx-select="#dashboard-kalender" hx-target="#dashboard-kalender" hx-swap="outerHTML"
-           aria-label="Vorheriger Monat">&larr;</a>
+           aria-label="Vorheriger Monat"><sl-icon name="chevron-left"></sl-icon></a>
 
         <h2>{{ monatsname }}</h2>
 
-        <a class="knopf knopf--leise knopf--klein"
+        <a class="knopf knopf--leise knopf--pfeil"
            href="?monat={{ naechster_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
            hx-get="?monat={{ naechster_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
            hx-select="#dashboard-kalender" hx-target="#dashboard-kalender" hx-swap="outerHTML"
-           aria-label="Nächster Monat">&rarr;</a>
+           aria-label="Nächster Monat"><sl-icon name="chevron-right"></sl-icon></a>
       </div>
 
       <table class="monat">

@@ -4,27 +4,27 @@
 {% endcomment %}
 <div class="kalender-kopf">
   {% if vorheriger_monat %}
-    <a class="knopf knopf--leise knopf--klein"
+    <a class="knopf knopf--leise knopf--pfeil"
        href="?monat={{ vorheriger_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
        hx-get="?monat={{ vorheriger_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
        hx-select="#buchungsbereich" hx-target="#buchungsbereich" hx-swap="outerHTML"
        hx-push-url="true"
-       aria-label="Vorheriger Monat">&larr;</a>
+       aria-label="Vorheriger Monat"><sl-icon name="chevron-left"></sl-icon></a>
   {% else %}
-    <span class="knopf knopf--leise knopf--klein" aria-hidden="true" style="visibility:hidden">&larr;</span>
+    <span class="knopf knopf--leise knopf--pfeil" aria-hidden="true" style="visibility:hidden"><sl-icon name="chevron-left"></sl-icon></span>
   {% endif %}
 
   <h2>{{ monatsname }}</h2>
 
   {% if naechster_monat %}
-    <a class="knopf knopf--leise knopf--klein"
+    <a class="knopf knopf--leise knopf--pfeil"
        href="?monat={{ naechster_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
        hx-get="?monat={{ naechster_monat }}{% if querystring %}&{{ querystring }}{% endif %}"
        hx-select="#buchungsbereich" hx-target="#buchungsbereich" hx-swap="outerHTML"
        hx-push-url="true"
-       aria-label="Nächster Monat">&rarr;</a>
+       aria-label="Nächster Monat"><sl-icon name="chevron-right"></sl-icon></a>
   {% else %}
-    <span class="knopf knopf--leise knopf--klein" aria-hidden="true" style="visibility:hidden">&rarr;</span>
+    <span class="knopf knopf--leise knopf--pfeil" aria-hidden="true" style="visibility:hidden"><sl-icon name="chevron-right"></sl-icon></span>
   {% endif %}
 </div>
 

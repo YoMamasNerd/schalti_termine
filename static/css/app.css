@@ -290,6 +290,14 @@ main h1 {
 }
 .kalender-kopf h2 { margin: 0; font-size: 1.05rem; }
 
+/* Größere, runde Blätter-Knöpfe statt der winzigen Pfeil-Zeichen –
+   gut treffbar auch auf dem Handy, mit Shoelace-Chevron statt &larr;/&rarr;. */
+.kalender-kopf .knopf--pfeil {
+  width: 2.5rem; height: 2.5rem; padding: 0; border-radius: 50%;
+  font-size: 1.3rem; line-height: 1; flex: none;
+}
+.kalender-kopf .knopf--pfeil sl-icon { pointer-events: none; }
+
 .monat { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .monat th {
   font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;
