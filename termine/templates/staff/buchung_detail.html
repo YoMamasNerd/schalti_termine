@@ -253,6 +253,61 @@
             </button>
           </form>
         </div>
+      {% elif buchung.status == 'verfallen' %}
+        <!-- Verfallenen Termin wieder einbuchen -->
+        <div class="karte" style="border-top:4px solid var(--gruen)">
+          <h2 style="margin-top:0; font-size:1.15rem; color:var(--gruen-dunkel); margin-bottom:0.5rem">
+            ✨ Termin wieder einbuchen
+          </h2>
+          <p class="leer" style="font-size:0.88rem; margin-bottom:1rem">
+            Die Reservierung ist verfallen. Sie können den Termin hier manuell verbindlich bestätigen, ohne dass der Kunde nochmals klicken muss. Der Kunde erhält automatisch die offizielle Bestätigungs-E-Mail samt Kalenderdatei.
+          </p>
+
+          {% if original_termin_verfuegbar %}
+            <form method="post" action="{% url 'termine:buchung_wieder_einbuchen' buchung.pk %}" style="margin-bottom:1.25rem"
+                  onsubmit="return confirm('Buchung für {{ buchung.name }} auf den ursprünglichen Termin verbindlich einbuchen? Der Kunde erhält eine Bestätigungs-E-Mail.');">
+              {% csrf_token %}
+              <div style="background:var(--flaeche-dunkler); padding:0.75rem; border-radius:6px; margin-bottom:0.75rem; font-size:0.88rem">
+                <strong>Ursprünglicher Termin ist noch frei:</strong><br>
+                📅 {{ buchung.termin.beginn_lokal|date:"l, j. F Y" }}, {{ buchung.termin.beginn_lokal|date:"H:i" }}–{{ buchung.termin.ende_lokal|date:"H:i" }} Uhr<br>
+                bei {{ buchung.termin.fahrlehrer.name }} ({{ buchung.termin.terminart.name }})
+              </div>
+              <button class="knopf knopf--primaer" type="submit" style="width:100%; justify-content:center">
+                Auf Originaltermin einbuchen
+              </button>
+            </form>
+          {% else %}
+            <div style="background:color-mix(in srgb, var(--rot) 10%, var(--flaeche)); border:1px solid var(--rot); padding:0.6rem 0.8rem; border-radius:6px; margin-bottom:1rem; font-size:0.85rem">
+              ⚠️ Der ursprüngliche Termin ist nicht mehr frei oder liegt in der Vergangenheit.
+            </div>
+          {% endif %}
+
+          {% if freie_termine %}
+            <form method="post" action="{% url 'termine:buchung_wieder_einbuchen' buchung.pk %}"
+                  onsubmit="return confirm('Buchung für {{ buchung.name }} auf den ausgewählten Termin verbindlich einbuchen? Der Kunde erhält eine Bestätigungs-E-Mail.');">
+              {% csrf_token %}
+              <div class="feld" style="margin-bottom:1rem">
+                <label for="ziel_termin_id" style="font-weight:600; display:block; margin-bottom:0.3rem">
+                  {% if original_termin_verfuegbar %}Oder auf anderen freien Slot buchen:{% else %}Neuen freien Slot auswählen:{% endif %}
+                </label>
+                <select name="ziel_termin_id" id="ziel_termin_id" required style="width:100%; font-size:0.95rem; padding:0.5rem">
+                  <option value="">-- Freien Termin wählen --</option>
+                  {% for ft in freie_termine %}
+                    {% if ft.pk != buchung.termin.pk or not original_termin_verfuegbar %}
+                      <option value="{{ ft.pk }}">
+                        {{ ft.beginn_lokal|date:"D, j. M Y, H:i" }}–{{ ft.ende_lokal|date:"H:i" }} Uhr — {{ ft.fahrlehrer.name }} ({{ ft.terminart.name }})
+                      </option>
+                    {% endif %}
+                  {% endfor %}
+                </select>
+              </div>
+
+              <button class="knopf {% if not original_termin_verfuegbar %}knopf--primaer{% else %}knopf--leise{% endif %}" type="submit" style="width:100%; justify-content:center">
+                Auf gewählten Termin einbuchen
+              </button>
+            </form>
+          {% endif %}
+        </div>
       {% else %}
         <div class="karte" style="background:var(--flaeche-dunkler)">
           <h2 style="margin-top:0; font-size:1.1rem; color:var(--text-leise); margin-bottom:0.5rem">

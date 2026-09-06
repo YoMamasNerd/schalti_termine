@@ -584,6 +584,35 @@ class Randfaelle(BackendBasis):
         self.assertEqual(termin1.status, Termin.Status.FREI)
         self.assertEqual(termin2.status, Termin.Status.GEBUCHT)
 
+    def test_buchung_wieder_einbuchen_view(self):
+        termin1 = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
+        b = Buchung.objects.create(
+            termin=termin1,
+            name="Max Verfallen",
+            email="max@example.com",
+            status=Buchung.Status.VERFALLEN,
+            verfallen_am=timezone.now(),
+        )
+
+        # GET buchung_detail zeigt die Wieder-Einbuchen Karte
+        resp = self.client.get(reverse("termine:buchung_detail", args=[b.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.context["original_termin_verfuegbar"])
+        self.assertContains(resp, "Termin wieder einbuchen")
+        self.assertContains(resp, "Auf Originaltermin einbuchen")
+
+        # POST buchung_wieder_einbuchen bucht den Termin verbindlich ein
+        antwort = self.client.post(
+            reverse("termine:buchung_wieder_einbuchen", args=[b.pk]),
+            follow=True,
+        )
+        self.assertEqual(antwort.status_code, 200)
+        b.refresh_from_db()
+        termin1.refresh_from_db()
+        self.assertEqual(b.status, Buchung.Status.BESTAETIGT)
+        self.assertEqual(termin1.status, Termin.Status.GEBUCHT)
+        self.assertIsNone(b.verfallen_am)
+
     def test_fuehrerscheinklassen_crud(self):
         from termine.forms import BuchungsForm
         from termine.models import Fuehrerscheinklasse

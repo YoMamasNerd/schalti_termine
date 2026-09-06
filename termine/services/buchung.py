@@ -256,6 +256,63 @@ def verschieben(
     return buchung
 
 
+@transaction.atomic
+def verfallene_buchung_einbuchen(
+    buchung: Buchung,
+    ziel_termin: Termin | None = None,
+    *,
+    benachrichtigen: bool = True,
+) -> Buchung:
+    """Bucht eine verfallene Reservierung durch einen Mitarbeiter manuell wieder ein.
+
+    Macht die Buchung direkt verbindlich (Status BESTAETIGT), ohne dass der
+    Kunde den Bestätigungslink klicken muss, und verschickt die Bestätigungsmail.
+    """
+    buchung = Buchung.objects.select_for_update().select_related("termin").get(pk=buchung.pk)
+
+    if buchung.status != Buchung.Status.VERFALLEN:
+        raise BuchungsFehler("Nur verfallene Buchungen können wieder eingebucht werden.")
+
+    jetzt = timezone.now()
+    termin_pk = ziel_termin.pk if ziel_termin else buchung.termin_id
+    try:
+        termin = Termin.objects.select_for_update().get(pk=termin_pk)
+    except Termin.DoesNotExist as exc:
+        raise TerminNichtVerfuegbar("Der gewünschte Termin existiert nicht.") from exc
+
+    if termin.beginn <= jetzt:
+        raise TerminNichtVerfuegbar("Termine in der Vergangenheit können nicht eingebucht werden.")
+
+    if termin.status != Termin.Status.FREI:
+        raise TerminNichtVerfuegbar("Der Termin ist nicht mehr frei.")
+
+    if termin.ist_gesperrt():
+        raise TerminNichtVerfuegbar("Der gewählte Termin steht wegen einer Sperrzeit nicht zur Verfügung.")
+
+    # Termin auf gebucht setzen
+    Termin.objects.filter(pk=termin.pk).update(status=Termin.Status.GEBUCHT)
+    termin.status = Termin.Status.GEBUCHT
+
+    # Buchung aktivieren
+    buchung.termin = termin
+    buchung.status = Buchung.Status.BESTAETIGT
+    buchung.bestaetigt_am = jetzt
+    buchung.verfallen_am = None
+    buchung.reserviert_bis = None
+    buchung.save(update_fields=["termin", "status", "bestaetigt_am", "verfallen_am", "reserviert_bis"])
+
+    if benachrichtigen:
+        def _nach_einbuchen():
+            mail.buchung_bestaetigt_kunde(buchung)
+            mail.buchung_bestaetigt_fahrlehrer(buchung)
+            fsm_sync.async_buche_in_fsm(buchung)
+
+        transaction.on_commit(_nach_einbuchen)
+
+    logger.info("Verfallene Buchung %s manuell eingebucht auf Termin %s", buchung.referenz, termin.pk)
+    return buchung
+
+
 def abgelaufene_reservierungen_freigeben() -> int:
     """Gibt Termine frei, deren Bestätigungslink nicht rechtzeitig geklickt wurde."""
     jetzt = timezone.now()

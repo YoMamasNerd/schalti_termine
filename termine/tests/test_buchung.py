@@ -669,3 +669,69 @@ class ReservierungsdauerEinstellbar(BuchungsBasis):
             "aktive_fuehrerscheinklassen": [],
             "fsm_theorie_blockiert_beratung": "",
         }
+
+
+class VerfalleneBuchungWiederEinbuchenTests(BuchungsBasis):
+    def test_verfallene_buchung_auf_originaltermin_einbuchen_mit_mail(self):
+        buchung = self.reservieren()
+        buchung.reserviert_bis = timezone.now() - dt.timedelta(minutes=1)
+        buchung.save()
+        buchungs_service.abgelaufene_reservierungen_freigeben()
+
+        buchung.refresh_from_db()
+        self.assertEqual(buchung.status, Buchung.Status.VERFALLEN)
+        self.assertEqual(self.termin.status, Termin.Status.FREI)
+
+        django_mail.outbox.clear()
+
+        # Mitarbeiter bucht manuell wieder ein
+        with self.captureOnCommitCallbacks(execute=True):
+            aktualisiert = buchungs_service.verfallene_buchung_einbuchen(buchung)
+
+        aktualisiert.refresh_from_db()
+        self.termin.refresh_from_db()
+
+        self.assertEqual(aktualisiert.status, Buchung.Status.BESTAETIGT)
+        self.assertIsNotNone(aktualisiert.bestaetigt_am)
+        self.assertIsNone(aktualisiert.verfallen_am)
+        self.assertEqual(self.termin.status, Termin.Status.GEBUCHT)
+
+        # Kunde und Fahrlehrer erhalten Bestätigungsmails
+        self.assertEqual(len(django_mail.outbox), 2)
+        kunden_mail = next(m for m in django_mail.outbox if buchung.email in m.to)
+        self.assertIn("terminbestätigung", kunden_mail.subject.lower())
+        self.assertEqual(len(kunden_mail.attachments), 1)
+        self.assertTrue(kunden_mail.attachments[0][0].endswith(".ics"))
+
+    def test_verfallene_buchung_auf_neuen_termin_einbuchen(self):
+        buchung = self.reservieren()
+        buchung.status = Buchung.Status.VERFALLEN
+        buchung.verfallen_am = timezone.now()
+        buchung.save()
+
+        neuer_termin = self.neuer_termin(tage_voraus=6, stunde=16)
+
+        aktualisiert = buchungs_service.verfallene_buchung_einbuchen(buchung, ziel_termin=neuer_termin)
+        aktualisiert.refresh_from_db()
+        neuer_termin.refresh_from_db()
+
+        self.assertEqual(aktualisiert.status, Buchung.Status.BESTAETIGT)
+        self.assertEqual(aktualisiert.termin_id, neuer_termin.pk)
+        self.assertEqual(neuer_termin.status, Termin.Status.GEBUCHT)
+
+    def test_einbuchen_nicht_moeglich_wenn_termin_bereits_gebucht(self):
+        buchung = self.reservieren()
+        buchung.status = Buchung.Status.VERFALLEN
+        buchung.save()
+
+        self.termin.status = Termin.Status.GEBUCHT
+        self.termin.save()
+
+        with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
+            buchungs_service.verfallene_buchung_einbuchen(buchung)
+
+    def test_einbuchen_nicht_moeglich_wenn_buchung_nicht_verfallen(self):
+        buchung = self.reservieren()
+        with self.assertRaises(buchungs_service.BuchungsFehler):
+            buchungs_service.verfallene_buchung_einbuchen(buchung)
+

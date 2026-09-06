@@ -42,6 +42,11 @@ urlpatterns = [
         name="buchung_verschieben",
     ),
     path(
+        "intern/buchungen/<int:pk>/wieder-einbuchen/",
+        staff_views.buchung_wieder_einbuchen,
+        name="buchung_wieder_einbuchen",
+    ),
+    path(
         "intern/buchungen/<int:pk>/stornieren/",
         staff_views.buchung_absagen,
         name="buchung_absagen",

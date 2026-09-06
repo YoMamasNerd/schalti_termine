@@ -832,6 +832,13 @@ def buchung_detail(request, pk: int):
         .order_by("beginn")[:60]
     )
 
+    original_termin_verfuegbar = (
+        buchung.status == Buchung.Status.VERFALLEN
+        and buchung.termin.status == Termin.Status.FREI
+        and buchung.termin.beginn > jetzt
+        and not buchung.termin.ist_gesperrt()
+    )
+
     return render(
         request,
         "staff/buchung_detail.html",
@@ -839,6 +846,7 @@ def buchung_detail(request, pk: int):
             "buchung": buchung,
             "andere_buchungen": andere_buchungen,
             "freie_termine": freie_termine,
+            "original_termin_verfuegbar": original_termin_verfuegbar,
         },
     )
 
@@ -864,6 +872,37 @@ def buchung_verschieben(request, pk: int):
             f"Termin für {buchung.name} erfolgreich auf {date_format(buchung.termin.beginn_lokal, 'SHORT_DATE_FORMAT')}, {buchung.termin.beginn_lokal:%H:%M} Uhr verschoben.",
         )
     except buchungs_service.BuchungsFehler as exc:
+        messages.error(request, str(exc))
+
+    return redirect("termine:buchung_detail", pk=buchung.pk)
+
+
+@mitarbeiter
+@require_POST
+def buchung_wieder_einbuchen(request, pk: int):
+    erlaubt = _erlaubte_fahrlehrer(request.user)
+    buchung = get_object_or_404(Buchung, pk=pk, termin__fahrlehrer__in=erlaubt)
+
+    if buchung.status != Buchung.Status.VERFALLEN:
+        messages.error(request, "Nur verfallene Buchungen können wieder eingebucht werden.")
+        return redirect("termine:buchung_detail", pk=buchung.pk)
+
+    neuer_termin_id = request.POST.get("ziel_termin_id")
+    ziel_termin = None
+    if neuer_termin_id:
+        try:
+            ziel_termin = Termin.objects.get(pk=int(neuer_termin_id), fahrlehrer__in=erlaubt)
+        except (Termin.DoesNotExist, ValueError):
+            messages.error(request, "Der gewählte Termin existiert nicht oder ist nicht erlaubt.")
+            return redirect("termine:buchung_detail", pk=buchung.pk)
+
+    try:
+        buchung = buchungs_service.verfallene_buchung_einbuchen(buchung, ziel_termin=ziel_termin)
+        messages.success(
+            request,
+            f"Buchung für {buchung.name} am {date_format(buchung.termin.beginn_lokal, 'SHORT_DATE_FORMAT')}, {buchung.termin.beginn_lokal:%H:%M} Uhr erfolgreich eingebucht. Die Bestätigungsmail wurde an den Kunden verschickt.",
+        )
+    except (buchungs_service.BuchungsFehler, buchungs_service.TerminNichtVerfuegbar) as exc:
         messages.error(request, str(exc))
 
     return redirect("termine:buchung_detail", pk=buchung.pk)
