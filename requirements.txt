@@ -1,6 +1,6 @@
 Django==6.1.1
 django-q2==1.11.1
-holidays==0.103
+holidays==0.104
 icalendar==7.3.0
 python-dotenv==1.2.3
 whitenoise==6.12.0
