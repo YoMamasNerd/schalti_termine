@@ -34,6 +34,12 @@ JOBS = {
         15,
         "Gleicht Belegungszeiten (Sperren) aus dem Fahrschulmanager ab.",
     ),
+    "System-Logs bereinigen": (
+        "termine.jobs.system_logs_bereinigen",
+        Schedule.DAILY,
+        None,
+        "Löscht System-Logs älter als 30 Tage und deckelt auf 10.000 Einträge.",
+    ),
 }
 
 

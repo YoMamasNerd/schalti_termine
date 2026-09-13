@@ -647,6 +647,18 @@
               {% endif %}
             </div>
           </div>
+
+          <div class="karte">
+            <h2>📋 System- &amp; Audit-Logs</h2>
+            <p class="leer" style="line-height:1.55; margin-bottom:1rem">
+              Filterbare Ereignisprotokolle für Buchungen, Absagen, Termine, FSM-Syncs und Systemaktivitäten. Automatische 30-Tage-Aufbewahrung in der Datenbank.
+            </p>
+            <div class="knopfreihe">
+              <a class="knopf" href="{% url 'termine:system_logs' %}">
+                Zu den System-Logs &rarr;
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     {% endif %}

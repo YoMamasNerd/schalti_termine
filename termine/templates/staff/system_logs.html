@@ -1,0 +1,203 @@
+{% extends "staff/base_staff.html" %}
+
+{% block titel %}System- &amp; Audit-Logs – {{ SITE_NAME }}{% endblock %}
+
+{% block inhalt %}
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem">
+    <div>
+      <h1 style="margin:0">📋 System- &amp; Audit-Logs</h1>
+      <p class="leer" style="margin:0.25rem 0 0">
+        Ereignisprotokolle für Buchungen, Termine, FSM-Syncs und Systemaktivitäten.
+      </p>
+    </div>
+    <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap">
+      <form method="post" action="{% url 'termine:cleanup_logs' %}" onsubmit="return confirm('Möchtest du Logs älter als 30 Tage jetzt bereinigen?');" style="margin:0">
+        {% csrf_token %}
+        <button type="submit" class="knopf knopf--leise knopf--klein" title="Löscht Logs älter als 30 Tage und deckelt auf max. 10.000 Einträge">
+          🗑️ Alte Logs bereinigen
+        </button>
+      </form>
+      <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:einstellungen' %}">
+        ⚙️ Einstellungen
+      </a>
+    </div>
+  </div>
+
+  {# --- Stats Leiste --- #}
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:1rem; margin-bottom:1.5rem">
+    <div class="karte" style="padding:1rem">
+      <div style="font-size:0.8rem; color:var(--text-leise); text-transform:uppercase; font-weight:600">Gespeicherte Logs</div>
+      <div style="font-size:1.6rem; font-weight:700; margin-top:0.25rem">{{ total_logs }}</div>
+      <div style="font-size:0.75rem; color:var(--text-leise); margin-top:0.25rem">Max. 10.000 (Rollierend)</div>
+    </div>
+    <div class="karte" style="padding:1rem">
+      <div style="font-size:0.8rem; color:var(--text-leise); text-transform:uppercase; font-weight:600">Fehler (letzte 24h)</div>
+      <div style="font-size:1.6rem; font-weight:700; margin-top:0.25rem; {% if errors_24h > 0 %}color:#dc2626{% else %}color:#16a34a{% endif %}">
+        {{ errors_24h }}
+      </div>
+      <div style="font-size:0.75rem; color:var(--text-leise); margin-top:0.25rem">ERROR &amp; CRITICAL</div>
+    </div>
+    <div class="karte" style="padding:1rem">
+      <div style="font-size:0.8rem; color:var(--text-leise); text-transform:uppercase; font-weight:600">Warnungen (24h)</div>
+      <div style="font-size:1.6rem; font-weight:700; margin-top:0.25rem; {% if warnings_24h > 0 %}color:#d97706{% else %}color:#16a34a{% endif %}">
+        {{ warnings_24h }}
+      </div>
+      <div style="font-size:0.75rem; color:var(--text-leise); margin-top:0.25rem">WARNING Level</div>
+    </div>
+    <div class="karte" style="padding:1rem">
+      <div style="font-size:0.8rem; color:var(--text-leise); text-transform:uppercase; font-weight:600">Speicher &amp; Retention</div>
+      <div style="font-size:1.15rem; font-weight:700; margin-top:0.4rem; color:var(--marke)">30 Tage</div>
+      <div style="font-size:0.75rem; color:var(--text-leise); margin-top:0.25rem">Automatische Bereinigung</div>
+    </div>
+  </div>
+
+  {# --- Filterleiste --- #}
+  <div class="karte" style="margin-bottom:1.5rem">
+    <form method="get" action="{% url 'termine:system_logs' %}" style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end">
+      <div style="flex:2; min-width:220px">
+        <label for="q" style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:0.35rem">Suche</label>
+        <input type="text" id="q" name="q" value="{{ query }}" placeholder="Titel, Nachricht, Aktion, Benutzer…" style="width:100%; padding:0.5rem 0.75rem">
+      </div>
+
+      <div style="flex:1; min-width:160px">
+        <label for="kategorie" style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:0.35rem">Art / Bereich</label>
+        <select id="kategorie" name="kategorie" style="width:100%; padding:0.5rem 0.75rem" onchange="this.form.submit()">
+          <option value="">Alle Bereiche</option>
+          {% for val, label in kategorien %}
+            <option value="{{ val }}" {% if selected_kategorie == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="flex:1; min-width:140px">
+        <label for="level" style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:0.35rem">Level</label>
+        <select id="level" name="level" style="width:100%; padding:0.5rem 0.75rem" onchange="this.form.submit()">
+          <option value="">Alle Level</option>
+          {% for val, label in level_choices %}
+            <option value="{{ val }}" {% if selected_level == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="flex:1; min-width:140px">
+        <label for="zeitraum" style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:0.35rem">Zeitraum</label>
+        <select id="zeitraum" name="zeitraum" style="width:100%; padding:0.5rem 0.75rem" onchange="this.form.submit()">
+          <option value="heute" {% if selected_zeitraum == 'heute' %}selected{% endif %}>Heute</option>
+          <option value="7tage" {% if selected_zeitraum == '7tage' %}selected{% endif %}>Letzte 7 Tage</option>
+          <option value="30tage" {% if selected_zeitraum == '30tage' %}selected{% endif %}>Letzte 30 Tage</option>
+          <option value="alle" {% if selected_zeitraum == 'alle' %}selected{% endif %}>Alle (gesamt)</option>
+        </select>
+      </div>
+
+      <div style="display:flex; gap:0.5rem">
+        <button type="submit" class="knopf knopf--klein">Filtern</button>
+        {% if selected_kategorie or selected_level or query or selected_zeitraum != '7tage' %}
+          <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:system_logs' %}">Zurücksetzen</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  {# --- Tabelle --- #}
+  {% if logs %}
+    <div class="karte">
+      <div class="tabelle-huelle">
+        <table class="liste tabelle--kompakt als-karten">
+          <thead>
+            <tr>
+              <th style="width:160px">Zeitpunkt</th>
+              <th style="width:100px">Level</th>
+              <th style="width:140px">Art / Bereich</th>
+              <th>Ereignis / Details</th>
+              <th style="width:140px">Benutzer</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+              <tr {% if log.level == 'ERROR' or log.level == 'CRITICAL' %}style="background:rgba(239, 68, 68, 0.05)"{% elif log.level == 'WARNING' %}style="background:rgba(245, 158, 11, 0.05)"{% endif %}>
+                <td data-label="Zeitpunkt" style="font-family:monospace; font-size:0.85rem; color:var(--text-leise)">
+                  {{ log.created_at|date:"d.m.Y H:i:s" }}
+                </td>
+                <td data-label="Level">
+                  {% if log.level == 'INFO' %}
+                    <span class="abzeichen" style="background:#e0f2fe; color:#0369a1; font-weight:600">INFO</span>
+                  {% elif log.level == 'WARNING' %}
+                    <span class="abzeichen" style="background:#fef3c7; color:#b45309; font-weight:600">WARNUNG</span>
+                  {% elif log.level == 'ERROR' or log.level == 'CRITICAL' %}
+                    <span class="abzeichen" style="background:#fee2e2; color:#b91c1c; font-weight:600">FEHLER</span>
+                  {% else %}
+                    <span class="abzeichen">{{ log.level }}</span>
+                  {% endif %}
+                </td>
+                <td data-label="Art / Bereich">
+                  <span class="abzeichen" style="background:var(--flaeche-hoch); font-size:0.8rem">
+                    {{ log.get_kategorie_display }}
+                  </span>
+                  <div style="font-size:0.75rem; color:var(--text-leise); margin-top:2px; font-family:monospace">
+                    {{ log.aktion }}
+                  </div>
+                </td>
+                <td data-label="Ereignis">
+                  <div style="font-weight:600; color:var(--text)">
+                    {{ log.titel }}
+                  </div>
+                  {% if log.nachricht %}
+                    <div style="margin-top:0.25rem; font-size:0.85rem; color:var(--text-leise); white-space:pre-wrap; word-break:break-word">
+                      {{ log.nachricht|truncatechars:300 }}
+                    </div>
+                  {% endif %}
+                  {% if log.details %}
+                    <details style="margin-top:0.35rem; font-size:0.8rem; color:var(--marke); cursor:pointer">
+                      <summary>JSON-Zusatzdaten anzeigen</summary>
+                      <pre style="background:var(--flaeche-hoch); padding:0.5rem; border-radius:4px; overflow-x:auto; margin:0.25rem 0; font-size:0.75rem; font-family:monospace">{{ log.details|pprint }}</pre>
+                    </details>
+                  {% endif %}
+                </td>
+                <td data-label="Benutzer" style="font-size:0.85rem">
+                  {% if log.benutzer %}
+                    👤 {{ log.benutzer.get_full_name|default:log.benutzer.username }}
+                  {% else %}
+                    <span style="color:var(--text-leise); font-style:italic">System / Auto</span>
+                  {% endif %}
+                  {% if log.ip_adresse %}
+                    <div style="font-size:0.75rem; color:var(--text-leise); font-family:monospace; margin-top:2px">
+                      {{ log.ip_adresse }}
+                    </div>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {# Pagination #}
+      {% if page_obj.has_other_pages %}
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.25rem; flex-wrap:wrap; gap:0.75rem; padding-top:1rem; border-top:1px solid var(--linie)">
+          <span style="font-size:0.85rem; color:var(--text-leise)">
+            Seite {{ page_obj.number }} von {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} Einträge insgesamt)
+          </span>
+          <div style="display:flex; gap:0.5rem">
+            {% if page_obj.has_previous %}
+              <a class="knopf knopf--leise knopf--klein" href="?kategorie={{ selected_kategorie }}&level={{ selected_level }}&zeitraum={{ selected_zeitraum }}&q={{ query }}&page={{ page_obj.previous_page_number }}">
+                &larr; Vorherige
+              </a>
+            {% endif %}
+            {% if page_obj.has_next %}
+              <a class="knopf knopf--leise knopf--klein" href="?kategorie={{ selected_kategorie }}&level={{ selected_level }}&zeitraum={{ selected_zeitraum }}&q={{ query }}&page={{ page_obj.next_page_number }}">
+                Nächste &rarr;
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="karte" style="text-align:center; padding:3rem 1rem">
+      <h3 style="margin:0; color:var(--text)">Keine Logs für die gewählten Filter gefunden</h3>
+      <p class="leer" style="margin:0.5rem 0 0; font-size:0.9rem">
+        Passe die Filterkriterien an oder wähle einen größeren Zeitraum.
+      </p>
+    </div>
+  {% endif %}
+{% endblock %}

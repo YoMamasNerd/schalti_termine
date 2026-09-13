@@ -1886,3 +1886,84 @@ def fsm_einstellungen(request):
             "ist_inhaber": ist_inhaber,
         },
     )
+
+
+@inhaber
+def system_logs(request):
+    """Zeigt die System- & Audit-Logs an, filterbar nach Art/Kategorie, Level, Zeitraum und Suche."""
+    from datetime import timedelta
+    from django.core.paginator import Paginator
+    from django.db.models import Q
+    from .models.logging import LogKategorie, LogLevel, SystemLog
+
+    qs = SystemLog.objects.select_related("benutzer").order_by("-created_at")
+
+    selected_kategorie = request.GET.get("kategorie", "").strip().lower()
+    if selected_kategorie and selected_kategorie in LogKategorie.values:
+        qs = qs.filter(kategorie=selected_kategorie)
+
+    selected_level = request.GET.get("level", "").strip().upper()
+    if selected_level and selected_level in LogLevel.values:
+        qs = qs.filter(level=selected_level)
+
+    selected_zeitraum = request.GET.get("zeitraum", "7tage").strip().lower()
+    now = timezone.now()
+    if selected_zeitraum == "heute":
+        qs = qs.filter(created_at__date=now.date())
+    elif selected_zeitraum == "7tage":
+        qs = qs.filter(created_at__gte=now - timedelta(days=7))
+    elif selected_zeitraum == "30tage":
+        qs = qs.filter(created_at__gte=now - timedelta(days=30))
+
+    query = request.GET.get("q", "").strip()
+    if query:
+        qs = qs.filter(
+            Q(titel__icontains=query)
+            | Q(nachricht__icontains=query)
+            | Q(aktion__icontains=query)
+            | Q(benutzer__username__icontains=query)
+            | Q(benutzer__first_name__icontains=query)
+            | Q(benutzer__last_name__icontains=query)
+        )
+
+    total_logs = SystemLog.objects.count()
+    letzte_24h = now - timedelta(hours=24)
+    errors_24h = SystemLog.objects.filter(level__in=[LogLevel.ERROR, LogLevel.CRITICAL], created_at__gte=letzte_24h).count()
+    warnings_24h = SystemLog.objects.filter(level=LogLevel.WARNING, created_at__gte=letzte_24h).count()
+
+    paginator = Paginator(qs, 50)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
+    return render(
+        request,
+        "staff/system_logs.html",
+        {
+            "page_obj": page_obj,
+            "logs": page_obj.object_list,
+            "selected_kategorie": selected_kategorie,
+            "selected_level": selected_level,
+            "selected_zeitraum": selected_zeitraum,
+            "query": query,
+            "kategorien": LogKategorie.choices,
+            "level_choices": LogLevel.choices,
+            "total_logs": total_logs,
+            "errors_24h": errors_24h,
+            "warnings_24h": warnings_24h,
+            "ist_inhaber": request.user.is_staff,
+        },
+    )
+
+
+@inhaber
+@require_POST
+def cleanup_logs_action(request):
+    """Manuelle Bereinigung alter System-Logs (> 30 Tage)."""
+    from .services.logging import cleanup_old_logs
+
+    res = cleanup_old_logs(max_days=30, max_records=10000)
+    messages.success(
+        request,
+        f"Bereinigung abgeschlossen: {res['gesamt_geloescht']} alte Einträge entfernt ({res['verbleibend']} verbleibend).",
+    )
+    return redirect("termine:system_logs")

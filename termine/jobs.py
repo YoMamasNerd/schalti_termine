@@ -41,3 +41,11 @@ def fsm_synchronisieren() -> str:
 
     ergebnisse = sync_alle_fahrlehrer()
     return f"FSM-Sync: {sum(ergebnisse.values())} Sperrzeiten für {len(ergebnisse)} Fahrlehrer abgeglichen"
+
+
+def system_logs_bereinigen() -> str:
+    """Täglich: Logs älter als 30 Tage löschen und Tabelle deckeln."""
+    from .services.logging import cleanup_old_logs
+
+    res = cleanup_old_logs(max_days=30, max_records=10000)
+    return f"Logs bereinigt: {res['gesamt_geloescht']} gelöscht ({res['verbleibend']} verbleibend)"

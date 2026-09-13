@@ -34,7 +34,7 @@
   </a>
 </li>
 
-{% aktiv 'einstellungen' 'terminarten' 'terminart_neu' 'terminart_bearbeiten' 'klassen' 'klasse_neu' 'klasse_bearbeiten' 'fahrlehrer_neu' 'fsm_einstellungen' as hier %}
+{% aktiv 'einstellungen' 'terminarten' 'terminart_neu' 'terminart_bearbeiten' 'klassen' 'klasse_neu' 'klasse_bearbeiten' 'fahrlehrer_neu' 'fsm_einstellungen' 'system_logs' as hier %}
 <li>
   <a class="schalti-nav-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:einstellungen' %}">
     Einstellungen

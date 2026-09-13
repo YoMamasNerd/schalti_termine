@@ -97,10 +97,17 @@ def reservieren(
     termin.status = Termin.Status.RESERVIERT
     termin.save(update_fields=["status", "geaendert_am"])
 
-    transaction.on_commit(lambda: mail.bestaetigung_anfordern(buchung))
-    # Bewusst die Referenz statt der E-Mail-Adresse: Nach DATA_RETENTION_DAYS
-    # putzt die Anonymisierung die Datenbank – im Log stünde die Adresse sonst
-    # weiter, und zwar für immer.
+    def _nach_reservierung():
+        mail.bestaetigung_anfordern(buchung)
+        from .logging import log_event
+        log_event(
+            kategorie="buchung",
+            aktion="reservierung_erstellt",
+            titel=f"Termin reserviert ({buchung.referenz})",
+            details={"termin_id": termin.pk, "referenz": buchung.referenz},
+        )
+
+    transaction.on_commit(_nach_reservierung)
     logger.info("Termin %s reserviert (%s)", termin.pk, buchung.referenz)
     return buchung
 
@@ -131,6 +138,13 @@ def bestaetigen(buchung: Buchung) -> Buchung:
         mail.buchung_bestaetigt_kunde(buchung)
         mail.buchung_bestaetigt_fahrlehrer(buchung)
         fsm_sync.async_buche_in_fsm(buchung)
+        from .logging import log_event
+        log_event(
+            kategorie="buchung",
+            aktion="buchung_bestaetigt",
+            titel=f"Buchung {buchung.referenz} bestätigt",
+            details={"termin_id": buchung.termin_id, "referenz": buchung.referenz},
+        )
 
     transaction.on_commit(_nach_bestaetigung)
     logger.info("Buchung %s bestätigt", buchung.referenz)
@@ -157,16 +171,24 @@ def stornieren(buchung: Buchung, *, von: str = "kunde", benachrichtigen: bool = 
         Termin.objects.filter(pk=buchung.termin_id).update(status=Termin.Status.FREI)
         buchung.termin.status = Termin.Status.FREI
 
-    if war_bestaetigt:
-        def _nach_storno():
+    def _nach_storno():
+        if war_bestaetigt:
             if benachrichtigen:
                 mail.storno_kunde(buchung)
                 if von != "fahrschule":
                     mail.storno_fahrlehrer(buchung)
             fsm_sync.async_storniere_in_fsm(buchung)
+        from .logging import log_event
 
-        transaction.on_commit(_nach_storno)
+        log_event(
+            kategorie="buchung",
+            aktion="buchung_storniert",
+            titel=f"Buchung {buchung.referenz} storniert ({von})",
+            level="WARNING" if von == "fahrschule" else "INFO",
+            details={"termin_id": buchung.termin_id, "referenz": buchung.referenz, "von": von},
+        )
 
+    transaction.on_commit(_nach_storno)
     logger.info("Buchung %s storniert (%s)", buchung.referenz, von)
     return buchung
 
@@ -232,8 +254,8 @@ def verschieben(
     buchung.termin = neuer_termin
     buchung.save(update_fields=["termin"])
 
-    if war_bestaetigt:
-        def _nach_verschieben():
+    def _nach_verschieben():
+        if war_bestaetigt:
             # Erst das alte FSM-Ereignis auflösen, dann das neue eintragen –
             # und beides erst nach dem Commit. Der Hintergrund-Auftrag liest
             # den Termin frisch aus der Datenbank; würde er noch während der
@@ -245,7 +267,16 @@ def verschieben(
                 mail.buchung_verschoben_kunde(buchung, alter_beginn)
             fsm_sync.async_buche_in_fsm(buchung)
 
-        transaction.on_commit(_nach_verschieben)
+        from .logging import log_event
+
+        log_event(
+            kategorie="buchung",
+            aktion="buchung_verschoben",
+            titel=f"Buchung {buchung.referenz} verschoben auf {neuer_termin.beginn_lokal:%d.%m.%Y %H:%M}",
+            details={"referenz": buchung.referenz, "neuer_termin_id": neuer_termin.pk},
+        )
+
+    transaction.on_commit(_nach_verschieben)
 
     logger.info(
         "Buchung %s verschoben von %s auf %s",

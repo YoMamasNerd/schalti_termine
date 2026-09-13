@@ -282,9 +282,15 @@ if not DEBUG:
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+        "db": {
+            "class": "termine.services.logging.DBLogHandler",
+            "level": "WARNING",
+        },
+    },
     "root": {
-        "handlers": ["console"],
+        "handlers": ["console", "db"],
         "level": "WARNING" if IM_TESTLAUF else os.environ.get("LOG_LEVEL", "INFO"),
     },
 }

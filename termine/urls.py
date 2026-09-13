@@ -90,5 +90,7 @@ urlpatterns = [
     path("intern/einstellungen/fahrlehrer/neu/", staff_views.fahrlehrer_neu, name="fahrlehrer_neu"),
     path("intern/einstellungen/smtp-test/", staff_views.smtp_test_ajax, name="smtp_test"),
     path("intern/einstellungen/fsm/", staff_views.fsm_einstellungen, name="fsm_einstellungen"),
+    path("intern/einstellungen/logs/", staff_views.system_logs, name="system_logs"),
+    path("intern/einstellungen/logs/bereinigen/", staff_views.cleanup_logs_action, name="cleanup_logs"),
 ]
 
