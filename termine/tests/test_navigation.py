@@ -48,11 +48,16 @@ class AktiverPunkt(TestCase):
             ("termine:regeln", "Rhythmus-Regeln"),
             ("termine:buchungen", "Buchungen"),
             ("termine:historie", "Historie"),
-            ("termine:einstellungen", "Einstellungen"),
         ):
             with self.subTest(seite=name):
                 antwort = self.client.get(reverse(name))
                 self.assertEqual(self.punkte(antwort), [beschriftung])
+
+    def test_einstellungen_im_benutzermenue(self):
+        antwort = self.client.get(reverse("termine:dashboard"))
+        self.assertContains(antwort, reverse("termine:einstellungen"))
+        self.assertContains(antwort, "Einstellungen")
+
 
     def test_unterseite_markiert_ihren_bereich(self):
         # Das Regelformular ist eine eigene Adresse, gehört aber zu den Regeln.

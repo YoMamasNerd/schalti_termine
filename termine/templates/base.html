@@ -33,11 +33,14 @@
           {{ user.first_name|default:user.username }}
         </sl-button>
         <sl-menu>
-          <sl-menu-item value="dashboard" href="{% url 'termine:dashboard' %}">
+          <sl-menu-item value="dashboard" href="{% url 'termine:dashboard' %}" onclick="window.location.href='{% url 'termine:dashboard' %}';">
             <sl-icon slot="prefix" name="speedometer2"></sl-icon> Übersicht
           </sl-menu-item>
+          <sl-menu-item value="einstellungen" href="{% url 'termine:einstellungen' %}" onclick="window.location.href='{% url 'termine:einstellungen' %}';">
+            <sl-icon slot="prefix" name="gear"></sl-icon> Einstellungen
+          </sl-menu-item>
           {% if user.is_staff %}
-            <sl-menu-item value="admin" href="/admin/">
+            <sl-menu-item value="admin" href="/admin/" onclick="window.location.href='/admin/';">
               <sl-icon slot="prefix" name="shield-check"></sl-icon> Django-Admin
             </sl-menu-item>
           {% endif %}
