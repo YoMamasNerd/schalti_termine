@@ -8,6 +8,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 
+from ..validators import validate_email_address, validate_phone_number
 from .common import neuer_token
 from .einstellungen import Fuehrerscheinklasse
 from .termin import Termin
@@ -39,8 +40,10 @@ class Buchung(models.Model):
     )
 
     name = models.CharField("Name", max_length=120)
-    email = models.EmailField("E-Mail")
-    telefon = models.CharField("Telefon", max_length=40, blank=True)
+    email = models.EmailField("E-Mail", validators=[validate_email_address])
+    telefon = models.CharField(
+        "Telefon", max_length=40, blank=True, validators=[validate_phone_number]
+    )
     fuehrerscheinklasse = models.CharField(
         "Führerscheinklasse", max_length=32, blank=True
     )

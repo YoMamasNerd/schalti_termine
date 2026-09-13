@@ -15,6 +15,7 @@ from .models import (
     Sperrzeit,
     Terminart,
 )
+from .validators import validate_email_address, validate_phone_number
 
 
 class BuchungsForm(forms.Form):
@@ -27,6 +28,7 @@ class BuchungsForm(forms.Form):
         label="E-Mail-Adresse",
         widget=forms.EmailInput(attrs={"autocomplete": "email"}),
         help_text="An diese Adresse schicken wir den Bestätigungslink.",
+        validators=[validate_email_address],
     )
     telefon = forms.CharField(
         label="Telefon",
@@ -34,6 +36,7 @@ class BuchungsForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs={"autocomplete": "tel"}),
         help_text="Freiwillig – hilft uns bei kurzfristigen Rückfragen.",
+        validators=[validate_phone_number],
     )
     fuehrerscheinklasse = forms.ChoiceField(
         label="Gewünschte Führerscheinklasse",
@@ -73,6 +76,14 @@ class BuchungsForm(forms.Form):
             else:
                 auswahl = alle_aktiven
             self.fields["fuehrerscheinklasse"].choices = [("", "Bitte wählen …")] + auswahl
+
+    def clean_email(self):
+        email = self.cleaned_data.get("email")
+        return validate_email_address(email)
+
+    def clean_telefon(self):
+        telefon = self.cleaned_data.get("telefon")
+        return validate_phone_number(telefon)
 
     def clean_website(self):
         if self.cleaned_data.get("website"):
