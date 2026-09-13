@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse

@@ -1892,8 +1892,10 @@ def fsm_einstellungen(request):
 def system_logs(request):
     """Zeigt die System- & Audit-Logs an, filterbar nach Art/Kategorie, Level, Zeitraum und Suche."""
     from datetime import timedelta
+
     from django.core.paginator import Paginator
     from django.db.models import Q
+
     from .models.logging import LogKategorie, LogLevel, SystemLog
 
     qs = SystemLog.objects.select_related("benutzer").order_by("-created_at")
