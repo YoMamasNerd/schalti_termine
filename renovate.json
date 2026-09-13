@@ -12,6 +12,11 @@
   },
   "packageRules": [
     {
+      "matchPackageNames": ["postgres"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
       "matchManagers": ["uv"],
       "groupName": "Python dependencies",
       "addLabels": ["python"]
