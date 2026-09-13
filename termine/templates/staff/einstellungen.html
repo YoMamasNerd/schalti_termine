@@ -1,10 +1,17 @@
 {% extends "staff/base_staff.html" %}
+{% load schalti_tags %}
+{% load socialaccount %}
 
 {% block titel %}Einstellungen – {{ SITE_NAME }}{% endblock %}
 
 {% block inhalt %}
-  <div style="margin-bottom:1.5rem">
-    <h1>Einstellungen</h1>
+  <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem">
+    <div>
+      <h1 style="margin:0 0 0.35rem 0;">Einstellungen</h1>
+      <p style="margin:0; color:var(--schalti-text-leise); font-size:0.95rem;">
+        Konfiguration für Buchungsregeln, Termine, Fahrlehrer und Systemdienste.
+      </p>
+    </div>
   </div>
 
   {% if not fahrlehrer %}
@@ -21,34 +28,42 @@
     </div>
   {% else %}
 
-    {# --- Tab Leiste: Kachel-Raster, damit alle Bereiche auf einen Blick sichtbar sind --- #}
-    <div class="einstellungen-tabs">
-      <button type="button" class="tab-schalter active" data-tab="tab-mein-profil">
-        <span class="tab-icon">👤</span> Mein Benutzerkonto
+    {# --- Tab-Leiste im Schalti UI Design --- #}
+    <div class="einstellungen-tabs" role="tablist">
+      <button type="button" class="tab-schalter active" data-tab="tab-mein-profil" role="tab">
+        <sl-icon name="person" class="tab-icon"></sl-icon>
+        <span>Mein Benutzerkonto</span>
       </button>
-      <button type="button" class="tab-schalter" data-tab="tab-fahrlehrer">
-        <span class="tab-icon">🚗</span> Fahrlehrer-Zeiten
+      <button type="button" class="tab-schalter" data-tab="tab-fahrlehrer" role="tab">
+        <sl-icon name="clock-history" class="tab-icon"></sl-icon>
+        <span>Fahrlehrer-Zeiten</span>
       </button>
       {% if ist_inhaber %}
-        <button type="button" class="tab-schalter" data-tab="tab-buchung">
-          <span class="tab-icon">🌐</span> Globale Buchungsregeln
+        <button type="button" class="tab-schalter" data-tab="tab-buchung" role="tab">
+          <sl-icon name="sliders" class="tab-icon"></sl-icon>
+          <span>Globale Buchungsregeln</span>
         </button>
       {% endif %}
-      <button type="button" class="tab-schalter" data-tab="tab-urlaube">
-        <span class="tab-icon">🏖️</span> Urlaube &amp; Sperrzeiten
+      <button type="button" class="tab-schalter" data-tab="tab-urlaube" role="tab">
+        <sl-icon name="calendar2-range" class="tab-icon"></sl-icon>
+        <span>Urlaube &amp; Sperrzeiten</span>
         {% if sperrzeiten %}<span class="tab-badge">{{ sperrzeiten.count }}</span>{% endif %}
       </button>
       {% if ist_inhaber %}
-        <button type="button" class="tab-schalter" data-tab="tab-stammdaten">
-          <span class="tab-icon">🗂️</span> Stammdaten &amp; Kataloge
+        <button type="button" class="tab-schalter" data-tab="tab-stammdaten" role="tab">
+          <sl-icon name="folder2-open" class="tab-icon"></sl-icon>
+          <span>Stammdaten &amp; Kataloge</span>
         </button>
-        <button type="button" class="tab-schalter" data-tab="tab-system">
-          <span class="tab-icon">⚙️</span> Schnittstellen &amp; System
+        <button type="button" class="tab-schalter" data-tab="tab-system" role="tab">
+          <sl-icon name="gear" class="tab-icon"></sl-icon>
+          <span>Schnittstellen &amp; System</span>
         </button>
       {% endif %}
     </div>
 
-    {# --- TAB 1: Mein Benutzerkonto --- #}
+    {# ========================================================================= #}
+    {# TAB 1: Mein Benutzerkonto                                                #}
+    {# ========================================================================= #}
     <div id="tab-mein-profil" class="tab-inhalt">
       <div class="raster-zwei">
         <div>
@@ -58,8 +73,10 @@
             {% csrf_token %}
             <input type="hidden" name="form_art" value="user_profile">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
-              <h2 style="margin:0">👤 Persönliche Angaben</h2>
-              <span class="status status--gebucht" style="font-size:0.8rem">Login: {{ request.user.username }}</span>
+              <h2 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                <sl-icon name="person" style="color:var(--marke)"></sl-icon> Persönliche Angaben
+              </h2>
+              <span class="status-pill neutral">Login: {{ request.user.username }}</span>
             </div>
             <p class="leer" style="margin-bottom:1rem; line-height:1.55">
               Ihre persönlichen Benutzerkontodaten für den internen Zugang.
@@ -83,7 +100,9 @@
                 action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-mein-profil" novalidate>
             {% csrf_token %}
             <input type="hidden" name="form_art" value="password_change">
-            <h2>🔑 Passwort ändern</h2>
+            <h2 style="margin:0 0 0.5rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+              <sl-icon name="key" style="color:var(--marke)"></sl-icon> Passwort ändern
+            </h2>
             <p class="leer" style="margin-bottom:1rem; line-height:1.55">
               Legen Sie ein neues Passwort für Ihren lokalen Login fest.
             </p>
@@ -105,17 +124,20 @@
         <div>
           {% if VOIDAUTH_ENABLED %}
           {# --- VoidAuth SSO Karte --- #}
-          {% load socialaccount %}
           <div class="karte">
-            <h2>🛡️ Single Sign-On (VoidAuth)</h2>
+            <h2 style="margin:0 0 0.5rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+              <sl-icon name="shield-check" style="color:var(--marke)"></sl-icon> Single Sign-On (VoidAuth)
+            </h2>
             <p class="leer" style="margin-bottom:1rem; line-height:1.55">
               Verknüpfen Sie Ihren Login mit VoidAuth, um sich mit nur einem Klick oder per Passkey anzumelden.
             </p>
 
             {% if social_account %}
-              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.75rem; border:1px solid var(--gruen); border-radius:var(--radius-klein); background:var(--gruen-hell);">
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.85rem; border:1px solid var(--gruen-hell); border-radius:var(--radius-klein); background:var(--gruen-hell);">
                 <div>
-                  <strong style="color:var(--gruen-dunkel); display:block;">✓ Mit VoidAuth verknüpft</strong>
+                  <div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.25rem;">
+                    <span class="status-pill success">✓ Mit VoidAuth verknüpft</span>
+                  </div>
                   <span style="font-size:0.85rem; color:var(--text-leise)">
                     SSO-UID: <code>{{ social_account.uid }}</code>
                     {% if social_account.extra_data.preferred_username %}
@@ -125,13 +147,13 @@
                 </div>
                 <form method="post" action="{% url 'termine:disconnect_sso' %}" onsubmit="return confirm('Möchten Sie die Verknüpfung mit VoidAuth wirklich aufheben?');">
                   {% csrf_token %}
-                  <button class="knopf knopf--leise knopf--klein" type="submit" style="color:var(--rot);">
+                  <button class="knopf knopf--gefahr knopf--klein" type="submit">
                     Verknüpfung aufheben
                   </button>
                 </form>
               </div>
             {% else %}
-              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.75rem; border:1px solid var(--linie); border-radius:var(--radius-klein);">
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.85rem; border:1px solid var(--linie); border-radius:var(--radius-klein);">
                 <div>
                   <strong>Noch nicht verknüpft</strong>
                   <span style="display:block; font-size:0.85rem; color:var(--text-leise)">Verbinden Sie Ihr lokales Benutzerkonto mit VoidAuth.</span>
@@ -148,12 +170,14 @@
       </div>
     </div>
 
-    {# --- TAB 2: Fahrlehrer & Kalender --- #}
+    {# ========================================================================= #}
+    {# TAB 2: Fahrlehrer-Zeiten                                                  #}
+    {# ========================================================================= #}
     <div id="tab-fahrlehrer" class="tab-inhalt" style="display:none">
       {% if ist_inhaber and alle_fahrlehrer.count > 1 %}
-        <div class="karte" style="margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; background:var(--flaeche-dunkel)">
+        <div class="karte" style="margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; background:var(--grund)">
           <div style="display:flex; align-items:center; gap:0.6rem">
-            <span style="font-size:1.1rem">🚗</span>
+            <sl-icon name="person-gear" style="font-size:1.25rem; color:var(--marke)"></sl-icon>
             <label for="fahrlehrer_select" style="font-weight:600; font-size:0.95rem">Ausgewählter Fahrlehrer:</label>
           </div>
           <form method="get" style="margin:0; display:flex; align-items:center; gap:0.5rem">
@@ -170,15 +194,18 @@
       {% endif %}
 
       <div class="raster-zwei">
+        {# Einstellungen des Fahrlehrers #}
         <form class="karte js-auto-save-form" id="form-profil" method="post"
               action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-fahrlehrer" novalidate>
           {% csrf_token %}
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
-            <h2 style="margin:0">{{ fahrlehrer.name }}</h2>
+            <h2 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+              <sl-icon name="clock-history" style="color:var(--marke)"></sl-icon> {{ fahrlehrer.name }}
+            </h2>
             {% if fahrlehrer.aktiv %}
-              <span class="status status--gebucht" style="font-size:0.8rem">Aktiv</span>
+              <span class="status-pill success"><span class="status-dot green"></span>Aktiv</span>
             {% else %}
-              <span class="status status--entfallen" style="font-size:0.8rem">Inaktiv</span>
+              <span class="status-pill neutral"><span class="status-dot"></span>Inaktiv</span>
             {% endif %}
           </div>
 
@@ -195,125 +222,119 @@
           </div>
         </form>
 
+        {# Kalender-Abo & Hilfen #}
         <div>
           <div class="karte">
-            <h2>📅 Persönliches Kalender-Abo</h2>
+            <h2 style="margin:0 0 0.5rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+              <sl-icon name="calendar3" style="color:var(--marke)"></sl-icon> Persönliches Kalender-Abo
+            </h2>
             <p class="leer" style="margin-bottom:1rem; line-height:1.55">
               Tragen Sie diese Webcal-Adresse in Ihrer Kalender-App (Apple Kalender, Google Kalender, Outlook) als Kalender-Abonnement ein. Neue Buchungen und Stornierungen erscheinen dort automatisch.
             </p>
-            <pre class="befehl" style="word-break:break-all; white-space:pre-wrap; font-size:0.85rem"><code>{{ fahrlehrer.feed_url }}</code></pre>
+            
+            <div style="position:relative; margin-bottom:1rem">
+              <pre class="befehl" id="feed-url-box" style="word-break:break-all; white-space:pre-wrap; font-size:0.85rem; padding-right:5.5rem; margin:0"><code>{{ fahrlehrer.feed_url }}</code></pre>
+              <button type="button" class="knopf knopf--leise knopf--klein" 
+                      style="position:absolute; top:0.4rem; right:0.4rem;"
+                      onclick="kopiereInZwischenablage('{{ fahrlehrer.feed_url|escapejs }}', 'Kalender-Abo-URL')">
+                <sl-icon name="copy"></sl-icon> Kopieren
+              </button>
+            </div>
+
             <form method="post"
                   action="{% url 'termine:feed_token_neu' %}?fahrlehrer={{ fahrlehrer.slug }}"
                   onsubmit="return confirm('Neue Abo-Adresse erzeugen? Das bisherige Abo hört danach auf zu funktionieren.');">
               {% csrf_token %}
               <button class="knopf knopf--leise knopf--klein" type="submit">
-                Neue Abo-Adresse generieren
+                <sl-icon name="arrow-repeat"></sl-icon> Neue Abo-Adresse generieren
               </button>
             </form>
           </div>
 
-          {% if ist_inhaber %}
-            <div class="karte" style="margin-top:1rem">
-              <h2>Team-Verwaltung</h2>
-              <p class="leer" style="margin-bottom:1rem; line-height:1.55">
-                Weitere Fahrlehrer anlegen oder bestehende Zugänge verwalten.
-              </p>
-              <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:fahrlehrer_neu' %}">
-                + Neuen Fahrlehrer anlegen
-              </a>
-            </div>
-          {% endif %}
+          <div class="karte" style="margin-top:1.25rem">
+            <h2 style="margin:0 0 0.5rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+              <sl-icon name="info-circle" style="color:var(--marke)"></sl-icon> Arbeitszeiten &amp; Feiertage
+            </h2>
+            <p class="leer" style="line-height:1.55; margin-bottom:0.75rem">
+              Gesetzliche Feiertage für <strong>{{ fahrlehrer.get_bundesland_display }}</strong> werden automatisch berücksichtigt und von der Buchung freigehalten.
+            </p>
+            <p class="leer" style="font-size:0.88rem; margin:0">
+              Spezifische Abwesenheiten oder Urlaubszeiten können direkt im Reiter <a href="#tab-urlaube" onclick="aktiviereTab('tab-urlaube')">Urlaube &amp; Sperrzeiten</a> gepflegt werden.
+            </p>
+          </div>
         </div>
       </div>
     </div>
 
+    {# ========================================================================= #}
+    {# TAB 3: Globale Buchungsregeln                                             #}
+    {# ========================================================================= #}
     {% if ist_inhaber %}
-      {# --- TAB 2: Globale Buchungsregeln --- #}
       <div id="tab-buchung" class="tab-inhalt" style="display:none">
-        <div class="raster-zwei">
-          <div class="karte">
-            <h2>🌐 Buchungsfenster (Fahrschulweit)</h2>
-            <p class="leer" style="margin-bottom:1rem; line-height:1.55">
-              Gilt zentral für alle Fahrlehrer: Mindest-Vorlauf und Planungshorizont bestimmen das Buchungsfenster für Kunden auf der Webseite.
-            </p>
+        <form class="js-auto-save-form" id="form-global" method="post" action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-buchung" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="form_art" value="global">
 
-            <form class="js-auto-save-form" id="form-global" method="post" action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-buchung" novalidate>
-              {% csrf_token %}
-              <input type="hidden" name="form_art" value="global">
-              {% for feld in globale_form %}
-                {% include "termine/_feld.html" with feld=feld %}
-              {% endfor %}
-              <div class="knopfreihe" style="margin-top:1.2rem">
-                <button class="knopf" type="submit">Buchungsfenster speichern</button>
+          <div class="raster-zwei">
+            {# Linke Spalte: Fristen & Zeitfenster #}
+            <div class="karte">
+              <h2 style="margin:0 0 0.5rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                <sl-icon name="sliders" style="color:var(--marke)"></sl-icon> Buchungsfenster &amp; Zeitregeln
+              </h2>
+              <p class="leer" style="margin-bottom:1.25rem; line-height:1.55">
+                Gilt fahrschulweit für alle Fahrlehrer: Mindest-Vorlauf, Planungshorizont und Reservierungsfristen.
+                {% if buchbar_bis %}
+                  <br><span style="display:inline-block; margin-top:0.35rem;" class="status-pill neutral">Aktuell buchbar bis: {{ buchbar_bis|date:"SHORT_DATE_FORMAT" }}</span>
+                {% endif %}
+              </p>
+
+              {% if globale_form.non_field_errors %}
+                <div class="hinweis hinweis--fehler">{{ globale_form.non_field_errors }}</div>
+              {% endif %}
+
+              {% include "termine/_feld.html" with feld=globale_form.bundesland %}
+              {% include "termine/_feld.html" with feld=globale_form.vorlauf_stunden %}
+              {% include "termine/_feld.html" with feld=globale_form.horizont_wochen %}
+              {% include "termine/_feld.html" with feld=globale_form.reservierung_minuten %}
+              {% include "termine/_feld.html" with feld=globale_form.erinnerung_stunden_vorher %}
+              {% include "termine/_feld.html" with feld=globale_form.fsm_theorie_blockiert_beratung %}
+            </div>
+
+            {# Rechte Spalte: Führerscheinklassen-Auswahl #}
+            <div class="karte">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem">
+                <h2 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                  <sl-icon name="card-checklist" style="color:var(--marke)"></sl-icon> Verfügbare Klassen im Buchungsformular
+                </h2>
               </div>
-            </form>
+              <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+                Legen Sie fest, welche Fahrerlaubnisklassen Kunden bei der Terminbuchung auswählen können. Ist <em>keine Klasse markiert</em>, stehen automatisch alle Klassen zur Verfügung.
+              </p>
+
+              {% include "termine/_feld.html" with feld=globale_form.aktive_fuehrerscheinklassen %}
+
+              <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--linie); display:flex; justify-content:space-between; align-items:center">
+                <span class="leer" style="font-size:0.88rem">Klassen verwalten oder neu anlegen:</span>
+                <a href="{% url 'termine:klassen' %}" class="knopf knopf--leise knopf--klein">Klassen-Katalog &rarr;</a>
+              </div>
+            </div>
           </div>
 
-          <div class="karte">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem">
-              <h2 style="margin:0">📋 Terminarten</h2>
-              <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:terminarten' %}">
-                Verwalten &rarr;
-              </a>
-            </div>
-            <p class="leer" style="margin-bottom:1rem; line-height:1.55">
-              Definieren Sie, welche Beratungstermine und Längen für Interessenten zur Auswahl stehen.
-            </p>
-
-            <div class="tabelle-huelle">
-              <table class="liste">
-                <thead><tr><th>Terminart</th><th>Dauer</th><th>Status</th></tr></thead>
-                <tbody>
-                  {% for art in terminarten %}
-                    <tr>
-                      <td><strong>{{ art.name }}</strong></td>
-                      <td>{{ art.dauer_minuten }} Min.</td>
-                      <td>
-                        {% if art.aktiv %}
-                          <span class="status status--gebucht" style="font-size:0.75rem">Aktiv</span>
-                        {% else %}
-                          <span class="status status--entfallen" style="font-size:0.75rem">Inaktiv</span>
-                        {% endif %}
-                      </td>
-                    </tr>
-                  {% empty %}
-                    <tr><td colspan="3" class="leer">Noch keine Terminart angelegt.</td></tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-
-            <p class="knopfreihe" style="margin-top:1rem">
-              <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:terminart_neu' %}">
-                + Neue Terminart anlegen
-              </a>
-            </p>
+          <div class="knopfreihe" style="margin-top:1.25rem">
+            <button class="knopf" type="submit">Globale Buchungsregeln speichern</button>
           </div>
-
-          <div class="karte" style="margin-top:1rem">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem">
-              <h2 style="margin:0">🚗 Führerscheinklassen (FEK)</h2>
-              <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:klassen' %}">
-                Klassen verwalten &rarr;
-              </a>
-            </div>
-            <p class="leer" style="line-height:1.55; margin-bottom:1rem">
-              Verwalten Sie die verfügbaren Fahrerlaubnisklassen, fügen Sie neue hinzu oder passen Sie Bezeichnungen an.
-            </p>
-            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:klasse_neu' %}">
-              + Neue Klasse anlegen
-            </a>
-          </div>
-        </div>
+        </form>
       </div>
     {% endif %}
 
-    {# --- TAB 3: Urlaube & Sperrzeiten --- #}
+    {# ========================================================================= #}
+    {# TAB 4: Urlaube & Sperrzeiten                                              #}
+    {# ========================================================================= #}
     <div id="tab-urlaube" class="tab-inhalt" style="display:none">
       {% if ist_inhaber and alle_fahrlehrer.count > 1 %}
-        <div class="karte" style="margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; background:var(--flaeche-dunkel)">
+        <div class="karte" style="margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; background:var(--grund)">
           <div style="display:flex; align-items:center; gap:0.6rem">
-            <span style="font-size:1.1rem">🏖️</span>
+            <sl-icon name="calendar2-range" style="font-size:1.25rem; color:var(--marke)"></sl-icon>
             <label for="fahrlehrer_urlaub_select" style="font-weight:600; font-size:0.95rem">Ausgewählter Fahrlehrer:</label>
           </div>
           <form method="get" style="margin:0; display:flex; align-items:center; gap:0.5rem">
@@ -332,14 +353,16 @@
       <div class="raster-zwei">
         <div class="karte">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
-            <h2 style="margin:0">🏖️ Urlaube ({{ fahrlehrer.name }})</h2>
+            <h2 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+              <sl-icon name="umbrella" style="color:var(--marke)"></sl-icon> Urlaube ({{ fahrlehrer.name }})
+            </h2>
             <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:tagesplanung' %}?fahrlehrer={{ fahrlehrer.slug }}">
               + Urlaub eintragen
             </a>
           </div>
 
           {% if sperrzeiten %}
-            <p class="leer">Geplante Urlaube und manuelle Abwesenheiten von <strong>{{ fahrlehrer.name }}</strong>:</p>
+            <p class="leer" style="margin-bottom:0.75rem">Geplante Urlaube und manuelle Abwesenheiten von <strong>{{ fahrlehrer.name }}</strong>:</p>
             <div class="tabelle-huelle">
               <table class="liste">
                 <thead><tr><th>Zeitraum</th><th>Grund</th><th></th></tr></thead>
@@ -362,14 +385,16 @@
               </table>
             </div>
           {% else %}
-            <div style="padding:1.5rem; text-align:center; background:var(--grund-leise); border-radius:6px; margin-bottom:1rem">
+            <div style="padding:1.5rem; text-align:center; background:var(--grund); border-radius:var(--radius-klein); margin-bottom:1rem">
               <p class="leer" style="margin:0">Keine anstehenden Urlaube für {{ fahrlehrer.name }} hinterlegt.</p>
             </div>
           {% endif %}
 
           {% if ist_inhaber and alle_fahrlehrer.count > 1 and alle_lehrer_sperren %}
             <div style="margin-top:1.5rem; border-top:1px solid var(--linie); padding-top:1rem">
-              <h3 style="margin:0 0 0.6rem; font-size:0.95rem">👥 Alle Team-Urlaube im Überblick:</h3>
+              <h3 style="margin:0 0 0.6rem; font-size:0.95rem; display:flex; align-items:center; gap:0.4rem">
+                <sl-icon name="people" style="color:var(--marke)"></sl-icon> Alle Team-Urlaube im Überblick:
+              </h3>
               <div class="tabelle-huelle">
                 <table class="liste" style="font-size:0.88rem">
                   <thead><tr><th>Fahrlehrer</th><th>Zeitraum</th><th>Grund</th></tr></thead>
@@ -390,9 +415,14 @@
 
         <div>
           {% if fsm_sperren_count %}
-            <div class="karte" style="border-left:4px solid #3b82f6">
-              <h2 style="color:#2563eb">🚗 FSM-Fahrstunden synchronisiert</h2>
-              <p style="margin:0.5rem 0 1rem; line-height:1.55">
+            <div class="karte" style="border-left:4px solid var(--marke)">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem">
+                <h2 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                  <sl-icon name="calendar-check" style="color:var(--marke)"></sl-icon> FSM-Fahrstunden synchronisiert
+                </h2>
+                <span class="status-pill success"><span class="status-dot green"></span>Aktiv</span>
+              </div>
+              <p style="margin:0.5rem 0 0.85rem; line-height:1.55">
                 Aktuell sind <strong>{{ fsm_sperren_count }}</strong> Fahrstunden und Prüfungen aus dem Fahrschulmanager für {{ fahrlehrer.name }} hinterlegt.
               </p>
               <p class="leer" style="font-size:0.88rem; margin-bottom:1rem">
@@ -404,21 +434,25 @@
             </div>
           {% endif %}
 
-          <div class="karte" style="{% if fsm_sperren_count %}margin-top:1rem{% endif %}">
-            <h2>Feiertage</h2>
+          <div class="karte" style="{% if fsm_sperren_count %}margin-top:1.25rem{% endif %}">
+            <h2 style="margin:0 0 0.5rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+              <sl-icon name="geo-alt" style="color:var(--marke)"></sl-icon> Feiertage
+            </h2>
             <p class="leer" style="margin:0 0 0.8rem; line-height:1.55">
               Gesetzliche Feiertage für das Bundesland <strong>{{ fahrlehrer.get_bundesland_display }}</strong> werden bei Rhythmus-Regeln automatisch berücksichtigt und freigehalten.
             </p>
             <p style="margin:0; font-size:0.88rem; color:var(--text-leise)">
-              Das Bundesland kann im Reiter <em>„Fahrlehrer &amp; Profil“</em> geändert werden.
+              Das Bundesland kann im Reiter <em>„Fahrlehrer-Zeiten“</em> angepasst werden.
             </p>
           </div>
         </div>
       </div>
     </div>
 
+    {# ========================================================================= #}
+    {# TAB 5: Stammdaten & Kataloge                                              #}
+    {# ========================================================================= #}
     {% if ist_inhaber %}
-      {# --- TAB 5: Stammdaten & Kataloge --- #}
       <div id="tab-stammdaten" class="tab-inhalt" style="display:none">
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:1.25rem">
           
@@ -426,7 +460,9 @@
           <div class="karte" style="margin:0; display:flex; flex-direction:column; justify-content:space-between">
             <div>
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem">
-                <h2 style="margin:0; font-size:1.15rem">🚗 Fahrlehrer ({{ alle_fahrlehrer.count }})</h2>
+                <h2 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                  <sl-icon name="people" style="color:var(--marke)"></sl-icon> Fahrlehrer ({{ alle_fahrlehrer.count }})
+                </h2>
                 <a class="knopf knopf--klein" href="{% url 'termine:fahrlehrer_neu' %}">+ Neuer Fahrlehrer</a>
               </div>
               <p class="leer" style="font-size:0.88rem; margin-bottom:1rem">
@@ -434,12 +470,17 @@
               </p>
               <ul style="list-style:none; padding:0; margin:0; font-size:0.9rem">
                 {% for fl in alle_fahrlehrer %}
-                  <li style="display:flex; justify-content:space-between; align-items:center; padding:0.45rem 0; border-bottom:1px solid var(--linie)">
+                  <li style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--linie)">
                     <div>
                       <strong>{{ fl.name }}</strong>
-                      <small class="leer" style="display:block; font-size:0.78rem">
-                        {{ fl.bundesland }} • Vorlauf {{ fl.vorlauf_stunden }}h • {% if fl.aktiv %}<span style="color:var(--gruen)">Aktiv</span>{% else %}<span style="color:var(--text-leise)">Inaktiv</span>{% endif %}
-                      </small>
+                      <div class="leer" style="font-size:0.78rem; margin-top:0.15rem; display:flex; align-items:center; gap:0.4rem;">
+                        <span>{{ fl.bundesland }} &middot; Vorlauf {{ fl.vorlauf_stunden }}h</span>
+                        {% if fl.aktiv %}
+                          <span class="status-pill success" style="font-size:0.7rem;"><span class="status-dot green"></span>Aktiv</span>
+                        {% else %}
+                          <span class="status-pill neutral" style="font-size:0.7rem;"><span class="status-dot"></span>Inaktiv</span>
+                        {% endif %}
+                      </div>
                     </div>
                     <a href="{% url 'termine:einstellungen' %}?fahrlehrer={{ fl.slug }}#tab-fahrlehrer" class="knopf knopf--leise knopf--klein">Zeiten &amp; Regeln</a>
                   </li>
@@ -452,7 +493,9 @@
           <div class="karte" style="margin:0; display:flex; flex-direction:column; justify-content:space-between">
             <div>
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem">
-                <h2 style="margin:0; font-size:1.15rem">📋 Terminarten ({{ terminarten.count }})</h2>
+                <h2 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                  <sl-icon name="calendar-event" style="color:var(--marke)"></sl-icon> Terminarten ({{ terminarten.count }})
+                </h2>
                 <a class="knopf knopf--klein" href="{% url 'termine:terminart_neu' %}">+ Neue Terminart</a>
               </div>
               <p class="leer" style="font-size:0.88rem; margin-bottom:1rem">
@@ -460,12 +503,17 @@
               </p>
               <ul style="list-style:none; padding:0; margin:0; font-size:0.9rem">
                 {% for ta in terminarten %}
-                  <li style="display:flex; justify-content:space-between; align-items:center; padding:0.45rem 0; border-bottom:1px solid var(--linie)">
+                  <li style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--linie)">
                     <div>
                       <strong>{{ ta.name }}</strong>
-                      <small class="leer" style="display:block; font-size:0.78rem">
-                        {{ ta.dauer_minuten }} Min • {% if ta.aktiv %}<span style="color:var(--gruen)">Aktiv</span>{% else %}<span style="color:var(--text-leise)">Inaktiv</span>{% endif %}
-                      </small>
+                      <div class="leer" style="font-size:0.78rem; margin-top:0.15rem; display:flex; align-items:center; gap:0.4rem;">
+                        <span>{{ ta.dauer_minuten }} Min.</span>
+                        {% if ta.aktiv %}
+                          <span class="status-pill success" style="font-size:0.7rem;"><span class="status-dot green"></span>Aktiv</span>
+                        {% else %}
+                          <span class="status-pill neutral" style="font-size:0.7rem;"><span class="status-dot"></span>Inaktiv</span>
+                        {% endif %}
+                      </div>
                     </div>
                     <a href="{% url 'termine:terminart_bearbeiten' ta.pk %}" class="knopf knopf--leise knopf--klein">Bearbeiten</a>
                   </li>
@@ -477,11 +525,13 @@
             </div>
           </div>
 
-          {# 3. Führerscheinklassen #}
+          {# 3. Führerscheinklassen (FEK) - BUGFIX: kl.code und kl.name verwenden #}
           <div class="karte" style="margin:0; display:flex; flex-direction:column; justify-content:space-between">
             <div>
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem">
-                <h2 style="margin:0; font-size:1.15rem">🪪 Führerscheinklassen</h2>
+                <h2 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                  <sl-icon name="card-checklist" style="color:var(--marke)"></sl-icon> Führerscheinklassen ({{ klassen.count }})
+                </h2>
                 <a class="knopf knopf--klein" href="{% url 'termine:klasse_neu' %}">+ Neue Klasse</a>
               </div>
               <p class="leer" style="font-size:0.88rem; margin-bottom:1rem">
@@ -489,14 +539,21 @@
               </p>
               <ul style="list-style:none; padding:0; margin:0; font-size:0.9rem">
                 {% for kl in klassen %}
-                  <li style="display:flex; justify-content:space-between; align-items:center; padding:0.45rem 0; border-bottom:1px solid var(--linie)">
+                  <li style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--linie)">
                     <div>
-                      <strong>{{ kl.kuerzel }}</strong> – <span class="leer">{{ kl.titel }}</span>
+                      <strong>{{ kl.code }}</strong> – <span>{{ kl.name }}</span>
+                      <div class="leer" style="font-size:0.78rem; margin-top:0.15rem;">
+                        {% if kl.aktiv %}
+                          <span class="status-pill success" style="font-size:0.7rem;"><span class="status-dot green"></span>Aktiv</span>
+                        {% else %}
+                          <span class="status-pill neutral" style="font-size:0.7rem;"><span class="status-dot"></span>Inaktiv</span>
+                        {% endif %}
+                      </div>
                     </div>
                     <a href="{% url 'termine:klasse_bearbeiten' kl.pk %}" class="knopf knopf--leise knopf--klein">Bearbeiten</a>
                   </li>
                 {% empty %}
-                  <li class="leer" style="padding:0.5rem 0">Keine Klassen angelegt (Standard: Freitext).</li>
+                  <li class="leer" style="padding:0.75rem 0">Keine Klassen angelegt (Standard: Freitext).</li>
                 {% endfor %}
               </ul>
             </div>
@@ -505,12 +562,14 @@
             </div>
           </div>
 
-          {# 4. Django Admin Stammdaten #}
+          {# 4. Django Admin Stammdaten (Nur Superuser) #}
           {% if user.is_superuser %}
             <div class="karte" style="margin:0; display:flex; flex-direction:column; justify-content:space-between; border-color:var(--linie)">
               <div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem">
-                  <h2 style="margin:0; font-size:1.15rem">🛠️ Django-Admin (Erweitert)</h2>
+                  <h2 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                    <sl-icon name="shield-lock" style="color:var(--marke)"></sl-icon> Django-Admin (Erweitert)
+                  </h2>
                 </div>
                 <p class="leer" style="font-size:0.88rem; margin-bottom:1rem">
                   Direkter Zugriff auf die Datenbank-Stammdaten, Benutzerkonten, Berechtigungen und Logs für Superuser.
@@ -526,22 +585,29 @@
 
         </div>
       </div>
+    {% endif %}
 
-      {# --- TAB 6: Schnittstellen & System --- #}
+    {# ========================================================================= #}
+    {# TAB 6: Schnittstellen & System                                            #}
+    {# ========================================================================= #}
+    {% if ist_inhaber %}
       <div id="tab-system" class="tab-inhalt" style="display:none">
         <div class="raster-zwei">
+          {# E-Mail & SMTP #}
           <div class="karte" style="grid-column: 1 / -1">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem">
               <div>
-                <h2 style="margin:0">✉️ E-Mail- &amp; SMTP-Server</h2>
+                <h2 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                  <sl-icon name="envelope" style="color:var(--marke)"></sl-icon> E-Mail- &amp; SMTP-Server
+                </h2>
                 <p class="leer" style="margin:0.25rem 0 0; font-size:0.9rem; line-height:1.5">
                   Konfigurieren Sie den SMTP-Server für den automatischen Versand von Buchungsbestätigungen, Stornierungen und Terminerinnerungen.
                 </p>
               </div>
               {% if globale_einstellungen.email_host %}
-                <span class="status status--gebucht" style="font-size:0.8rem">SMTP eingerichtet</span>
+                <span class="status-pill success"><span class="status-dot green"></span>SMTP eingerichtet</span>
               {% else %}
-                <span class="status status--entfallen" style="font-size:0.8rem">Nicht eingerichtet</span>
+                <span class="status-pill danger"><span class="status-dot red"></span>Nicht eingerichtet</span>
               {% endif %}
             </div>
 
@@ -588,13 +654,13 @@
               <div class="knopfreihe" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem">
                 <button class="knopf" type="submit">SMTP-Einstellungen speichern</button>
                 <button class="knopf knopf--leise" type="button" id="btn-smtp-live-test" style="border-color:var(--marke); color:var(--marke); font-weight:600">
-                  ⚡ SMTP-Authentifizierung live testen
+                  <sl-icon name="lightning-charge"></sl-icon> SMTP-Authentifizierung live testen
                 </button>
               </div>
             </form>
 
             {# Live-Test Feedback Box #}
-            <div id="smtp-test-box" style="display:none; border-radius:6px; padding:1rem; margin-top:1.25rem; font-size:0.92rem; line-height:1.5">
+            <div id="smtp-test-box" style="display:none; border-radius:var(--radius-klein); padding:1rem; margin-top:1.25rem; font-size:0.92rem; line-height:1.5">
               <div id="smtp-test-spinner" style="display:none; align-items:center; gap:0.6rem; color:var(--text-leise)">
                 <span class="lade-kreis" style="display:inline-block; width:18px; height:18px; border:2px solid var(--linie); border-top-color:var(--marke); border-radius:50%; animation:drehen 0.8s linear infinite"></span>
                 <span>Verbindung zum SMTP-Server wird aufgebaut und Authentifizierung geprüft…</span>
@@ -617,13 +683,18 @@
             </details>
           </div>
 
+          {# Fahrschulmanager #}
           {% if FSM_SYNC_ENABLED %}
-            <div class="karte">
-              <h2>🔌 Fahrschulmanager (FSM)</h2>
-              <p class="leer" style="line-height:1.55; margin-bottom:1rem">
-                Verknüpft die Online-Terminbuchung direkt mit dem Fahrschulmanager. Synchronisiert Fahrlehrer, blockiert Zeiten automatisch und trägt gebuchte Beratungstermine direkt in den Kalender ein.
-              </p>
-              <div class="knopfreihe">
+            <div class="karte" style="margin:0; display:flex; flex-direction:column; justify-content:space-between;">
+              <div>
+                <h2 style="margin:0 0 0.5rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                  <sl-icon name="diagram-3" style="color:var(--marke)"></sl-icon> Fahrschulmanager (FSM)
+                </h2>
+                <p class="leer" style="line-height:1.55; margin-bottom:1rem">
+                  Verknüpft die Online-Terminbuchung direkt mit dem Fahrschulmanager. Synchronisiert Fahrlehrer, blockiert Zeiten automatisch und trägt gebuchte Beratungstermine direkt ein.
+                </p>
+              </div>
+              <div class="knopfreihe" style="margin-top:1rem">
                 <a class="knopf" href="{% url 'termine:fsm_einstellungen' %}">
                   FSM-Verknüpfung &amp; Sync verwalten &rarr;
                 </a>
@@ -631,30 +702,18 @@
             </div>
           {% endif %}
 
-          <div class="karte">
-            <h2>👥 Team &amp; Zugangsrechte</h2>
-            <p class="leer" style="line-height:1.55; margin-bottom:1rem">
-              Jeder Fahrlehrer erhält einen eigenen Login, eigene Regeln und ein eigenes Kalender-Abo.
-            </p>
-            <div class="knopfreihe">
-              <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:fahrlehrer_neu' %}">
-                + Neuen Fahrlehrer anlegen
-              </a>
-              {% if user.is_superuser %}
-                <a class="knopf knopf--leise knopf--klein" href="/django-admin/">
-                  Stammdaten &amp; Benutzer (Admin)
-                </a>
-              {% endif %}
+          {# Audit-Logs #}
+          <div class="karte" style="margin:0; display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <h2 style="margin:0 0 0.5rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                <sl-icon name="journal-text" style="color:var(--marke)"></sl-icon> System- &amp; Audit-Logs
+              </h2>
+              <p class="leer" style="line-height:1.55; margin-bottom:1rem">
+                Filterbare Ereignisprotokolle für Buchungen, Absagen, Termine, FSM-Syncs und Systemaktivitäten. Automatische 30-Tage-Aufbewahrung in der Datenbank.
+              </p>
             </div>
-          </div>
-
-          <div class="karte">
-            <h2>📋 System- &amp; Audit-Logs</h2>
-            <p class="leer" style="line-height:1.55; margin-bottom:1rem">
-              Filterbare Ereignisprotokolle für Buchungen, Absagen, Termine, FSM-Syncs und Systemaktivitäten. Automatische 30-Tage-Aufbewahrung in der Datenbank.
-            </p>
-            <div class="knopfreihe">
-              <a class="knopf" href="{% url 'termine:system_logs' %}">
+            <div class="knopfreihe" style="margin-top:1rem">
+              <a class="knopf knopf--leise" href="{% url 'termine:system_logs' %}">
                 Zu den System-Logs &rarr;
               </a>
             </div>
@@ -669,44 +728,52 @@
       }
       .einstellungen-tabs {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 0.5rem;
         margin-bottom: 1.5rem;
       }
-      @media (min-width: 761px) {
+      @media (min-width: 640px) {
+        .einstellungen-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      }
+      @media (min-width: 1024px) {
         .einstellungen-tabs { grid-template-columns: repeat(6, minmax(0, 1fr)); }
       }
-      @media (max-width: 480px) {
-        .einstellungen-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      }
       .tab-schalter {
-        background: var(--flaeche);
-        border: 1px solid var(--linie);
-        border-radius: var(--radius-klein);
-        padding: 0.65rem 0.75rem;
-        font-size: 0.85rem;
+        background: var(--schalti-flaeche, var(--flaeche));
+        border: 1px solid var(--schalti-linie, var(--linie));
+        border-radius: var(--schalti-radius-sm, var(--radius-klein));
+        padding: 0.75rem 0.85rem;
+        font-size: 0.88rem;
         font-weight: 600;
-        color: var(--text-leise);
+        color: var(--schalti-text-leise, var(--text-leise));
         cursor: pointer;
-        transition: color 0.15s, border-color 0.15s, background 0.15s;
+        transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
         display: flex;
         align-items: center;
-        gap: 0.45rem;
+        gap: 0.5rem;
         min-width: 0;
         text-align: left;
         line-height: 1.25;
       }
-      .tab-icon { font-size: 1.05rem; flex-shrink: 0; }
-      .tab-schalter > span:not(.tab-icon):not(.tab-badge),
-      .tab-schalter > :last-child { min-width: 0; }
+      .tab-icon {
+        font-size: 1.15rem;
+        flex-shrink: 0;
+        color: inherit;
+      }
+      .tab-schalter > span:not(.tab-icon):not(.tab-badge) {
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
       .tab-schalter:hover {
-        color: var(--text);
-        border-color: color-mix(in srgb, var(--primaer) 45%, var(--linie));
+        color: var(--schalti-marke, var(--marke));
+        border-color: var(--schalti-marke, var(--marke));
       }
       .tab-schalter.active {
-        color: var(--primaer);
-        border-color: var(--primaer);
-        background: color-mix(in srgb, var(--primaer) 8%, var(--flaeche));
+        color: var(--schalti-marke, var(--marke));
+        border-color: var(--schalti-marke, var(--marke));
+        background: var(--schalti-marke-hell, var(--marke-hell));
       }
       .tab-badge {
         font-size: 0.75rem;
@@ -715,13 +782,15 @@
         padding: 0.1rem 0.45rem;
         border-radius: 999px;
         font-weight: 700;
+        margin-left: auto;
       }
       .tab-schalter.active .tab-badge {
-        background: var(--primaer);
+        background: var(--schalti-marke, var(--marke));
         color: #ffffff;
       }
     </style>
 
+    {# Autosave Feedback Toast #}
     <div id="settings-autosave-toast" style="display:none; position:fixed; bottom:1.5rem; right:1.5rem; z-index:999; background:#065f46; color:#fff; padding:0.6rem 1.2rem; border-radius:0.5rem; font-weight:600; font-size:0.9rem; box-shadow:0 4px 14px rgba(0,0,0,0.2); align-items:center; gap:0.5rem; transition:opacity 0.3s ease; opacity:0">
       <span style="font-size:1.1rem">✓</span> <span id="settings-toast-text">Automatisch gespeichert</span>
     </div>
@@ -731,7 +800,7 @@
         const schalter = document.querySelectorAll('.tab-schalter');
         const inhalte = document.querySelectorAll('.tab-inhalt');
 
-        function aktiviereTab(tabId) {
+        window.aktiviereTab = function(tabId) {
           if (!tabId || !document.getElementById(tabId)) {
             tabId = 'tab-mein-profil';
           }
@@ -749,7 +818,7 @@
               inhalt.style.display = 'none';
             }
           });
-        }
+        };
 
         schalter.forEach(btn => {
           btn.addEventListener('click', () => {
@@ -767,21 +836,44 @@
           }
         }
 
+        // Hilfsfunktion Zwischenablage
+        window.kopiereInZwischenablage = function(text, label = 'Text') {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+              if (typeof window.schaltiToast === 'function') {
+                window.schaltiToast(`${label} in die Zwischenablage kopiert!`, 'success', 'check-circle');
+              } else {
+                showToast(`${label} kopiert!`);
+              }
+            }).catch(() => {
+              prompt(`${label} kopieren:`, text);
+            });
+          } else {
+            prompt(`${label} kopieren:`, text);
+          }
+        };
+
         // --- Live Auto-Save für alle Einstellungsformulare ---
         const toast = document.getElementById('settings-autosave-toast');
         const toastText = document.getElementById('settings-toast-text');
         let toastTimeout = null;
 
         function showToast(text, isError = false) {
-          if (toastTimeout) clearTimeout(toastTimeout);
-          toastText.textContent = text;
-          toast.style.background = isError ? '#991b1b' : '#065f46';
-          toast.style.display = 'inline-flex';
-          setTimeout(() => { toast.style.opacity = '1'; }, 10);
-          toastTimeout = setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => { toast.style.display = 'none'; }, 300);
-          }, 2500);
+          if (typeof window.schaltiToast === 'function') {
+            window.schaltiToast(text, isError ? 'danger' : 'success', isError ? 'exclamation-circle' : 'check-circle');
+          }
+          // Auch DOM-Element aktualisieren für Tests/Fallback
+          if (toast && toastText) {
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastText.textContent = text;
+            toast.style.background = isError ? '#991b1b' : '#065f46';
+            toast.style.display = 'inline-flex';
+            setTimeout(() => { toast.style.opacity = '1'; }, 10);
+            toastTimeout = setTimeout(() => {
+              toast.style.opacity = '0';
+              setTimeout(() => { toast.style.display = 'none'; }, 300);
+            }, 2500);
+          }
         }
 
         async function submitFormAsync(form) {
@@ -857,7 +949,7 @@
 
           if (smtpTestBox) {
             smtpTestBox.style.display = 'block';
-            smtpTestBox.style.background = 'var(--grund-leise)';
+            smtpTestBox.style.background = 'var(--grund)';
             smtpTestBox.style.border = '1px solid var(--linie)';
           }
           if (smtpTestSpinner) smtpTestSpinner.style.display = 'flex';
@@ -880,29 +972,29 @@
               smtpTestErgebnis.style.display = 'block';
               if (daten.ok) {
                 if (smtpTestBox) {
-                  smtpTestBox.style.background = '#f0fdf4';
-                  smtpTestBox.style.border = '1px solid #86efac';
+                  smtpTestBox.style.background = 'var(--schalti-gruen-hell, #f0fdf4)';
+                  smtpTestBox.style.border = '1px solid var(--schalti-gruen, #86efac)';
                 }
                 smtpTestErgebnis.innerHTML = `
-                  <div style="display:flex; align-items:flex-start; gap:0.6rem; color:#166534">
+                  <div style="display:flex; align-items:flex-start; gap:0.6rem; color:var(--schalti-gruen-dunkel, #166534)">
                     <span style="font-size:1.2rem; line-height:1">✓</span>
                     <div>
                       <strong style="display:block; margin-bottom:0.2rem">${daten.meldung}</strong>
-                      ${daten.details ? `<div style="font-size:0.85rem; color:#15803d">${daten.details}</div>` : ''}
+                      ${daten.details ? `<div style="font-size:0.85rem;">${daten.details}</div>` : ''}
                     </div>
                   </div>
                 `;
               } else {
                 if (smtpTestBox) {
-                  smtpTestBox.style.background = '#fef2f2';
-                  smtpTestBox.style.border = '1px solid #fca5a5';
+                  smtpTestBox.style.background = 'var(--schalti-rot-hell, #fef2f2)';
+                  smtpTestBox.style.border = '1px solid var(--schalti-rot, #fca5a5)';
                 }
                 smtpTestErgebnis.innerHTML = `
-                  <div style="display:flex; align-items:flex-start; gap:0.6rem; color:#991b1b">
+                  <div style="display:flex; align-items:flex-start; gap:0.6rem; color:var(--schalti-rot-dunkel, #991b1b)">
                     <span style="font-size:1.2rem; line-height:1">✕</span>
                     <div>
                       <strong style="display:block; margin-bottom:0.2rem">${daten.meldung || 'Fehler beim SMTP-Test'}</strong>
-                      ${daten.details ? `<div style="font-size:0.85rem; color:#b91c1c">${daten.details}</div>` : ''}
+                      ${daten.details ? `<div style="font-size:0.85rem;">${daten.details}</div>` : ''}
                     </div>
                   </div>
                 `;
@@ -913,15 +1005,15 @@
             if (smtpTestErgebnis) {
               smtpTestErgebnis.style.display = 'block';
               if (smtpTestBox) {
-                smtpTestBox.style.background = '#fef2f2';
-                smtpTestBox.style.border = '1px solid #fca5a5';
+                smtpTestBox.style.background = 'var(--schalti-rot-hell, #fef2f2)';
+                smtpTestBox.style.border = '1px solid var(--schalti-rot, #fca5a5)';
               }
               smtpTestErgebnis.innerHTML = `
-                <div style="display:flex; align-items:flex-start; gap:0.6rem; color:#991b1b">
+                <div style="display:flex; align-items:flex-start; gap:0.6rem; color:var(--schalti-rot-dunkel, #991b1b)">
                   <span style="font-size:1.2rem; line-height:1">✕</span>
                   <div>
                     <strong style="display:block; margin-bottom:0.2rem">Netzwerk- oder Serverfehler</strong>
-                    <div style="font-size:0.85rem; color:#b91c1c">${err.message || err}</div>
+                    <div style="font-size:0.85rem;">${err.message || err}</div>
                   </div>
                 </div>
               `;
