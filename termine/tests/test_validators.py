@@ -102,11 +102,20 @@ class BuchungsFormValidationTest(TestCase):
         self.assertEqual(form.cleaned_data["telefon"], "0170 / 9876543")
 
     def test_formular_lehnt_ungueltige_email_ab(self):
+        # Fall A: Völlig ungültige Syntax
         daten = self.basis_daten()
+        daten["email"] = "falsch"
+        form = BuchungsForm(data=daten)
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
+        self.assertEqual(len(form.errors["email"]), 1, "Es darf genau eine Fehlermeldung bei falscher Mail erscheinen")
+
+        # Fall B: Unvollständige Domain
         daten["email"] = "ungueltig@domain"
         form = BuchungsForm(data=daten)
         self.assertFalse(form.is_valid())
         self.assertIn("email", form.errors)
+        self.assertEqual(len(form.errors["email"]), 1, "Es darf genau eine Fehlermeldung bei falscher Mail erscheinen")
 
     def test_formular_lehnt_ungueltiges_telefon_ab(self):
         daten = self.basis_daten()
@@ -114,3 +123,4 @@ class BuchungsFormValidationTest(TestCase):
         form = BuchungsForm(data=daten)
         self.assertFalse(form.is_valid())
         self.assertIn("telefon", form.errors)
+        self.assertEqual(len(form.errors["telefon"]), 1)

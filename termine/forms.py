@@ -28,7 +28,6 @@ class BuchungsForm(forms.Form):
         label="E-Mail-Adresse",
         widget=forms.EmailInput(attrs={"autocomplete": "email"}),
         help_text="An diese Adresse schicken wir den Bestätigungslink.",
-        validators=[validate_email_address],
     )
     telefon = forms.CharField(
         label="Telefon",
@@ -36,7 +35,6 @@ class BuchungsForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs={"autocomplete": "tel"}),
         help_text="Freiwillig – hilft uns bei kurzfristigen Rückfragen.",
-        validators=[validate_phone_number],
     )
     fuehrerscheinklasse = forms.ChoiceField(
         label="Gewünschte Führerscheinklasse",
@@ -79,6 +77,8 @@ class BuchungsForm(forms.Form):
 
     def clean_email(self):
         email = self.cleaned_data.get("email")
+        if not email:
+            return email
         return validate_email_address(email)
 
     def clean_telefon(self):
