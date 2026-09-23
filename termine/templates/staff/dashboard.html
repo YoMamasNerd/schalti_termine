@@ -68,7 +68,9 @@
         <span class="leer" style="font-size:0.85rem">Durch Sperrzeiten oder Blocker nicht angelegt</span>
       </div>
       <p style="margin-bottom:0.75rem; font-size:0.9rem">
-        Folgende regelmäßige Termine konnten nicht im Kalender freigegeben werden, da der jeweilige Fahrlehrer blockiert ist. Sie können diese Termine manuell bei einem anderen verfügbaren Fahrlehrer einplanen:
+        Folgende regelmäßige Termine konnten nicht im Kalender freigegeben werden, da der jeweilige Fahrlehrer blockiert ist.
+        <strong>Klicken Sie auf einen grünen Fahrlehrer, um den Termin direkt in seinen Kalender zu übertragen.</strong>
+        Hat für den Slot schon jemand gebucht, verschieben Sie die Buchung anschließend in der <a href="{% url 'termine:buchungen' %}">Buchungsliste</a> auf den neuen Termin.
       </p>
       <div class="tabelle-huelle">
         <table class="liste" style="font-size:0.9rem">
@@ -79,7 +81,7 @@
               <th>Terminart</th>
               <th>Grund / Blocker</th>
               <th>Verfügbare Alternativen</th>
-              <th></th>
+              <th style="text-align:right">Aktionen</th>
             </tr>
           </thead>
           <tbody>
@@ -100,9 +102,10 @@
                         <input type="hidden" name="bis" value="{{ kol.ende|date:'H:i' }}">
                         <input type="hidden" name="terminart" value="{{ kol.terminart.pk }}">
                         <input type="hidden" name="fahrlehrer_slug" value="{{ gewaehlter_slug }}">
-                        <button type="submit" class="abzeichen"
-                                style="background:var(--gruen-hell); color:var(--gruen-dunkel); padding:2px 6px; border-radius:3px; font-size:0.8rem; border:1px solid transparent; cursor:pointer; margin-right:4px">
-                          ✓ {{ alt.name }}
+                        <button type="submit" class="abzeichen kollision-anlegen"
+                                title="Termin in den Kalender von {{ alt.name }} übertragen"
+                                style="background:var(--gruen-hell); color:var(--gruen-dunkel); padding:2px 8px; border-radius:3px; font-size:0.8rem; border:1px solid transparent; cursor:pointer; margin-right:4px">
+                          {{ alt.name }} <sl-icon name="calendar-plus" style="vertical-align:-2px"></sl-icon>
                         </button>
                       </form>
                     {% endfor %}

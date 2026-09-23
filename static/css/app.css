@@ -695,3 +695,14 @@ table.tabelle--kompakt th {
 .kollisions-aktion .abzeichen {
   font: inherit; line-height: 1.2; vertical-align: middle;
 }
+/* Alternativ-Fahrlehrer sind Buttons, keine Badges – Hover macht das sichtbar */
+.kollision-anlegen {
+  transition: background 120ms, border-color 120ms, transform 80ms;
+}
+.kollision-anlegen:hover {
+  background: var(--gruen) !important;
+  border-color: var(--gruen-dunkel) !important;
+  color: var(--auf-akzent) !important;
+}
+.kollision-anlegen:active { transform: scale(0.97); }
+.kollision-anlegen sl-icon { font-size: 0.9rem; }
