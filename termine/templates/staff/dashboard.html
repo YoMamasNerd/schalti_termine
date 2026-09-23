@@ -57,9 +57,10 @@
     {% endif %}
   </div>
 
-  <!-- Warnungen bei Rhythmus-Kollisionen -->
+  <!-- Warnungen bei Rhythmus-Kollisionen (zugeklappt als Akkordeon) -->
   {% if kollisionen %}
-    <div class="karte" style="border-left:4px solid var(--rot); margin-bottom:1.5rem">
+    <sl-details style="margin-bottom:1.5rem" summary="⚠️ Kollisionen bei Rhythmus-Terminen ({{ kollisionen|length }})">
+      <div class="karte" style="border-left:4px solid var(--rot); margin:0; padding:1rem">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem">
         <h2 style="margin:0; font-size:1.1rem; color:var(--rot); display:flex; align-items:center; gap:0.5rem">
           ⚠️ Kollisionen bei Rhythmus-Terminen ({{ kollisionen|length }})
@@ -109,7 +110,8 @@
           </tbody>
         </table>
       </div>
-    </div>
+      </div>
+    </sl-details>
   {% endif %}
 
   <!-- Gespiegelter Kalender & Tagesdetails -->
