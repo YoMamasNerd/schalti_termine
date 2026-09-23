@@ -695,6 +695,25 @@ def termine_anlegen(request):
     return redirect(ziel)
 
 
+def _dashboard_ziel(request, fahrlehrer=None):
+    """Nach Kollisions-Aktionen zurück aufs Dashboard – mit gewähltem Fahrlehrer.
+
+    Ohne aktiven Filter („Alle Fahrlehrer") bleibt es dabei; ein mitgegebener
+    Einzelslug wird über `fahrlehrer_slug` bevorzugt.
+    """
+    ziel = reverse("termine:dashboard")
+    if fahrlehrer is None:
+        slug = request.POST.get("fahrlehrer_slug", "")
+        if slug:
+            try:
+                fahrlehrer = Fahrlehrer.objects.get(slug=slug)
+            except Fahrlehrer.DoesNotExist:
+                fahrlehrer = None
+    if fahrlehrer:
+        ziel += f"?fahrlehrer={fahrlehrer.slug}"
+    return ziel
+
+
 @mitarbeiter
 @require_POST
 def kollision_anlegen(request):
@@ -716,7 +735,7 @@ def kollision_anlegen(request):
         terminart = Terminart.objects.get(pk=request.POST.get("terminart"), aktiv=True)
     except (ValueError, Terminart.DoesNotExist):
         messages.error(request, "Ungültige Kollisionsdaten – bitte Seite neu laden.")
-        return redirect("termine:dashboard")
+        return redirect(_dashboard_ziel(request))
 
     neue, uebersprungen = termine_manuell_anlegen(
         fahrlehrer, terminart, tag, von, bis
@@ -733,7 +752,7 @@ def kollision_anlegen(request):
             f"Slot bei {fahrlehrer.name} war nicht frei"
             + (" (bereits belegt)." if uebersprungen else "."),
         )
-    return redirect("termine:dashboard")
+    return redirect(_dashboard_ziel(request))
 
 
 @mitarbeiter
@@ -755,7 +774,7 @@ def kollision_ignorieren(request):
         terminart = Terminart.objects.get(pk=request.POST.get("terminart"), aktiv=True)
     except (ValueError, Terminart.DoesNotExist):
         messages.error(request, "Ungültige Kollisionsdaten – bitte Seite neu laden.")
-        return redirect("termine:dashboard")
+        return redirect(_dashboard_ziel(request))
 
     KollisionsIgnorier.objects.get_or_create(
         fahrlehrer=fahrlehrer,
@@ -765,7 +784,7 @@ def kollision_ignorieren(request):
         terminart=terminart,
     )
     messages.info(request, f"Kollision am {date_format(tag, 'D, j. M Y')} ignoriert.")
-    return redirect("termine:dashboard")
+    return redirect(_dashboard_ziel(request))
 
 
 @mitarbeiter
@@ -779,7 +798,11 @@ def kollision_ignorier_rueckgangig(request, pk: int):
     )
     ignorier.delete()
     messages.info(request, "Ignorieren zurückgenommen – die Kollision erscheint wieder.")
-    return redirect("termine:dashboard")
+    # Ohne aktiven Filter („Alle Fahrlehrer") zurück zur Übersicht, sonst zum
+    # Fahrlehrer des Eintrags – die Aktion könnte aus dessen Sicht kommen.
+    if request.POST.get("fahrlehrer_slug"):
+        return redirect(_dashboard_ziel(request))
+    return redirect(_dashboard_ziel(request, fahrlehrer=ignorier.fahrlehrer))
 
 
 @mitarbeiter
