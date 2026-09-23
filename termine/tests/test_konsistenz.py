@@ -22,6 +22,7 @@ from termine.models import (
     Fahrlehrer,
     FahrschulEinstellungen,
     Fuehrerscheinklasse,
+    KollisionsIgnorier,
     RhythmusRegel,
     Sperrzeit,
     Termin,
@@ -227,6 +228,172 @@ class KollisionenNurAusAngebotsRegeln(TestCase):
         self.assertEqual(
             finde_kollisionen_rhythmus_regeln([fahrlehrer], von=morgen, bis=morgen), []
         )
+
+
+class KollisionsBehandlung(TestCase):
+    """Gelöste und einmal ignorierte Kollisionen verschwinden aus dem Banner.
+
+    Wer den kollidierenden Slot von Hand bei einem anderen Fahrlehrer angelegt
+    hat, soll die Warnung nicht wochenlang weitersehen. Und „Ignorieren“ gilt
+    für genau dieses Datum – dauerhaftes Ausblenden ist Sache der Regel.
+    """
+
+    def setUp(self):
+        self.fl_blockiert = Fahrlehrer.objects.create(
+            name="Anna", email="a@example.org"
+        )
+        self.fl_frei = Fahrlehrer.objects.create(name="Ben", email="b@example.org")
+        self.art = Terminart.objects.create(name="Beratung", dauer_minuten=60)
+        self.morgen = timezone.localdate() + dt.timedelta(days=1)
+
+        self.regel = RhythmusRegel.objects.create(
+            fahrlehrer=self.fl_blockiert,
+            regel_art=RhythmusRegel.RegelArt.ANGEBOT,
+            terminart=self.art,
+            wochentage=list(range(7)),
+            beginn=dt.time(10, 0),
+            ende=dt.time(12, 0),
+            gueltig_ab=timezone.localdate(),
+        )
+        self.sperre = Sperrzeit.objects.create(
+            fahrlehrer=self.fl_blockiert,
+            beginn=timezone.make_aware(dt.datetime.combine(self.morgen, dt.time(9, 0))),
+            ende=timezone.make_aware(
+                dt.datetime.combine(self.morgen + dt.timedelta(days=2), dt.time(18, 0))
+            ),
+            grund="Kita",
+        )
+        self.chef = get_user_model().objects.create_user(
+            "chefin", password="geheim123", is_staff=True
+        )
+
+    def _slot(self):
+        return (
+            self.morgen,
+            dt.time(10, 0),
+            dt.time(11, 0),
+        )
+
+    def test_geloeste_kollision_erscheint_nicht_mehr(self):
+        slot = self._slot()
+        # Ben bekommt beide Slots der Regel (10–11 und 11–12) – gelöst.
+        for von in (slot[1], dt.time(11, 0)):
+            Termin.objects.create(
+                fahrlehrer=self.fl_frei,
+                terminart=self.art,
+                beginn=timezone.make_aware(dt.datetime.combine(slot[0], von)),
+                ende=timezone.make_aware(dt.datetime.combine(slot[0], von) + dt.timedelta(hours=1)),
+                status=Termin.Status.FREI,
+                herkunft=Termin.Herkunft.MANUELL,
+            )
+
+        self.assertEqual(
+            finde_kollisionen_rhythmus_regeln(
+                [self.fl_blockiert], von=self.morgen, bis=self.morgen
+            ),
+            [],
+        )
+
+    def test_ignorieren_versteckt_einmalig(self):
+        self.client.force_login(self.chef)
+        tag, von, bis = self._slot()
+        for uhr in ((von, bis), (dt.time(11, 0), dt.time(12, 0))):
+            self.client.post(
+                reverse("termine:kollision_ignorieren"),
+                {
+                    "fahrlehrer": self.fl_blockiert.pk,
+                    "tag": tag.isoformat(),
+                    "von": f"{uhr[0]:%H:%M}",
+                    "bis": f"{uhr[1]:%H:%M}",
+                    "terminart": self.art.pk,
+                },
+            )
+
+        self.assertEqual(
+            finde_kollisionen_rhythmus_regeln(
+                [self.fl_blockiert], von=self.morgen, bis=self.morgen
+            ),
+            [],
+        )
+        # Nur dieses Datum ist betroffen – übermorgen wieder sichtbar.
+        uebermorgen = self.morgen + dt.timedelta(days=2)
+        self.assertEqual(
+            len(
+                finde_kollisionen_rhythmus_regeln(
+                    [self.fl_blockiert], von=uebermorgen, bis=uebermorgen
+                )
+            ),
+            2,
+        )
+
+    def test_ignorieren_laesst_sich_zuruecknehmen(self):
+        self.client.force_login(self.chef)
+        tag, von, bis = self._slot()
+        for uhr in ((von, bis), (dt.time(11, 0), dt.time(12, 0))):
+            self.client.post(
+                reverse("termine:kollision_ignorieren"),
+                {
+                    "fahrlehrer": self.fl_blockiert.pk,
+                    "tag": tag.isoformat(),
+                    "von": f"{uhr[0]:%H:%M}",
+                    "bis": f"{uhr[1]:%H:%M}",
+                    "terminart": self.art.pk,
+                },
+            )
+        ignorier = KollisionsIgnorier.objects.get(beginn=von)
+
+        self.client.post(
+            reverse("termine:kollision_ignorier_rueckgangig", args=[ignorier.pk])
+        )
+        self.assertEqual(KollisionsIgnorier.objects.count(), 1)
+        # Nur der zurückgenommene Slot meldet sich wieder.
+        uebrig = finde_kollisionen_rhythmus_regeln(
+            [self.fl_blockiert], von=self.morgen, bis=self.morgen
+        )
+        self.assertEqual(len(uebrig), 1)
+        self.assertEqual(timezone.localtime(uebrig[0].beginn).time(), von)
+
+    def test_anlegen_bei_alternativ_fahrlehrer_loest_die_kollision(self):
+        self.client.force_login(self.chef)
+        tag, von, bis = self._slot()
+        self.client.post(
+            reverse("termine:kollision_anlegen"),
+            {
+                "fahrlehrer": self.fl_frei.pk,
+                "tag": tag.isoformat(),
+                "von": f"{von:%H:%M}",
+                "bis": f"{bis:%H:%M}",
+                "terminart": self.art.pk,
+            },
+        )
+
+        # Termin existiert bei Ben, genau dieser Slot ist aus dem Banner.
+        termin = Termin.objects.get(fahrlehrer=self.fl_frei, terminart=self.art)
+        self.assertEqual(timezone.localtime(termin.beginn).time(), von)
+        uebrig = finde_kollisionen_rhythmus_regeln(
+            [self.fl_blockiert], von=self.morgen, bis=self.morgen
+        )
+        self.assertEqual(len(uebrig), 1)
+        self.assertEqual(timezone.localtime(uebrig[0].beginn).time(), dt.time(11, 0))
+
+    def test_fahrlehrer_ohne_berechtigung_wird_abgewiesen(self):
+        self.client.force_login(self.chef)
+        # Ein Fahrlehrer, der nicht existiert, führt zu 404; ein berechtigter
+        # zu Erfolg – hier reicht der Nachweis, dass ohne Login nichts geht.
+        self.client.logout()
+        tag, von, bis = self._slot()
+        antwort = self.client.post(
+            reverse("termine:kollision_ignorieren"),
+            {
+                "fahrlehrer": self.fl_blockiert.pk,
+                "tag": tag.isoformat(),
+                "von": f"{von:%H:%M}",
+                "bis": f"{bis:%H:%M}",
+                "terminart": self.art.pk,
+            },
+        )
+        self.assertEqual(antwort.status_code, 302)
+        self.assertEqual(KollisionsIgnorier.objects.count(), 0)
 
 
 class KlassenAuswahlAusEinerQuelle(TestCase):

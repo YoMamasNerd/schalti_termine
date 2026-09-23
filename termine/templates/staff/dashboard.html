@@ -92,17 +92,37 @@
                 <td>
                   {% if kol.alternative_fahrlehrer %}
                     {% for alt in kol.alternative_fahrlehrer %}
-                      <span class="abzeichen" style="background:var(--gruen-hell); color:var(--gruen-dunkel); padding:2px 6px; border-radius:3px; font-size:0.8rem; margin-right:4px">
-                        ✓ {{ alt.name }}
-                      </span>
+                      <form method="post" action="{% url 'termine:kollision_anlegen' %}" class="kollisions-aktion">
+                        {% csrf_token %}
+                        <input type="hidden" name="fahrlehrer" value="{{ alt.pk }}">
+                        <input type="hidden" name="tag" value="{{ kol.tag|date:'Y-m-d' }}">
+                        <input type="hidden" name="von" value="{{ kol.beginn|date:'H:i' }}">
+                        <input type="hidden" name="bis" value="{{ kol.ende|date:'H:i' }}">
+                        <input type="hidden" name="terminart" value="{{ kol.terminart.pk }}">
+                        <button type="submit" class="abzeichen"
+                                style="background:var(--gruen-hell); color:var(--gruen-dunkel); padding:2px 6px; border-radius:3px; font-size:0.8rem; border:1px solid transparent; cursor:pointer; margin-right:4px">
+                          ✓ {{ alt.name }}
+                        </button>
+                      </form>
                     {% endfor %}
                   {% else %}
                     <span class="leer">Kein anderer Fahrlehrer frei</span>
                   {% endif %}
                 </td>
-                <td style="text-align:right">
+                <td style="text-align:right; white-space:nowrap">
+                  <form method="post" action="{% url 'termine:kollision_ignorieren' %}" class="kollisions-aktion">
+                    {% csrf_token %}
+                    <input type="hidden" name="fahrlehrer" value="{{ kol.fahrlehrer.pk }}">
+                    <input type="hidden" name="tag" value="{{ kol.tag|date:'Y-m-d' }}">
+                    <input type="hidden" name="von" value="{{ kol.beginn|date:'H:i' }}">
+                    <input type="hidden" name="bis" value="{{ kol.ende|date:'H:i' }}">
+                    <input type="hidden" name="terminart" value="{{ kol.terminart.pk }}">
+                    <button type="submit" class="knopf knopf--leise knopf--klein">
+                      Ignorieren
+                    </button>
+                  </form>
                   <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:tagesplanung' %}?woche={{ kol.tag|date:'Y-m-d' }}{% if kol.alternative_fahrlehrer %}&fahrlehrer={{ kol.alternative_fahrlehrer.0.slug }}{% else %}&fahrlehrer={{ kol.fahrlehrer.slug }}{% endif %}">
-                    In Tagesplanung öffnen &rarr;
+                    Planung &rarr;
                   </a>
                 </td>
               </tr>
@@ -110,6 +130,29 @@
           </tbody>
         </table>
       </div>
+      {% if ignorierte_kollisionen %}
+        <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px dashed var(--grenze, var(--schwarz-hell, #ddd))">
+          <h3 style="margin:0 0 0.5rem 0; font-size:0.9rem; color:var(--text-leise, var(--grau, #666)); font-weight:600">
+            Ausgeblendete Kollisionen
+          </h3>
+          <ul style="list-style:none; margin:0; padding:0; font-size:0.85rem">
+            {% for ign in ignorierte_kollisionen %}
+              <li style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:0.25rem 0">
+                <span>
+                  {{ ign.fahrlehrer.name }} · {{ ign.tag|date:"D, j. M Y" }},
+                  {{ ign.beginn|date:"H:i" }}–{{ ign.ende|date:"H:i" }} Uhr · {{ ign.terminart.name }}
+                </span>
+                <form method="post" action="{% url 'termine:kollision_ignorier_rueckgangig' ign.pk %}" class="kollisions-aktion">
+                  {% csrf_token %}
+                  <button type="submit" class="knopf knopf--leise knopf--klein">
+                    Wieder anzeigen
+                  </button>
+                </form>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
       </div>
     </sl-details>
   {% endif %}

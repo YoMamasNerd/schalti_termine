@@ -18,7 +18,15 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from ..models import Buchung, Fahrlehrer, RhythmusRegel, Sperrzeit, Termin, Terminart
+from ..models import (
+    Buchung,
+    Fahrlehrer,
+    KollisionsIgnorier,
+    RhythmusRegel,
+    Sperrzeit,
+    Termin,
+    Terminart,
+)
 from .feiertage import feiertage_im_zeitraum
 
 logger = logging.getLogger(__name__)
@@ -546,6 +554,13 @@ def finde_kollisionen_rhythmus_regeln(
         ).select_related("fahrlehrer")
     )
 
+    # Veraltete Ignorier-Einträge (vor dem Horizont) ausräumen, aktive laden.
+    KollisionsIgnorier.objects.filter(tag__lt=von).delete()
+    ignorierte = {
+        (i.fahrlehrer_id, i.tag, i.beginn, i.ende, i.terminart_id)
+        for i in KollisionsIgnorier.objects.all()
+    }
+
     kollisionen: list[RhythmusKollision] = []
 
     for fl in fahrlehrer_liste:
@@ -584,6 +599,26 @@ def finde_kollisionen_rhythmus_regeln(
                             break
 
                     if kollidierende_sperre:
+                        # Gelöst? Dann existiert inzwischen ein Termin mit gleicher
+                        # Terminart im selben Slot bei einem anderen Fahrlehrer.
+                        geloest = any(
+                            t.fahrlehrer_id != fl.pk
+                            and t.terminart_id == regel.terminart_id
+                            and t.beginn == slot_beginn
+                            and t.ende == slot_ende
+                            for t in alle_termine
+                        )
+                        if geloest:
+                            continue
+                        # Einmal ignoriert? Dann diesen Slot ebenfalls ausblenden.
+                        if (
+                            fl.pk,
+                            tag,
+                            slot_beginn.time(),
+                            slot_ende.time(),
+                            regel.terminart_id,
+                        ) in ignorierte:
+                            continue
                         # Alternative Fahrlehrer suchen: Wer hat zu dieser Zeit weder Sperrzeit noch Termin?
                         alternativen = []
                         for anderer_fl in alle_aktiven_fl:

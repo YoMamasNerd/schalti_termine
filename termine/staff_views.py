@@ -52,6 +52,7 @@ from .models import (
     Fahrlehrer,
     FahrschulEinstellungen,
     Fuehrerscheinklasse,
+    KollisionsIgnorier,
     RhythmusRegel,
     Sperrzeit,
     Termin,
@@ -356,6 +357,12 @@ def dashboard(request):
     kpi_offen = kpi_stats["kpi_offen"]
 
     kollisionen = finde_kollisionen_rhythmus_regeln(ziel_fahrlehrer)
+    ignorierte_kollisionen = list(
+        KollisionsIgnorier.objects.filter(
+            fahrlehrer__in=ziel_pks,
+            tag__gte=heute,
+        ).select_related("fahrlehrer", "terminart")
+    )
 
     querystring = f"fahrlehrer={gewaehlter_slug}" if gewaehlter_slug else ""
 
@@ -382,6 +389,7 @@ def dashboard(request):
             "kpi_gebucht": kpi_gebucht,
             "kpi_offen": kpi_offen,
             "kollisionen": kollisionen,
+            "ignorierte_kollisionen": ignorierte_kollisionen,
         },
     )
 
@@ -685,6 +693,93 @@ def termine_anlegen(request):
     if ziel_fahrlehrer:
         ziel += f"&fahrlehrer={ziel_fahrlehrer}"
     return redirect(ziel)
+
+
+@mitarbeiter
+@require_POST
+def kollision_anlegen(request):
+    """Legt einen einzigen Termin bei einem Alternativ-Fahrlehrer an.
+
+    Kommt aus dem Dashboard-Banner: Der Slot der Kollision wird bei einem
+    anderen Fahrlehrer freigegeben, ohne dass man die Tagesplanung von Hand
+    füttern muss. Nach dem Anlegen gilt die Kollision als gelöst.
+    """
+    fahrlehrer = get_object_or_404(
+        Fahrlehrer, pk=request.POST.get("fahrlehrer"), aktiv=True
+    )
+    if fahrlehrer not in _erlaubte_fahrlehrer(request.user):
+        raise PermissionDenied("Kein Zugriff auf diesen Fahrlehrer.")
+    try:
+        tag = dt.date.fromisoformat(request.POST.get("tag", ""))
+        von = dt.time.fromisoformat(request.POST.get("von", ""))
+        bis = dt.time.fromisoformat(request.POST.get("bis", ""))
+        terminart = Terminart.objects.get(pk=request.POST.get("terminart"), aktiv=True)
+    except (ValueError, Terminart.DoesNotExist):
+        messages.error(request, "Ungültige Kollisionsdaten – bitte Seite neu laden.")
+        return redirect("termine:dashboard")
+
+    neue, uebersprungen = termine_manuell_anlegen(
+        fahrlehrer, terminart, tag, von, bis
+    )
+    if neue:
+        messages.success(
+            request,
+            f"Termin am {date_format(tag, 'D, j. M Y')} "
+            f"{von:%H:%M}–{bis:%H:%M} bei {fahrlehrer.name} angelegt.",
+        )
+    else:
+        messages.warning(
+            request,
+            f"Slot bei {fahrlehrer.name} war nicht frei"
+            + (" (bereits belegt)." if uebersprungen else "."),
+        )
+    return redirect("termine:dashboard")
+
+
+@mitarbeiter
+@require_POST
+def kollision_ignorieren(request):
+    """Blendet genau dieses Kollisions-Vorkommen einmalig aus dem Banner aus.
+
+    Wiederkehrende Kollisionen (jede Woche gleiche Sperrzeit) gehören in die
+    Rhythmus-Regel geändert, nicht hier ignoriert – der Eintrag gilt nur für
+    das konkrete Datum.
+    """
+    fahrlehrer = get_object_or_404(Fahrlehrer, pk=request.POST.get("fahrlehrer"))
+    if fahrlehrer not in _erlaubte_fahrlehrer(request.user):
+        raise PermissionDenied("Kein Zugriff auf diesen Fahrlehrer.")
+    try:
+        tag = dt.date.fromisoformat(request.POST.get("tag", ""))
+        von = dt.time.fromisoformat(request.POST.get("von", ""))
+        bis = dt.time.fromisoformat(request.POST.get("bis", ""))
+        terminart = Terminart.objects.get(pk=request.POST.get("terminart"), aktiv=True)
+    except (ValueError, Terminart.DoesNotExist):
+        messages.error(request, "Ungültige Kollisionsdaten – bitte Seite neu laden.")
+        return redirect("termine:dashboard")
+
+    KollisionsIgnorier.objects.get_or_create(
+        fahrlehrer=fahrlehrer,
+        tag=tag,
+        beginn=von,
+        ende=bis,
+        terminart=terminart,
+    )
+    messages.info(request, f"Kollision am {date_format(tag, 'D, j. M Y')} ignoriert.")
+    return redirect("termine:dashboard")
+
+
+@mitarbeiter
+@require_POST
+def kollision_ignorier_rueckgangig(request, pk: int):
+    """Nimmt ein einmaliges Ignorieren zurück – der Eintrag verschwindet wieder."""
+    ignorier = get_object_or_404(
+        KollisionsIgnorier,
+        pk=pk,
+        fahrlehrer__in=_erlaubte_fahrlehrer(request.user),
+    )
+    ignorier.delete()
+    messages.info(request, "Ignorieren zurückgenommen – die Kollision erscheint wieder.")
+    return redirect("termine:dashboard")
 
 
 @mitarbeiter

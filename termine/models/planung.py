@@ -211,3 +211,47 @@ class Sperrzeit(models.Model):
     def clean(self):
         if self.beginn and self.ende and self.beginn >= self.ende:
             raise ValidationError({"ende": "Das Ende muss nach dem Beginn liegen."})
+
+
+class KollisionsIgnorier(models.Model):
+    """Einmalig ignorierte Kollision (konkretes Datum + Uhrzeit).
+
+    Unterdrückt genau ein Vorkommen im Banner. Soll eine Kollision dauerhaft
+    verschwinden, ist die Rhythmus-Regel selbst anzupassen – nicht dieser Eintrag.
+    Abgelaufene Einträge (Tag vor dem Planungshorizontbeginn) räumt die Prüfung weg.
+    """
+
+    fahrlehrer = models.ForeignKey(
+        Fahrlehrer,
+        on_delete=models.CASCADE,
+        related_name="kollisions_ignoriere",
+        verbose_name="Fahrlehrer",
+    )
+    tag = models.DateField("Datum")
+    beginn = models.TimeField("Von")
+    ende = models.TimeField("Bis")
+    terminart = models.ForeignKey(
+        Terminart,
+        on_delete=models.CASCADE,
+        related_name="kollisions_ignoriere",
+        verbose_name="Terminart",
+    )
+    erstellt_am = models.DateTimeField("Erstellt am", auto_now_add=True)
+
+    class Meta:
+        app_label = "termine"
+        verbose_name = "Ignorierte Kollision"
+        verbose_name_plural = "Ignorierte Kollisionen"
+        ordering = ("tag", "beginn")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["fahrlehrer", "tag", "beginn", "ende", "terminart"],
+                name="kollisions_ignorier_eindeutig",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"{self.fahrlehrer}: {self.tag:%d.%m.%Y} "
+            f"{self.beginn:%H:%M}–{self.ende:%H:%M} ({self.terminart})"
+        )

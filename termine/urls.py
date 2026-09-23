@@ -32,6 +32,21 @@ urlpatterns = [
     path("intern/planung/anlegen/", staff_views.termine_anlegen, name="termine_anlegen"),
     path("intern/planung/sperrzeit/", staff_views.sperrzeit_anlegen, name="sperrzeit_anlegen"),
     path("intern/planung/generieren/", staff_views.generieren, name="generieren"),
+    path(
+        "intern/kollisionen/anlegen/",
+        staff_views.kollision_anlegen,
+        name="kollision_anlegen",
+    ),
+    path(
+        "intern/kollisionen/ignorieren/",
+        staff_views.kollision_ignorieren,
+        name="kollision_ignorieren",
+    ),
+    path(
+        "intern/kollisionen/ignorieren/<int:pk>/rueckgangig/",
+        staff_views.kollision_ignorier_rueckgangig,
+        name="kollision_ignorier_rueckgangig",
+    ),
     path("intern/termin/<int:pk>/loeschen/", staff_views.termin_loeschen, name="termin_loeschen"),
     path("intern/buchungen/", staff_views.buchungsliste, name="buchungen"),
     path("intern/historie/", staff_views.historie, name="historie"),

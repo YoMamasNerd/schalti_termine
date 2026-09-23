@@ -22,7 +22,7 @@ from .common import (
 from .einstellungen import FahrschulEinstellungen, Fuehrerscheinklasse
 from .fahrlehrer import Fahrlehrer
 from .logging import LogKategorie, LogLevel, SystemLog
-from .planung import RhythmusRegel, Sperrzeit, SperrzeitTyp
+from .planung import KollisionsIgnorier, RhythmusRegel, Sperrzeit, SperrzeitTyp
 from .termin import Termin, TerminQuerySet
 from .terminart import Terminart
 
@@ -36,6 +36,7 @@ __all__ = [
     "Fuehrerscheinklasse",
     "LogKategorie",
     "LogLevel",
+    "KollisionsIgnorier",
     "RhythmusRegel",
     "Sperrzeit",
     "SperrzeitTyp",
