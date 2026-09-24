@@ -306,7 +306,7 @@ class SmtpViewsTest(TestCase):
         self.globale_einst.refresh_from_db()
         self.assertNotEqual(self.globale_einst.email_host, "hacked.smtp.org")
 
-    @patch("termine.staff_views.teste_smtp_authentifizierung")
+    @patch("termine.staff_views.einstellungen.teste_smtp_authentifizierung")
     def test_smtp_test_ajax_erfolg(self, mock_test):
         mock_test.return_value = SmtpTestErgebnis(True, "Authentifizierung erfolgreich!")
         self.client.force_login(self.chef)
@@ -327,7 +327,7 @@ class SmtpViewsTest(TestCase):
         self.assertTrue(data["ok"])
         self.assertIn("Authentifizierung erfolgreich", data["meldung"])
 
-    @patch("termine.staff_views.sende_test_email")
+    @patch("termine.staff_views.einstellungen.sende_test_email")
     def test_smtp_test_ajax_mail_versand(self, mock_mail):
         mock_mail.return_value = SmtpTestErgebnis(True, "Test-E-Mail gesendet")
         self.client.force_login(self.chef)
