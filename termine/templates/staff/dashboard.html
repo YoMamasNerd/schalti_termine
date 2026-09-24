@@ -3,6 +3,7 @@
 {% block titel %}Übersicht – {{ SITE_NAME }}{% endblock %}
 
 {% block inhalt %}
+  <div id="dashboard-bereich">
   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem">
     <div>
       <h1>Übersicht</h1>
@@ -12,7 +13,8 @@
         {% if gewaehlter_tag %}<input type="hidden" name="tag" value="{{ gewaehlter_tag|date:'Y-m-d' }}">{% endif %}
         <input type="hidden" name="monat" value="{{ jahr }}-{{ monat|stringformat:'02d' }}">
         <label for="fahrlehrer_select" style="font-weight:600; font-size:0.9rem">Fahrlehrer:</label>
-        <select name="fahrlehrer" id="fahrlehrer_select" onchange="this.form.submit()" style="padding:0.4rem 0.6rem">
+        <select name="fahrlehrer" id="fahrlehrer_select" style="padding:0.4rem 0.6rem"
+              hx-get="" hx-include="closest form" hx-target="#dashboard-bereich" hx-select="#dashboard-bereich" hx-swap="outerHTML" hx-push-url="true">
           <option value="">Alle Fahrlehrer</option>
           {% for fl in alle_fahrlehrer %}
             <option value="{{ fl.slug }}" {% if gewaehlter_slug == fl.slug %}selected{% endif %}>
@@ -94,7 +96,8 @@
                 <td>
                   {% if kol.alternative_fahrlehrer %}
                     {% for alt in kol.alternative_fahrlehrer %}
-                      <form method="post" action="{% url 'termine:kollision_anlegen' %}" class="kollisions-aktion">
+                      <form method="post" action="{% url 'termine:kollision_anlegen' %}" class="kollisions-aktion"
+                            hx-post="{% url 'termine:kollision_anlegen' %}" hx-target="#dashboard-bereich" hx-select="#dashboard-bereich" hx-swap="outerHTML">
                         {% csrf_token %}
                         <input type="hidden" name="fahrlehrer" value="{{ alt.pk }}">
                         <input type="hidden" name="tag" value="{{ kol.tag|date:'Y-m-d' }}">
@@ -114,7 +117,8 @@
                   {% endif %}
                 </td>
                 <td style="text-align:right; white-space:nowrap">
-                  <form method="post" action="{% url 'termine:kollision_ignorieren' %}" class="kollisions-aktion">
+                  <form method="post" action="{% url 'termine:kollision_ignorieren' %}" class="kollisions-aktion"
+                          hx-post="{% url 'termine:kollision_ignorieren' %}" hx-target="#dashboard-bereich" hx-select="#dashboard-bereich" hx-swap="outerHTML">
                     {% csrf_token %}
                     <input type="hidden" name="fahrlehrer" value="{{ kol.fahrlehrer.pk }}">
                     <input type="hidden" name="tag" value="{{ kol.tag|date:'Y-m-d' }}">
@@ -147,7 +151,8 @@
                   {{ ign.fahrlehrer.name }} · {{ ign.tag|date:"D, j. M Y" }},
                   {{ ign.beginn|date:"H:i" }}–{{ ign.ende|date:"H:i" }} Uhr · {{ ign.terminart.name }}
                 </span>
-                <form method="post" action="{% url 'termine:kollision_ignorier_rueckgangig' ign.pk %}" class="kollisions-aktion">
+                <form method="post" action="{% url 'termine:kollision_ignorier_rueckgangig' ign.pk %}" class="kollisions-aktion"
+                        hx-post="{% url 'termine:kollision_ignorier_rueckgangig' ign.pk %}" hx-target="#dashboard-bereich" hx-select="#dashboard-bereich" hx-swap="outerHTML">
                   {% csrf_token %}
                   <input type="hidden" name="fahrlehrer_slug" value="{{ gewaehlter_slug }}">
                   <button type="submit" class="knopf knopf--leise knopf--klein">
@@ -462,4 +467,7 @@
       <p class="leer">Zurzeit stehen keine bestätigten Beratungstermine an.</p>
     {% endif %}
   </div>
+  </div>
+
+  {% include "staff/_messages_oob.html" %}
 {% endblock %}

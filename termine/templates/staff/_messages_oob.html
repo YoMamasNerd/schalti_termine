@@ -1,0 +1,11 @@
+{# Flash-Messages als htmx-OOB-Fragment: wird bei htmx-Requests aus der Response
+   gezogen und an #flash-messages in base.html geswappt. Bei Full-Loads ist der
+   Swap inert — die schalti_ui-Messages übernehmen dort die Anzeige. #}
+<div id="flash-messages" hx-swap-oob="true">
+  {% for message in messages %}
+    <sl-alert variant="{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% else %}primary{% endif %}" open closable duration="5000">
+      <sl-icon slot="icon" name="info-circle"></sl-icon>
+      {{ message }}
+    </sl-alert>
+  {% endfor %}
+</div>
