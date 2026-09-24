@@ -1,0 +1,109 @@
+    {% load socialaccount %}
+    {# ========================================================================= #}
+    {# TAB 1: Mein Benutzerkonto                                                #}
+    {# ========================================================================= #}
+    <div id="tab-mein-profil" class="tab-inhalt">
+      <div class="raster-zwei">
+        <div>
+          {# Persönliche Angaben #}
+          <form class="karte js-auto-save-form" id="form-user-profil" method="post"
+                action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-mein-profil" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="form_art" value="user_profile">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+              <h2 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                <sl-icon name="person" style="color:var(--marke)"></sl-icon> Persönliche Angaben
+              </h2>
+              <span class="status-pill neutral">Login: {{ request.user.username }}</span>
+            </div>
+            <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+              Ihre persönlichen Benutzerkontodaten für den internen Zugang.
+            </p>
+
+            {% if user_form.non_field_errors %}
+              <div class="hinweis hinweis--fehler">{{ user_form.non_field_errors }}</div>
+            {% endif %}
+
+            {% for feld in user_form %}
+              {% include "termine/_feld.html" with feld=feld %}
+            {% endfor %}
+
+            <div class="knopfreihe" style="margin-top:1.5rem">
+              <button class="knopf" type="submit">Änderungen speichern</button>
+            </div>
+          </form>
+
+          {# Passwort ändern #}
+          <form class="karte" id="form-password-change" method="post" autocomplete="off" style="margin-top:1.25rem"
+                action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-mein-profil" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="form_art" value="password_change">
+            <h2 style="margin:0 0 0.5rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+              <sl-icon name="key" style="color:var(--marke)"></sl-icon> Passwort ändern
+            </h2>
+            <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+              Legen Sie ein neues Passwort für Ihren lokalen Login fest.
+            </p>
+
+            {% if password_form.non_field_errors %}
+              <div class="hinweis hinweis--fehler">{{ password_form.non_field_errors }}</div>
+            {% endif %}
+
+            {% for feld in password_form %}
+              {% include "termine/_feld.html" with feld=feld %}
+            {% endfor %}
+
+            <div class="knopfreihe" style="margin-top:1.5rem">
+              <button class="knopf knopf--leise" type="submit">Neues Passwort speichern</button>
+            </div>
+          </form>
+        </div>
+
+        <div>
+          {% if VOIDAUTH_ENABLED %}
+          {# --- VoidAuth SSO Karte --- #}
+          <div class="karte">
+            <h2 style="margin:0 0 0.5rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+              <sl-icon name="shield-check" style="color:var(--marke)"></sl-icon> Single Sign-On (VoidAuth)
+            </h2>
+            <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+              Verknüpfen Sie Ihren Login mit VoidAuth, um sich mit nur einem Klick oder per Passkey anzumelden.
+            </p>
+
+            {% if social_account %}
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.85rem; border:1px solid var(--gruen-hell); border-radius:var(--radius-klein); background:var(--gruen-hell);">
+                <div>
+                  <div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.25rem;">
+                    <span class="status-pill success">✓ Mit VoidAuth verknüpft</span>
+                  </div>
+                  <span style="font-size:0.85rem; color:var(--text-leise)">
+                    SSO-UID: <code>{{ social_account.uid }}</code>
+                    {% if social_account.extra_data.preferred_username %}
+                      &middot; Benutzer: {{ social_account.extra_data.preferred_username }}
+                    {% endif %}
+                  </span>
+                </div>
+                <form method="post" action="{% url 'termine:disconnect_sso' %}" onsubmit="return confirm('Möchten Sie die Verknüpfung mit VoidAuth wirklich aufheben?');">
+                  {% csrf_token %}
+                  <button class="knopf knopf--gefahr knopf--klein" type="submit">
+                    Verknüpfung aufheben
+                  </button>
+                </form>
+              </div>
+            {% else %}
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.85rem; border:1px solid var(--linie); border-radius:var(--radius-klein);">
+                <div>
+                  <strong>Noch nicht verknüpft</strong>
+                  <span style="display:block; font-size:0.85rem; color:var(--text-leise)">Verbinden Sie Ihr lokales Benutzerkonto mit VoidAuth.</span>
+                </div>
+                <a href="{% provider_login_url 'openid_connect' provider_id='voidauth' process='connect' %}"
+                   class="knopf knopf--klein">
+                  Jetzt mit VoidAuth verknüpfen
+                </a>
+              </div>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
