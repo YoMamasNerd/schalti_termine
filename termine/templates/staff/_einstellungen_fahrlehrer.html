@@ -9,7 +9,7 @@
             <label for="fahrlehrer_select" style="font-weight:600; font-size:0.95rem">Ausgewählter Fahrlehrer:</label>
           </div>
           <form method="get" style="margin:0; display:flex; align-items:center; gap:0.5rem">
-            <select name="fahrlehrer" id="fahrlehrer_select" style="width:auto; padding:0.4rem 0.75rem; font-size:0.95rem; font-weight:600" onchange="window.location.href='?fahrlehrer=' + this.value + '#tab-fahrlehrer';">
+            <select name="fahrlehrer" id="fahrlehrer_select" style="width:auto; padding:0.4rem 0.75rem; font-size:0.95rem; font-weight:600" hx-get="" hx-include="this" hx-target="#einstellungen-bereich" hx-select="#einstellungen-bereich" hx-swap="outerHTML" hx-on::after-request="if(this.value) window.location.hash='tab-fahrlehrer'">
               {% for person in alle_fahrlehrer %}
                 <option value="{{ person.slug }}" {% if person.pk == fahrlehrer.pk %}selected{% endif %}>
                   {{ person.name }}{% if not person.aktiv %} (inaktiv){% endif %}
@@ -71,6 +71,7 @@
 
             <form method="post"
                   action="{% url 'termine:feed_token_neu' %}?fahrlehrer={{ fahrlehrer.slug }}"
+                  hx-post="{% url 'termine:feed_token_neu' %}?fahrlehrer={{ fahrlehrer.slug }}" hx-target="#einstellungen-bereich" hx-select="#einstellungen-bereich" hx-swap="outerHTML"
                   onsubmit="return confirm('Neue Abo-Adresse erzeugen? Das bisherige Abo hört danach auf zu funktionieren.');">
               {% csrf_token %}
               <button class="knopf knopf--leise knopf--klein" type="submit">
