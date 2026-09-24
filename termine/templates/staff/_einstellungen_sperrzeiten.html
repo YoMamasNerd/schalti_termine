@@ -9,7 +9,7 @@
             <label for="fahrlehrer_urlaub_select" style="font-weight:600; font-size:0.95rem">Ausgewählter Fahrlehrer:</label>
           </div>
           <form method="get" style="margin:0; display:flex; align-items:center; gap:0.5rem">
-            <select name="fahrlehrer" id="fahrlehrer_urlaub_select" style="width:auto; padding:0.4rem 0.75rem; font-size:0.95rem; font-weight:600" onchange="window.location.href='?fahrlehrer=' + this.value + '#tab-urlaube';">
+            <select name="fahrlehrer" id="fahrlehrer_urlaub_select" style="width:auto; padding:0.4rem 0.75rem; font-size:0.95rem; font-weight:600" hx-get="" hx-include="this" hx-target="#einstellungen-bereich" hx-select="#einstellungen-bereich" hx-swap="outerHTML" hx-on::after-request="if(this.value) window.location.hash='tab-urlaube'">
               {% for person in alle_fahrlehrer %}
                 <option value="{{ person.slug }}" {% if person.pk == fahrlehrer.pk %}selected{% endif %}>
                   {{ person.name }}{% if not person.aktiv %} (inaktiv){% endif %}
@@ -45,7 +45,8 @@
                       <td style="text-align:right">
                         <form method="post"
                               action="{% url 'termine:sperrzeit_loeschen' sperre.pk %}?next={% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}%23tab-urlaube"
-                              onsubmit="return confirm('Sperrzeit wirklich aufheben?');">
+                              hx-post="{% url 'termine:sperrzeit_loeschen' sperre.pk %}?next={% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}%23tab-urlaube" hx-target="#einstellungen-bereich" hx-select="#einstellungen-bereich" hx-swap="outerHTML"
+                              hx-confirm="Sperrzeit wirklich aufheben?">
                           {% csrf_token %}
                           <button class="knopf knopf--gefahr knopf--klein" type="submit">Aufheben</button>
                         </form>

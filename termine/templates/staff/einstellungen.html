@@ -30,6 +30,7 @@
   {% else %}
 
     {# --- Tab-Leiste im Schalti UI Design --- #}
+    <div id="einstellungen-bereich">
     <div class="einstellungen-tabs" role="tablist">
       <button type="button" class="tab-schalter active" data-tab="tab-mein-profil" role="tab">
         <sl-icon name="person" class="tab-icon"></sl-icon>
@@ -73,6 +74,8 @@
     {% include "staff/_einstellungen_stammdaten.html" %}
 
     {% include "staff/_einstellungen_system.html" %}
+
+    {% include "staff/_messages_oob.html" %}
     <style>
       @keyframes drehen {
         to { transform: rotate(360deg); }
@@ -147,6 +150,7 @@
     </div>
 
     <script src="{% static 'js/einstellungen.js' %}" data-smtp-test-url="{% url 'termine:smtp_test' %}"></script>
+    </div>
 
   {% endif %}
 {% endblock %}
