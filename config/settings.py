@@ -43,6 +43,9 @@ CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 # weil diese außerhalb eines Requests erzeugt werden (Hintergrundjobs).
 SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "http://localhost:8000").rstrip("/")
 SITE_NAME = os.environ.get("SITE_NAME", "Fahrschule – Beratungstermine")
+SCHALTI_APPS_REGISTRY_URL = os.environ.get(
+    "SCHALTI_APPS_REGISTRY_URL", "https://apps.arbeits-zimmer.de/apps.json"
+)
 
 # --- Fahrschulmanager (FSM) Integration ------------------------------------
 # Synchronisation von Beratungsterminen und Belegungszeiten über das zentrale FSM-Gateway.
@@ -98,6 +101,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "termine.context_processors.site",
+                "schalti_ui.context_processors.apps_registry",
             ],
         },
     },
