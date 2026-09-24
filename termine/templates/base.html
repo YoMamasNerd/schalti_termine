@@ -27,9 +27,15 @@
 
 {% block body_class %}{% block koerper %}oeffentlich{% endblock %}{% endblock %}
 
-{% block nav_items %}
+{% block nav_items %}{% endblock %}
+
+{% block subnav %}
   {% if user.is_authenticated and user.is_staff or user.is_authenticated and user.fahrlehrer %}
-    {% include "staff/_navigation.html" %}
+    <nav class="schalti-subnav" aria-label="Bereiche">
+      <div class="schalti-subnav-container">
+        {% include "staff/_navigation.html" %}
+      </div>
+    </nav>
   {% endif %}
 {% endblock %}
 

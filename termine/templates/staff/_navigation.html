@@ -1,36 +1,25 @@
 {% load navigation %}
 {% aktiv 'dashboard' as hier %}
-<li>
-  <a class="schalti-nav-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:dashboard' %}">
-    Übersicht
-  </a>
-</li>
+<a class="filter-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:dashboard' %}">
+  <i class="bi bi-speedometer2"></i> Übersicht
+</a>
 
 {% aktiv 'tagesplanung' 'termine_anlegen' 'sperrzeit_anlegen' 'generieren' as hier %}
-<li>
-  <a class="schalti-nav-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:tagesplanung' %}">
-    Tagesplanung
-  </a>
-</li>
+<a class="filter-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:tagesplanung' %}">
+  <i class="bi bi-calendar2-week"></i> Tagesplanung
+</a>
 
 {% aktiv 'regeln' 'regel_neu' 'regel_bearbeiten' as hier %}
-<li>
-  <a class="schalti-nav-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:regeln' %}">
-    Rhythmus-Regeln
-  </a>
-</li>
+<a class="filter-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:regeln' %}">
+  <i class="bi bi-sliders"></i> Rhythmus-Regeln
+</a>
 
 {% aktiv 'buchungen' 'buchung_detail' 'buchung_verschieben' 'buchung_absagen' as hier %}
-<li>
-  <a class="schalti-nav-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:buchungen' %}">
-    Buchungen
-  </a>
-</li>
+<a class="filter-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:buchungen' %}">
+  <i class="bi bi-calendar-check"></i> Buchungen
+</a>
 
 {% aktiv 'historie' as hier %}
-<li>
-  <a class="schalti-nav-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:historie' %}">
-    Historie
-  </a>
-</li>
-
+<a class="filter-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:historie' %}">
+  <i class="bi bi-clock-history"></i> Historie
+</a>
