@@ -32,14 +32,12 @@ class AktiverPunkt(TestCase):
         """Die Beschriftungen aller als aktiv markierten Punkte."""
         import re
         html = antwort.content.decode()
-        return [
-            m.strip()
-            for m in re.findall(
-                r'<a[^>]*class="[^"]*\baktiv\b[^"]*"[^>]*>(.*?)</a>',
-                html,
-                re.DOTALL,
-            )
-        ]
+        roh = re.findall(
+            r'<a[^>]*class="[^"]*\baktiv\b[^"]*"[^>]*>(.*?)</a>',
+            html,
+            re.DOTALL,
+        )
+        return [re.sub(r"<[^>]+>", "", m).strip() for m in roh]
 
     def test_jede_hauptseite_markiert_genau_sich_selbst(self):
         for name, beschriftung in (
@@ -74,7 +72,10 @@ class AktiverPunkt(TestCase):
 
     def test_aktiver_punkt_ist_auch_fuer_screenreader_erkennbar(self):
         antwort = self.client.get(reverse("termine:buchungen"))
-        self.assertContains(antwort, 'aria-current="page"', count=1)
+        import re as _re
+        html = antwort.content.decode()
+        pills = _re.findall(r'<a[^>]*class="[^"]*(?:schalti-nav-pill|filter-pill)[^"]*"[^>]*>', html)
+        self.assertEqual(sum('aria-current="page"' in p for p in pills), 1)
 
     def test_oeffentliche_seite_hat_keine_interne_navigation_fuer_nicht_angemeldete(self):
         self.client.logout()
