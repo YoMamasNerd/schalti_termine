@@ -27,6 +27,10 @@
 
 {% block body_class %}{% block koerper %}oeffentlich{% endblock %}{% endblock %}
 
+{% block app_switcher %}
+  {% if user.is_authenticated %}{{ block.super }}{% endif %}
+{% endblock %}
+
 {% block nav_items %}{% endblock %}
 
 {% block subnav %}
