@@ -91,7 +91,10 @@ class KeineInterneSeiteAusserhalbVonIntern(TestCase):
         for muster in get_resolver().url_patterns:
             for eintrag in getattr(muster, "url_patterns", [muster]):
                 ansicht = getattr(eintrag, "callback", None)
-                if getattr(ansicht, "__module__", "") != staff_views.__name__:
+                modul = getattr(ansicht, "__module__", "")
+                if modul != staff_views.__name__ and not modul.startswith(
+                    staff_views.__name__ + "."
+                ):
                     continue
                 with self.subTest(name=eintrag.name):
                     self.assertTrue(

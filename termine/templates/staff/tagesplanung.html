@@ -1,9 +1,6 @@
 {% extends "staff/base_staff.html" %}
 
-{% block titel %}Tagesplanung – {{ SITE_NAME }}  </div>
-
-  {% include "staff/_messages_oob.html" %}
-{% endblock %}
+{% block titel %}Tagesplanung – {{ SITE_NAME }}{% endblock %}
 
 {% block inhalt %}
   <h1>Tagesplanung</h1>
@@ -197,4 +194,7 @@
       </div>
     </div>
   </div>
+  </div>
+
+  {% include "staff/_messages_oob.html" %}
 {% endblock %}
