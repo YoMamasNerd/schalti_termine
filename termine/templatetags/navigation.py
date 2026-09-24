@@ -17,4 +17,4 @@ def aktiv(context, *url_namen: str) -> str:
     treffer = getattr(context.get("request"), "resolver_match", None)
     if treffer is None:
         return ""
-    return "aktiv" if treffer.url_name in url_namen else ""
+    return "ist-aktiv" if treffer.url_name in url_namen else ""
