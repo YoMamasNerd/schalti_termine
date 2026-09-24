@@ -67,6 +67,8 @@
 {% endblock %}
 
 {% block content %}
+  {# Ziel für htmx-OOB-Message-Swaps (schalti_ui rendert seine Messages selbst, ohne ID) #}
+  <div id="flash-messages"></div>
   <div class="huelle" style="margin-top: 1rem;">
     {% block inhalt %}{% endblock %}
   </div>

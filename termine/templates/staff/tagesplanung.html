@@ -1,15 +1,20 @@
 {% extends "staff/base_staff.html" %}
 
-{% block titel %}Tagesplanung – {{ SITE_NAME }}{% endblock %}
+{% block titel %}Tagesplanung – {{ SITE_NAME }}  </div>
+
+  {% include "staff/_messages_oob.html" %}
+{% endblock %}
 
 {% block inhalt %}
   <h1>Tagesplanung</h1>
 
+  <div id="planungsbereich">
   <form class="karte" method="get" style="margin-bottom:1rem">
     <div class="knopfreihe">
       {% if alle_fahrlehrer.count > 1 %}
         <label for="fahrlehrer" style="font-weight:600">Fahrlehrer</label>
-        <select name="fahrlehrer" id="fahrlehrer" style="width:auto" onchange="this.form.submit()">
+        <select name="fahrlehrer" id="fahrlehrer" style="width:auto"
+                hx-get="" hx-include="closest form" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML" hx-push-url="true">
           {% for person in alle_fahrlehrer %}
             <option value="{{ person.slug }}" {% if person.pk == fahrlehrer.pk %}selected{% endif %}>
               {{ person.name }}
@@ -17,9 +22,9 @@
           {% endfor %}
         </select>
       {% endif %}
-      <a class="knopf knopf--leise knopf--klein" href="?woche={{ vorherige_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}">&larr; 7 Tage</a>
-      <a class="knopf knopf--leise knopf--klein" href="?woche={{ heute|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}">Ab heute</a>
-      <a class="knopf knopf--leise knopf--klein" href="?woche={{ naechste_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}">7 Tage &rarr;</a>
+      <a class="knopf knopf--leise knopf--klein" href="?woche={{ vorherige_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}" hx-get="?woche={{ vorherige_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML" hx-push-url="true">&larr; 7 Tage</a>
+      <a class="knopf knopf--leise knopf--klein" href="?woche={{ heute|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}" hx-get="?woche={{ heute|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML" hx-push-url="true">Ab heute</a>
+      <a class="knopf knopf--leise knopf--klein" href="?woche={{ naechste_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}" hx-get="?woche={{ naechste_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML" hx-push-url="true">7 Tage &rarr;</a>
       <strong style="margin-left:0.5rem">{{ start_tag|date:"j. F" }} – {{ end_tag|date:"j. F Y" }}</strong>
       <noscript><button class="knopf knopf--klein" type="submit">Wechseln</button></noscript>
     </div>
@@ -75,7 +80,8 @@
                   {% endif %}
                 </span>
                 {% if eintrag.status == "frei" %}
-                  <form method="post" action="{% url 'termine:termin_loeschen' eintrag.termin.pk %}" style="display:inline">
+                  <form method="post" action="{% url 'termine:termin_loeschen' eintrag.termin.pk %}" style="display:inline"
+                        hx-post="{% url 'termine:termin_loeschen' eintrag.termin.pk %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML">
                     {% csrf_token %}
                     <button class="weg" type="submit" title="Termin löschen" aria-label="Termin löschen">&times;</button>
                   </form>
@@ -105,7 +111,8 @@
                 {% if not eintrag.ist_fsm %}
                   <form method="post" action="{% url 'termine:sperrzeit_loeschen' eintrag.sperre.pk %}"
                         style="display:inline"
-                        onsubmit="return confirm('Sperrzeit wirklich aufheben?');">
+                        hx-post="{% url 'termine:sperrzeit_loeschen' eintrag.sperre.pk %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML"
+                        hx-confirm='Sperrzeit wirklich aufheben?'>
                     {% csrf_token %}
                     <button class="weg" type="submit" title="Sperrzeit aufheben" aria-label="Sperrzeit aufheben">&times;</button>
                   </form>
@@ -135,7 +142,8 @@
         Das ist die schnelle Einzelplanung: Tag, Zeitfenster und Terminart wählen –
         die App zerlegt das Fenster automatisch in einzelne Termine für <strong>{{ fahrlehrer.name }}</strong>.
       </p>
-      <form method="post" action="{% url 'termine:termine_anlegen' %}">
+      <form method="post" action="{% url 'termine:termine_anlegen' %}"
+              hx-post="{% url 'termine:termine_anlegen' %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML">
         {% csrf_token %}
         <input type="hidden" name="fahrlehrer" value="{{ fahrlehrer.pk }}">
         <input type="hidden" name="fahrlehrer_slug" value="{{ fahrlehrer.slug }}">
@@ -158,7 +166,8 @@
           Gebuchte Termine bleiben immer unangetastet.
         </p>
         <div class="knopfreihe">
-          <form method="post" action="{% url 'termine:generieren' %}">
+          <form method="post" action="{% url 'termine:generieren' %}"
+                  hx-post="{% url 'termine:generieren' %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML">
             {% csrf_token %}
             <input type="hidden" name="fahrlehrer" value="{{ fahrlehrer.slug }}">
             <button class="knopf" type="submit">Jetzt vorausplanen</button>
@@ -173,7 +182,8 @@
           Sperrt einen Zeitraum komplett für <strong>{{ fahrlehrer.name }}</strong>. Freie Termine darin werden gelöscht,
           und die automatische Planung lässt den Zeitraum aus.
         </p>
-        <form method="post" action="{% url 'termine:sperrzeit_anlegen' %}">
+        <form method="post" action="{% url 'termine:sperrzeit_anlegen' %}"
+            hx-post="{% url 'termine:sperrzeit_anlegen' %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML">
           {% csrf_token %}
           <input type="hidden" name="fahrlehrer" value="{{ fahrlehrer.pk }}">
           <input type="hidden" name="fahrlehrer_slug" value="{{ fahrlehrer.slug }}">
