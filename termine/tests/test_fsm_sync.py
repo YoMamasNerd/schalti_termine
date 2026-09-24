@@ -359,7 +359,7 @@ class FsmEinstellungenViewTests(TestCase):
 
     @override_settings(FSM_SYNC_ENABLED=True)
     def test_speichert_fsm_zuordnungen(self):
-        with patch("termine.staff_views.FsmClient") as mock_cls:
+        with patch("termine.staff_views.einstellungen.FsmClient") as mock_cls:
             mock_inst = MagicMock()
             mock_inst.get_fahrlehrer.return_value = []
             mock_cls.return_value = mock_inst
@@ -379,7 +379,7 @@ class FsmEinstellungenViewTests(TestCase):
 
     @override_settings(FSM_SYNC_ENABLED=True)
     def test_manueller_sync_button(self):
-        with patch("termine.staff_views.FsmClient") as mock_cls:
+        with patch("termine.staff_views.einstellungen.FsmClient") as mock_cls:
             mock_inst = MagicMock()
             mock_inst.get_termine.return_value = []
             mock_cls.return_value = mock_inst
@@ -392,7 +392,7 @@ class FsmEinstellungenViewTests(TestCase):
 
     @override_settings(FSM_SYNC_ENABLED=True)
     def test_import_fahrlehrer_button(self):
-        with patch("termine.staff_views.FsmClient") as mock_cls:
+        with patch("termine.staff_views.einstellungen.FsmClient") as mock_cls:
             mock_inst = MagicMock()
             mock_inst.get_fahrlehrer.return_value = [
                 {

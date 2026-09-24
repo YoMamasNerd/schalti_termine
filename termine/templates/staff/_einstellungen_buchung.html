@@ -1,0 +1,60 @@
+    {# ========================================================================= #}
+    {# TAB 3: Globale Buchungsregeln                                             #}
+    {# ========================================================================= #}
+    {% if ist_inhaber %}
+      <div id="tab-buchung" class="tab-inhalt" style="display:none">
+        <form class="js-auto-save-form" id="form-global" method="post" action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-buchung" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="form_art" value="global">
+
+          <div class="raster-zwei">
+            {# Linke Spalte: Fristen & Zeitfenster #}
+            <div class="karte">
+              <h2 style="margin:0 0 0.5rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                <sl-icon name="sliders" style="color:var(--marke)"></sl-icon> Buchungsfenster &amp; Zeitregeln
+              </h2>
+              <p class="leer" style="margin-bottom:1.25rem; line-height:1.55">
+                Gilt fahrschulweit für alle Fahrlehrer: Mindest-Vorlauf, Planungshorizont und Reservierungsfristen.
+                {% if buchbar_bis %}
+                  <br><span style="display:inline-block; margin-top:0.35rem;" class="status-pill neutral">Aktuell buchbar bis: {{ buchbar_bis|date:"SHORT_DATE_FORMAT" }}</span>
+                {% endif %}
+              </p>
+
+              {% if globale_form.non_field_errors %}
+                <div class="hinweis hinweis--fehler">{{ globale_form.non_field_errors }}</div>
+              {% endif %}
+
+              {% include "termine/_feld.html" with feld=globale_form.bundesland %}
+              {% include "termine/_feld.html" with feld=globale_form.vorlauf_stunden %}
+              {% include "termine/_feld.html" with feld=globale_form.horizont_wochen %}
+              {% include "termine/_feld.html" with feld=globale_form.reservierung_minuten %}
+              {% include "termine/_feld.html" with feld=globale_form.erinnerung_stunden_vorher %}
+              {% include "termine/_feld.html" with feld=globale_form.fsm_theorie_blockiert_beratung %}
+            </div>
+
+            {# Rechte Spalte: Führerscheinklassen-Auswahl #}
+            <div class="karte">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem">
+                <h2 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                  <sl-icon name="card-checklist" style="color:var(--marke)"></sl-icon> Verfügbare Klassen im Buchungsformular
+                </h2>
+              </div>
+              <p class="leer" style="margin-bottom:1rem; line-height:1.55">
+                Legen Sie fest, welche Fahrerlaubnisklassen Kunden bei der Terminbuchung auswählen können. Ist <em>keine Klasse markiert</em>, stehen automatisch alle Klassen zur Verfügung.
+              </p>
+
+              {% include "termine/_feld.html" with feld=globale_form.aktive_fuehrerscheinklassen %}
+
+              <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--linie); display:flex; justify-content:space-between; align-items:center">
+                <span class="leer" style="font-size:0.88rem">Klassen verwalten oder neu anlegen:</span>
+                <a href="{% url 'termine:klassen' %}" class="knopf knopf--leise knopf--klein">Klassen-Katalog &rarr;</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="knopfreihe" style="margin-top:1.25rem">
+            <button class="knopf" type="submit">Globale Buchungsregeln speichern</button>
+          </div>
+        </form>
+      </div>
+    {% endif %}

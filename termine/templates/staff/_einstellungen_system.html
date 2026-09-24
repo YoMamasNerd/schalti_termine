@@ -1,0 +1,134 @@
+    {# ========================================================================= #}
+    {# TAB 6: Schnittstellen & System                                            #}
+    {# ========================================================================= #}
+    {% if ist_inhaber %}
+      <div id="tab-system" class="tab-inhalt" style="display:none">
+        <div class="raster-zwei">
+          {# E-Mail & SMTP #}
+          <div class="karte" style="grid-column: 1 / -1">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem">
+              <div>
+                <h2 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                  <sl-icon name="envelope" style="color:var(--marke)"></sl-icon> E-Mail- &amp; SMTP-Server
+                </h2>
+                <p class="leer" style="margin:0.25rem 0 0; font-size:0.9rem; line-height:1.5">
+                  Konfigurieren Sie den SMTP-Server für den automatischen Versand von Buchungsbestätigungen, Stornierungen und Terminerinnerungen.
+                </p>
+              </div>
+              {% if globale_einstellungen.email_host %}
+                <span class="status-pill success"><span class="status-dot green"></span>SMTP eingerichtet</span>
+              {% else %}
+                <span class="status-pill danger"><span class="status-dot red"></span>Nicht eingerichtet</span>
+              {% endif %}
+            </div>
+
+            <form class="js-auto-save-form" id="form-smtp" method="post"
+                  action="{% url 'termine:einstellungen' %}?fahrlehrer={{ fahrlehrer.slug }}#tab-system" novalidate>
+              {% csrf_token %}
+              <input type="hidden" name="form_art" value="smtp">
+
+              {% if smtp_form.non_field_errors %}
+                <div class="hinweis hinweis--fehler">{{ smtp_form.non_field_errors }}</div>
+              {% endif %}
+
+              <div class="raster-zwei" style="gap:1rem; margin-bottom:0.75rem">
+                <div>
+                  {% include "termine/_feld.html" with feld=smtp_form.email_host %}
+                </div>
+                <div>
+                  {% include "termine/_feld.html" with feld=smtp_form.email_port %}
+                </div>
+              </div>
+
+              <div class="raster-zwei" style="gap:1rem; margin-bottom:0.75rem">
+                <div>
+                  {% include "termine/_feld.html" with feld=smtp_form.email_user %}
+                </div>
+                <div>
+                  {% include "termine/_feld.html" with feld=smtp_form.email_password %}
+                </div>
+              </div>
+
+              <div class="raster-zwei" style="gap:1rem; margin-bottom:0.75rem">
+                <div>
+                  {% include "termine/_feld.html" with feld=smtp_form.email_use_tls %}
+                </div>
+                <div>
+                  {% include "termine/_feld.html" with feld=smtp_form.email_use_ssl %}
+                </div>
+              </div>
+
+              <div style="margin-bottom:1.25rem">
+                {% include "termine/_feld.html" with feld=smtp_form.email_from %}
+              </div>
+
+              <div class="knopfreihe" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem">
+                <button class="knopf" type="submit">SMTP-Einstellungen speichern</button>
+                <button class="knopf knopf--leise" type="button" id="btn-smtp-live-test" style="border-color:var(--marke); color:var(--marke); font-weight:600">
+                  <sl-icon name="lightning-charge"></sl-icon> SMTP-Authentifizierung live testen
+                </button>
+              </div>
+            </form>
+
+            {# Live-Test Feedback Box #}
+            <div id="smtp-test-box" style="display:none; border-radius:var(--radius-klein); padding:1rem; margin-top:1.25rem; font-size:0.92rem; line-height:1.5">
+              <div id="smtp-test-spinner" style="display:none; align-items:center; gap:0.6rem; color:var(--text-leise)">
+                <span class="lade-kreis" style="display:inline-block; width:18px; height:18px; border:2px solid var(--linie); border-top-color:var(--marke); border-radius:50%; animation:drehen 0.8s linear infinite"></span>
+                <span>Verbindung zum SMTP-Server wird aufgebaut und Authentifizierung geprüft…</span>
+              </div>
+              <div id="smtp-test-ergebnis" style="display:none"></div>
+            </div>
+
+            {# Optionaler Test-Mail-Versand #}
+            <details style="margin-top:1.25rem; border-top:1px solid var(--linie); padding-top:1rem">
+              <summary style="cursor:pointer; font-weight:600; font-size:0.9rem; color:var(--marke)">
+                ✉️ Test-E-Mail an eigene Adresse senden
+              </summary>
+              <div style="margin-top:0.75rem; display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap">
+                <input type="email" id="smtp-test-mail-empfaenger" placeholder="Ihre E-Mail-Adresse"
+                       value="{{ request.user.email|default:fahrlehrer.email }}" style="max-width:320px; padding:0.45rem 0.75rem">
+                <button class="knopf knopf--klein knopf--leise" type="button" id="btn-sende-test-mail">
+                  Test-Mail abschicken
+                </button>
+              </div>
+            </details>
+          </div>
+
+          {# Fahrschulmanager #}
+          {% if FSM_SYNC_ENABLED %}
+            <div class="karte" style="margin:0; display:flex; flex-direction:column; justify-content:space-between;">
+              <div>
+                <h2 style="margin:0 0 0.5rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                  <sl-icon name="diagram-3" style="color:var(--marke)"></sl-icon> Fahrschulmanager (FSM)
+                </h2>
+                <p class="leer" style="line-height:1.55; margin-bottom:1rem">
+                  Verknüpft die Online-Terminbuchung direkt mit dem Fahrschulmanager. Synchronisiert Fahrlehrer, blockiert Zeiten automatisch und trägt gebuchte Beratungstermine direkt ein.
+                </p>
+              </div>
+              <div class="knopfreihe" style="margin-top:1rem">
+                <a class="knopf" href="{% url 'termine:fsm_einstellungen' %}">
+                  FSM-Verknüpfung &amp; Sync verwalten &rarr;
+                </a>
+              </div>
+            </div>
+          {% endif %}
+
+          {# Audit-Logs #}
+          <div class="karte" style="margin:0; display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <h2 style="margin:0 0 0.5rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
+                <sl-icon name="journal-text" style="color:var(--marke)"></sl-icon> System- &amp; Audit-Logs
+              </h2>
+              <p class="leer" style="line-height:1.55; margin-bottom:1rem">
+                Filterbare Ereignisprotokolle für Buchungen, Absagen, Termine, FSM-Syncs und Systemaktivitäten. Automatische 30-Tage-Aufbewahrung in der Datenbank.
+              </p>
+            </div>
+            <div class="knopfreihe" style="margin-top:1rem">
+              <a class="knopf knopf--leise" href="{% url 'termine:system_logs' %}">
+                Zu den System-Logs &rarr;
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
