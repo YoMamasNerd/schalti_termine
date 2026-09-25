@@ -27,10 +27,13 @@
       "addLabels": ["cdn"]
     },
     {
-      "matchDepNames": ["schalti_ui"],
+      "matchDepNames": ["schalti_ui", "schalti-ui"],
+      "matchPackageNames": ["https://github.com/YoMamasNerd/schalti_ui.git", "YoMamasNerd/schalti_ui", "schalti_ui", "schalti-ui"],
       "groupName": "schalti_ui Design System",
       "addLabels": ["design-system"],
-      "schedule": ["at any time"]
+      "schedule": ["at any time"],
+      "automerge": true,
+      "automergeType": "pr"
     }
   ],
   "customManagers": [
