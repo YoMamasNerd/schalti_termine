@@ -10,4 +10,4 @@ django-allauth>=65.15.0
 cryptography>=50.0.0
 pyjwt[crypto]>=2.8.0
 requests>=2.31.0
-schalti_ui @ git+https://github.com/YoMamasNerd/schalti_ui.git@80149b34df0290d4f1e9f4bfe131888fe0980f0f
+schalti_ui @ git+https://github.com/YoMamasNerd/schalti_ui.git@2754635738cf5cf9b099120a1bdbfd6853acece8
