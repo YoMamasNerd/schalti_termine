@@ -1,0 +1,31 @@
+[project]
+name = "schalti_termine"
+version = "0.1.0"
+description = "Schalti Fahrstunden- und Terminverwaltung"
+requires-python = ">=3.14"
+dependencies = [
+    "django>=6.1.1",
+    "django-q2>=1.11.1",
+    "holidays>=0.105",
+    "icalendar>=7.3.0",
+    "python-dotenv>=1.2.3",
+    "whitenoise>=6.12.0",
+    "gunicorn>=26.2.0",
+    "psycopg[binary]>=3.3.6",
+    "django-allauth>=65.15.0",
+    "cryptography>=50.0.0",
+    "pyjwt[crypto]>=2.8.0",
+    "requests>=2.31.0",
+    "schalti-ui",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+schalti-ui = { git = "https://github.com/YoMamasNerd/schalti_ui.git", branch = "master" }
