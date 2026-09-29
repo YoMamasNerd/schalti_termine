@@ -1,9 +1,47 @@
+from urllib.parse import urlencode
+
+from django.conf import settings
 from django.contrib.auth import views as auth_views
-from django.urls import path
+from django.shortcuts import redirect
+from django.urls import path, reverse
 
 from . import staff_views, views
 
 app_name = "termine"
+
+
+def _sso_aktiv() -> bool:
+    return bool(
+        getattr(settings, "VOIDAUTH_ENABLED", False)
+        and getattr(settings, "SOCIALACCOUNT_PROVIDERS", {}).get("openid_connect")
+    )
+
+
+class SSOLoginView(auth_views.LoginView):
+    """LoginView, der bei aktivem VoidAuth direkt in den OIDC-Flow umleitet.
+
+    ?sso=0 zeigt das Passwort-Formular — nötig nach Logout (sonst loggt die
+    aktive VoidAuth-Session sofort wieder ein) und bei VoidAuth-Ausfall.
+    """
+
+    def get(self, request, *args, **kwargs):
+        if not request.user.is_authenticated and _sso_aktiv() and request.GET.get("sso") != "0":
+            login_url = reverse("openid_connect_login", kwargs={"provider_id": "voidauth"})
+            next_url = request.GET.get(self.redirect_field_name)
+            if next_url:
+                return redirect(f"{login_url}?{urlencode({'next': next_url})}")
+            return redirect(login_url)
+        return super().get(request, *args, **kwargs)
+
+
+class SSOLogoutView(auth_views.LogoutView):
+    """Logout mit ?sso=0 am Ziel — sonst wäre der Logout nur ein Reload,
+
+    weil die Login-Seite sofort zurück in den (noch aktiven) OIDC-Flow leitet.
+    """
+
+    def get_success_url(self):
+        return f"{reverse('termine:login')}?sso=0"
 
 urlpatterns = [
     # --- Öffentliche Buchung ---
@@ -23,10 +61,10 @@ urlpatterns = [
     # --- Interner Bereich ---
     path(
         "intern/anmelden/",
-        auth_views.LoginView.as_view(template_name="staff/anmelden.html"),
+        SSOLoginView.as_view(template_name="staff/anmelden.html"),
         name="login",
     ),
-    path("intern/abmelden/", auth_views.LogoutView.as_view(), name="logout"),
+    path("intern/abmelden/", SSOLogoutView.as_view(), name="logout"),
     path("intern/", staff_views.dashboard, name="dashboard"),
     path("intern/planung/", staff_views.tagesplanung, name="tagesplanung"),
     path("intern/planung/anlegen/", staff_views.termine_anlegen, name="termine_anlegen"),
