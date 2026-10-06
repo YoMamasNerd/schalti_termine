@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 
 from django.conf import settings
 from django.contrib import messages
@@ -37,6 +38,8 @@ from ..services.planung import (
 )
 from .common import _erlaubte_fahrlehrer, _gewaehlter_fahrlehrer, _sicheres_ziel, mitarbeiter
 from .dashboard import _dashboard_ziel, _ist_fahrstunde_sperre
+
+logger = logging.getLogger(__name__)
 
 
 @mitarbeiter
@@ -273,6 +276,49 @@ def tagesplanung(request):
             or settings.DEFAULT_HORIZON_WEEKS,
         },
     )
+
+@mitarbeiter
+@require_POST
+def fsm_sync_jetzt(request):
+    """Manueller FSM-Abgleich für den gewählten Fahrlehrer (Button in der Tagesplanung).
+
+    Läuft synchron und erzwingt einen Live-Abruf im Gateway – die Kalender-TTL
+    dort beträgt 12 Stunden, der 15-Minuten-Job liest also meistens den Cache.
+    Genau das war der Grund, warum in der Tagesplanung veraltete Einträge
+    stehen blieben: gelöschte FSM-Termine verschwinden erst aus der lokalen
+    Kopie, wenn wieder frische Daten ankommen.
+    """
+    fahrlehrer, _ = _gewaehlter_fahrlehrer(request)
+    slug = request.POST.get("fahrlehrer")
+    if slug:
+        fahrlehrer = _erlaubte_fahrlehrer(request.user).filter(slug=slug).first()
+
+    if fahrlehrer is None:
+        messages.error(request, "Kein Fahrlehrer ausgewählt.")
+        return redirect("termine:tagesplanung")
+
+    from ..services.fsm_sync import is_fsm_aktiv_fuer_fahrlehrer, sync_blocker_fuer_fahrlehrer
+
+    if not is_fsm_aktiv_fuer_fahrlehrer(fahrlehrer):
+        messages.warning(request, f"FSM-Sync ist für {fahrlehrer.name} nicht aktiv.")
+        return redirect(f"{reverse('termine:tagesplanung')}?fahrlehrer={fahrlehrer.slug}")
+
+    # Ab heute 00:00 Uhr abgleichen, damit auch heute laufende oder bereits
+    # erledigte FSM-Termine noch als Beleg geführt und ggf. bereinigt werden.
+    jetzt = lokal(timezone.localdate(), dt.time.min)
+    try:
+        anzahl = sync_blocker_fuer_fahrlehrer(
+            fahrlehrer, jetzt_override=jetzt, refresh=True
+        )
+        messages.success(
+            request,
+            f"FSM-Daten für {fahrlehrer.name} aktualisiert ({anzahl} Termine abgeglichen).",
+        )
+    except Exception as exc:
+        logger.warning("FSM-Sync: Manueller Sync für %s fehlgeschlagen: %s", fahrlehrer.pk, exc)
+        messages.error(request, "FSM-Synchronisierung fehlgeschlagen – bitte später erneut versuchen.")
+    return redirect(f"{reverse('termine:tagesplanung')}?fahrlehrer={fahrlehrer.slug}")
+
 
 @mitarbeiter
 @require_POST

@@ -147,14 +147,23 @@ class FsmClient:
         fahrlehrer_fsm_id: str,
         start: dt.datetime,
         end: dt.datetime,
+        refresh: bool = False,
     ) -> list[FsmTermin]:
-        """Ruft alle Termine eines Fahrlehrers für einen Zeitraum ab."""
+        """Ruft alle Termine eines Fahrlehrers für einen Zeitraum ab.
+
+        `refresh=True` erzwingt einen Live-Abruf im Gateway statt der
+        Cache-Kopie – nötig für den manuellen Sync, weil die Kalender-TTL
+        dort 12 Stunden beträgt und Stale-Daten sonst genau den Zustand
+        liefern würden, der bereits überholt ist.
+        """
         params = {
             "von": start.isoformat(),
             "bis": end.isoformat(),
             "start": start.isoformat(),
             "end": end.isoformat(),
         }
+        if refresh:
+            params["refresh"] = "1"
         res = self._request("GET", f"kalender/{fahrlehrer_fsm_id}", params=params)
 
         raw_events = []

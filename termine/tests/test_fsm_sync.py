@@ -6,6 +6,7 @@ import datetime as dt
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -265,6 +266,67 @@ class FsmSyncTests(TestCase):
 
         sync_blocker_fuer_fahrlehrer(self.fahrlehrer, client=mock_client)
         self.assertFalse(Termin.objects.filter(pk=termin.pk).exists())
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_sync_entfernt_heutige_fsm_sperrzeit_wenn_in_fsm_geloescht(self):
+        """Der manuelle Sync gleicht ab heute 00:00 Uhr ab – auch heute
+        bereits beendete FSM-Termine werden als gelöscht bereinigt."""
+        heute_start = timezone.make_aware(
+            dt.datetime.combine(timezone.localdate(), dt.time.min)
+        )
+        Sperrzeit.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            fsm_id="fsm-heutig-geloescht",
+            beginn=heute_start + dt.timedelta(hours=8),
+            ende=heute_start + dt.timedelta(hours=9),
+            grund="FSM: Tamino Fahrstunde",
+            herkunft=Sperrzeit.Herkunft.FSM,
+        )
+
+        mock_client = MagicMock()
+        mock_client.get_termine.return_value = []
+
+        sync_blocker_fuer_fahrlehrer(
+            self.fahrlehrer, client=mock_client, jetzt_override=heute_start
+        )
+        self.assertFalse(
+            Sperrzeit.objects.filter(fsm_id="fsm-heutig-geloescht").exists()
+        )
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_sync_refresh_reicht_parameter_durch(self):
+        """Der manuelle Sync erzwingt einen Live-Abruf im Gateway."""
+        mock_client = MagicMock()
+        mock_client.get_termine.return_value = []
+
+        heute_start = timezone.make_aware(
+            dt.datetime.combine(timezone.localdate(), dt.time.min)
+        )
+        sync_blocker_fuer_fahrlehrer(
+            self.fahrlehrer, client=mock_client, jetzt_override=heute_start, refresh=True
+        )
+
+        _, kwargs = mock_client.get_termine.call_args
+        self.assertIs(kwargs.get("refresh"), True)
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_fsm_sync_button_route(self):
+        """Der Sync-Button in der Tagesplanung läuft über die neue Route."""
+        benutzer = get_user_model().objects.create_user("jona", password="geheim123", is_staff=True)
+        self.client.force_login(benutzer)
+
+        mock_client = MagicMock()
+        mock_client.get_termine.return_value = []
+        with patch(
+            "termine.services.fsm_sync.FsmClient", return_value=mock_client
+        ):
+            antwort = self.client.post(
+                reverse("termine:fsm_sync_jetzt"), {"fahrlehrer": self.fahrlehrer.slug}
+            )
+        self.assertRedirects(antwort, f"/intern/planung/?fahrlehrer={self.fahrlehrer.slug}")
+        # Sync lief mit Live-Abruf ab heute 00:00 Uhr
+        args, kwargs = mock_client.get_termine.call_args
+        self.assertIs(kwargs.get("refresh"), True)
 
     @override_settings(FSM_SYNC_ENABLED=True)
     def test_management_command_fsm_sync(self):
@@ -567,7 +629,7 @@ class FsmEinstellungenViewTests(TestCase):
         mock_client = MagicMock()
         mock_client.termin_anlegen.return_value = "fsm-mock-created-uuid"
         # Anna hat Theorieunterricht
-        mock_client.get_termine.side_effect = lambda fl_id, s, e: [
+        mock_client.get_termine.side_effect = lambda fl_id, s, e, **kw: [
             FsmTermin(
                 id="fsm-th-101",
                 von=th_start,

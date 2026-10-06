@@ -398,6 +398,8 @@ def sync_blocker_fuer_fahrlehrer(
     tage_voraus: int | None = None,
     client: FsmClient | None = None,
     return_theorie: bool = False,
+    jetzt_override: dt.datetime | None = None,
+    refresh: bool = False,
 ) -> int | tuple[int, list[tuple[str, dt.datetime, dt.datetime, str, Fahrlehrer]]]:
     """Führt den bidirektionalen Abgleich für einen Fahrlehrer durch:
 
@@ -416,11 +418,11 @@ def sync_blocker_fuer_fahrlehrer(
     wochen = FahrschulEinstellungen.get_solo().horizont_wochen or 4
     tage = tage_voraus or (wochen * 7)
 
-    jetzt = timezone.now()
+    jetzt = jetzt_override or timezone.now()
     ende = jetzt + dt.timedelta(days=tage)
 
     try:
-        fsm_termine = client.get_termine(fahrlehrer.fsm_id, jetzt, ende)
+        fsm_termine = client.get_termine(fahrlehrer.fsm_id, jetzt, ende, refresh=refresh)
     except FsmError as exc:
         logger.warning(
             "FSM-Sync: Konnte Termine für Fahrlehrer %s nicht abrufen: %s",
