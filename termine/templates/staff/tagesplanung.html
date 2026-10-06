@@ -6,8 +6,11 @@
   <h1>Tagesplanung</h1>
 
   <div id="planungsbereich">
-  <form class="karte" method="get" style="margin-bottom:1rem">
-    <div class="knopfreihe">
+  <div class="karte knopfreihe" style="margin-bottom:1rem">
+    {# GET-Form und Sync-Form sind absichtlich Geschwister: verschachtelte
+       Formulare zerlegt der Browser, dann verliert der Fahrlehrer-Select
+       seine Anbindung. display:contents hält das Flex-Layout bei. #}
+    <form method="get" style="display:contents">
       {% if alle_fahrlehrer.count > 1 %}
         <label for="fahrlehrer" style="font-weight:600">Fahrlehrer</label>
         <select name="fahrlehrer" id="fahrlehrer" style="width:auto"
@@ -23,20 +26,20 @@
       <a class="knopf knopf--leise knopf--klein" href="?woche={{ heute|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}" hx-get="?woche={{ heute|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML" hx-push-url="true">Ab heute</a>
       <a class="knopf knopf--leise knopf--klein" href="?woche={{ naechste_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}" hx-get="?woche={{ naechste_woche|date:'Y-m-d' }}&amp;fahrlehrer={{ fahrlehrer.slug }}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML" hx-push-url="true">7 Tage &rarr;</a>
       <strong style="margin-left:0.5rem">{{ start_tag|date:"j. F" }} – {{ end_tag|date:"j. F Y" }}</strong>
-      {% if FSM_SYNC_ENABLED %}
-        <form method="post" action="{% url 'termine:fsm_sync_jetzt' %}" style="margin-left:auto"
-              hx-post="{% url 'termine:fsm_sync_jetzt' %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML">
-          {% csrf_token %}
-          <input type="hidden" name="fahrlehrer" value="{{ fahrlehrer.slug }}">
-          <button class="knopf knopf--leise knopf--klein" type="submit"
-                  title="FSM-Termine und Belegungszeiten jetzt live abgleichen">
-            <sl-icon name="arrow-clockwise"></sl-icon> FSM synchronisieren
-          </button>
-        </form>
-      {% endif %}
       <noscript><button class="knopf knopf--klein" type="submit">Wechseln</button></noscript>
-    </div>
-  </form>
+    </form>
+    {% if FSM_SYNC_ENABLED %}
+      <form method="post" action="{% url 'termine:fsm_sync_jetzt' %}" style="margin-left:auto"
+            hx-post="{% url 'termine:fsm_sync_jetzt' %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML">
+        {% csrf_token %}
+        <input type="hidden" name="fahrlehrer" value="{{ fahrlehrer.slug }}">
+        <button class="knopf knopf--leise knopf--klein" type="submit"
+                title="FSM-Termine und Belegungszeiten jetzt live abgleichen">
+          <sl-icon name="arrow-clockwise"></sl-icon> FSM synchronisieren
+        </button>
+      </form>
+    {% endif %}
+  </div>
 
   <div class="woche">
     {% for tag in tage %}
