@@ -7,9 +7,6 @@
 
   <div id="planungsbereich">
   <div class="karte knopfreihe" style="margin-bottom:1rem">
-    {# GET-Form und Sync-Form sind absichtlich Geschwister: verschachtelte
-       Formulare zerlegt der Browser, dann verliert der Fahrlehrer-Select
-       seine Anbindung. display:contents hält das Flex-Layout bei. #}
     <form method="get" style="display:contents">
       {% if alle_fahrlehrer.count > 1 %}
         <label for="fahrlehrer" style="font-weight:600">Fahrlehrer</label>
