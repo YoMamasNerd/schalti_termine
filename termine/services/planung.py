@@ -350,11 +350,16 @@ def generiere_termine(
         ende, art, regel = soll[beginn]
         vorhanden = bestand_nach_beginn.get(beginn)
         if vorhanden is not None:
-            if vorhanden.status == Termin.Status.ENTFALLEN:
+            if (
+                vorhanden.status == Termin.Status.ENTFALLEN
+                and not vorhanden.manuell_entfernt
+            ):
                 # Die Regel deckt diesen Zeitpunkt wieder ab. Ein zweiter
                 # Termin zur selben Uhrzeit ginge ohnehin nicht – der
                 # Unique-Index verbietet ihn –, also wird dieser wieder
-                # angeboten.
+                # angeboten. Manuell entfernte bleiben draußen: Wer in der
+                # Tagesplanung einen Regel-Termin löscht, will ihn nicht im
+                # nächsten Generatorlauf wiedersehen.
                 Termin.objects.filter(pk=vorhanden.pk).update(
                     status=Termin.Status.FREI, terminart=art, regel=regel, ende=ende
                 )

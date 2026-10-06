@@ -97,6 +97,11 @@ class Termin(models.Model):
         help_text="ID des synchronisierten Termins im Fahrschulmanager.",
     )
     notiz = models.CharField("Interne Notiz", max_length=200, blank=True)
+    manuell_entfernt = models.BooleanField(
+        "Manuell entfernt",
+        default=False,
+        help_text="Von Hand aus dem Angebot genommen, obwohl eine Rhythmus-Regel den Zeitpunkt deckt. Der Generator legt solche Termine nicht neu an.",
+    )
     erstellt_am = models.DateTimeField(auto_now_add=True)
     geaendert_am = models.DateTimeField(auto_now=True)
 

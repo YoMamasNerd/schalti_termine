@@ -194,6 +194,42 @@ class Wiederbelebung(Basis):
             Termin.objects.filter(fahrlehrer=self.anna, beginn=termin.beginn).count(), 1
         )
 
+    def test_manuell_geloeschter_regel_termin_wird_nicht_wiederbelebt(self):
+        """Der ×-Button in der Tagesplanung: Wird ein Regel-Termin von Hand
+        entfernt, legt der Generator den Slot nicht wieder an."""
+        RhythmusRegel.objects.create(
+            fahrlehrer=self.anna,
+            terminart=self.art,
+            wochentage=[0, 1, 2, 3, 4, 5, 6],
+            beginn=dt.time(9, 0),
+            ende=dt.time(10, 0),
+            gueltig_ab=timezone.localdate(),
+        )
+        generiere_termine(self.anna)
+        termin = (
+            Termin.objects.filter(fahrlehrer=self.anna, herkunft=Termin.Herkunft.REGEL)
+            .order_by("beginn")
+            .first()
+        )
+        self.assertIsNotNone(termin)
+
+        # × in der Tagesplanung drücken
+        self.client.force_login(self.chef)
+        antwort = self.client.post(reverse("termine:termin_loeschen", args=[termin.pk]))
+        self.assertEqual(antwort.status_code, 302)
+        termin.refresh_from_db()
+        self.assertEqual(termin.status, Termin.Status.ENTFALLEN)
+        self.assertTrue(termin.manuell_entfernt)
+
+        # Der nächste Generatorlauf legt den Slot nicht neu an.
+        bericht = generiere_termine(self.anna)
+        self.assertEqual(bericht.wiederbelebt, 0)
+        self.assertFalse(
+            Termin.objects.filter(
+                fahrlehrer=self.anna, beginn=termin.beginn
+            ).exclude(status=Termin.Status.ENTFALLEN).exists()
+        )
+
 
 class Buchungshorizont(Basis):
     """Der Generator und die Anzeige „buchbar bis" müssen denselben Tag meinen."""

@@ -511,9 +511,20 @@ def sperrzeit_anlegen(request):
 def termin_loeschen(request, pk: int):
     termin = get_object_or_404(Termin, pk=pk, fahrlehrer__in=_erlaubte_fahrlehrer(request.user))
     if termin.status != Termin.Status.FREI:
-        messages.error(
+        messages.error(request, "Dieser Termin ist belegt. Bitte stornieren Sie zuerst die Buchung.")
+    elif termin.herkunft == Termin.Herkunft.REGEL and not termin.manuell_entfernt:
+        # Regel-Termin: als ENTFALLEN+manuell_entfernt markieren statt löschen.
+        # Sonst legt der nächste Generatorlauf den Slot sofort wieder an –
+        # die Regel kennt den Lösch-Willen des Benutzers nicht. Der Eintrag
+        # bleibt als Beleg für die Buchungshistorie erhalten, genau wie bei
+        # Terminen, die einmal gebucht waren.
+        termin.status = Termin.Status.ENTFALLEN
+        termin.manuell_entfernt = True
+        termin.save(update_fields=["status", "manuell_entfernt", "geaendert_am"])
+        messages.success(
             request,
-            "Dieser Termin ist belegt. Bitte stornieren Sie zuerst die Buchung.",
+            f"Termin am {date_format(termin.tag, 'j. F')} entfernt. "
+            "Die Rhythmus-Regel legt ihn nicht neu an."
         )
     else:
         tag = termin.tag
