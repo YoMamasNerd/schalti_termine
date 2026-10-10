@@ -48,6 +48,9 @@
       "groupName": "CDN dependencies",
       "addLabels": [
         "cdn"
+      ],
+      "schedule": [
+        "at any time"
       ]
     },
     {
