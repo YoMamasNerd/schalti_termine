@@ -508,8 +508,8 @@ dev = [{ name = "ruff", specifier = ">=0.8.0" }]
 
 [[package]]
 name = "schalti-ui"
-version = "0.2.0"
-source = { git = "https://github.com/YoMamasNerd/schalti_ui.git?branch=master#f24bf149ac358bcaf864c2cbc31bd1ea8930ea94" }
+version = "0.3.4"
+source = { git = "https://github.com/YoMamasNerd/schalti_ui.git?branch=master#91ba8065e79387f46f6238e89366201e69831f06" }
 dependencies = [
     { name = "django" },
 ]
