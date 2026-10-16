@@ -518,9 +518,17 @@ def termin_loeschen(request, pk: int):
         # die Regel kennt den Lösch-Willen des Benutzers nicht. Der Eintrag
         # bleibt als Beleg für die Buchungshistorie erhalten, genau wie bei
         # Terminen, die einmal gebucht waren.
+        fsm_id_to_delete = termin.fsm_termin_id
         termin.status = Termin.Status.ENTFALLEN
         termin.manuell_entfernt = True
-        termin.save(update_fields=["status", "manuell_entfernt", "geaendert_am"])
+        termin.fsm_termin_id = ""
+        termin.save(update_fields=["status", "manuell_entfernt", "fsm_termin_id", "geaendert_am"])
+        if fsm_id_to_delete:
+            from ..services import fsm_sync
+
+            transaction.on_commit(
+                lambda: fsm_sync.async_loesche_fsm_termine([fsm_id_to_delete])
+            )
         messages.success(
             request,
             f"Termin am {date_format(termin.tag, 'j. F')} entfernt. "

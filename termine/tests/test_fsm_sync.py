@@ -685,5 +685,41 @@ class FsmEinstellungenViewTests(TestCase):
         sch.refresh_from_db()
         self.assertEqual(sch.repeats, 0)
 
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_sync_blocker_raeumt_entfallene_termine_aus_fsm_ab(self):
+        fahrlehrer = Fahrlehrer.objects.create(
+            name="Test Lehrer",
+            slug="test-lehrer-sync",
+            email="test-lehrer@example.com",
+            fsm_id="fsm-test-fl-1",
+            fsm_sync_aktiv=True,
+        )
+        terminart = Terminart.objects.create(
+            name="Beratung",
+            slug="beratung-entfallen-test",
+            dauer_minuten=30,
+        )
+        jetzt = timezone.now()
+        termin = Termin.objects.create(
+            fahrlehrer=fahrlehrer,
+            terminart=terminart,
+            beginn=jetzt + dt.timedelta(days=2, hours=10),
+            ende=jetzt + dt.timedelta(days=2, hours=10, minutes=30),
+            status=Termin.Status.ENTFALLEN,
+            manuell_entfernt=True,
+            fsm_termin_id="entfallene-fsm-id-999",
+        )
+
+        mock_client = MagicMock()
+        mock_client.get_termine.return_value = []
+        mock_client.termin_loeschen.return_value = True
+
+        sync_blocker_fuer_fahrlehrer(fahrlehrer, client=mock_client)
+
+        mock_client.termin_loeschen.assert_called_once_with("entfallene-fsm-id-999")
+        termin.refresh_from_db()
+        self.assertEqual(termin.fsm_termin_id, "")
+
+
 
 

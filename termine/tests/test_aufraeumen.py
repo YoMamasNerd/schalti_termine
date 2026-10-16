@@ -213,13 +213,22 @@ class Wiederbelebung(Basis):
         )
         self.assertIsNotNone(termin)
 
+        # Termin hat einen FSM-Blocker
+        termin.fsm_termin_id = "fsm-blocker-to-delete"
+        termin.save(update_fields=["fsm_termin_id"])
+
         # × in der Tagesplanung drücken
         self.client.force_login(self.chef)
-        antwort = self.client.post(reverse("termine:termin_loeschen", args=[termin.pk]))
-        self.assertEqual(antwort.status_code, 302)
+        with mock.patch("termine.services.fsm_sync.async_loesche_fsm_termine") as mock_loesche:
+            with self.captureOnCommitCallbacks(execute=True):
+                antwort = self.client.post(reverse("termine:termin_loeschen", args=[termin.pk]))
+            self.assertEqual(antwort.status_code, 302)
+            mock_loesche.assert_called_once_with(["fsm-blocker-to-delete"])
+
         termin.refresh_from_db()
         self.assertEqual(termin.status, Termin.Status.ENTFALLEN)
         self.assertTrue(termin.manuell_entfernt)
+        self.assertEqual(termin.fsm_termin_id, "")
 
         # Der nächste Generatorlauf legt den Slot nicht neu an.
         bericht = generiere_termine(self.anna)

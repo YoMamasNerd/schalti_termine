@@ -457,10 +457,19 @@ def sync_blocker_fuer_fahrlehrer(
             # Hat noch keinen FSM-Blocker -> in FSM anlegen
             exportiere_termin_nach_fsm(termin, client=client)
 
-    # Bereits von Schalti erzeugte FSM-IDs (Beratungstermine und eigene Sperrzeiten)
+    # Entfallene Termine mit verbliebener FSM-ID aus FSM abräumen
+    entfallene_mit_fsm = Termin.objects.filter(
+        fahrlehrer=fahrlehrer,
+        status=Termin.Status.ENTFALLEN,
+    ).exclude(fsm_termin_id="")
+    for t_entfallen in entfallene_mit_fsm:
+        loesche_termin_aus_fsm(t_entfallen, client=client)
+
+    # Bereits von Schalti erzeugte FSM-IDs (aktive Beratungstermine und eigene Sperrzeiten)
     eigene_fsm_ids = set(
         Termin.objects.filter(fahrlehrer=fahrlehrer)
         .exclude(fsm_termin_id="")
+        .exclude(status=Termin.Status.ENTFALLEN)
         .values_list("fsm_termin_id", flat=True)
     )
     for raw_fsm_id in (
