@@ -66,6 +66,7 @@ class Entfernen(Basis):
         self.assertFalse(Termin.objects.filter(pk=termin.pk).exists())
 
     def test_termin_mit_historie_bleibt_als_entfallen_stehen(self):
+        """Der Beleg bleibt unangetastet – und der Termin wird nicht mehr angeboten."""
         termin = self.mit_storno_historie()
         geloescht, entfallen = termine_entfernen(Termin.objects.filter(pk=termin.pk))
 
@@ -76,14 +77,7 @@ class Entfernen(Basis):
         # Der Beleg ist unangetastet.
         self.assertEqual(Buchung.objects.filter(termin=termin).count(), 1)
 
-    def test_entfallene_termine_werden_nicht_mehr_angeboten(self):
-        termin = self.mit_storno_historie()
-        termine_entfernen(Termin.objects.filter(pk=termin.pk))
         self.assertNotIn(termin, Termin.objects.buchbar())
-
-    def test_entfallener_termin_ist_nicht_mehr_buchbar(self):
-        termin = self.mit_storno_historie()
-        termine_entfernen(Termin.objects.filter(pk=termin.pk))
         with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
             buchungs_service.reservieren(termin.pk, name="Jonas", email="j@example.org")
 
@@ -127,15 +121,15 @@ class DieVierLoeschpfade(Basis):
         self.assertEqual(termin.status, Termin.Status.ENTFALLEN)
         self.assertTrue(Sperrzeit.objects.exists())
 
-    def test_einzelnen_termin_entfernen(self):
-        termin = self.mit_storno_historie()
+    def test_einzelnen_termin_und_regel_loeschen(self):
+        """Beide Wege nehmen den Termin aus dem Angebot, statt ihn zu zerstören."""
+        termin = self.mit_storno_historie(stunde=12)
         self.client.force_login(self.chef)
         antwort = self.client.post(reverse("termine:termin_loeschen", args=[termin.pk]))
         self.assertEqual(antwort.status_code, 302)
         termin.refresh_from_db()
         self.assertEqual(termin.status, Termin.Status.ENTFALLEN)
 
-    def test_regel_loeschen(self):
         regel = RhythmusRegel.objects.create(
             fahrlehrer=self.anna,
             terminart=self.art,
@@ -147,7 +141,6 @@ class DieVierLoeschpfade(Basis):
         termin = self.mit_storno_historie()
         Termin.objects.filter(pk=termin.pk).update(regel=regel)
 
-        self.client.force_login(self.chef)
         antwort = self.client.post(reverse("termine:regel_loeschen", args=[regel.pk]))
         self.assertEqual(antwort.status_code, 302)
         termin.refresh_from_db()
@@ -267,7 +260,8 @@ class Buchungshorizont(Basis):
 class HandplanungNurZukunft(Basis):
     """Dieselbe Zusage wie beim Generator: keine Termine in der Vergangenheit."""
 
-    def test_fenster_das_heute_frueher_begann_faengt_jetzt_an(self):
+    def test_heute_beginnt_das_fenster_bei_jetzt(self):
+        """„ab 9 Uhr, 30 Minuten" meint den Rest des Tages, nicht den Vormittag."""
         from termine.services.planung import termine_manuell_anlegen
 
         heute = timezone.localdate()

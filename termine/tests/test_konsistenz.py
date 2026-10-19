@@ -46,14 +46,12 @@ class AbgeschalteteTerminartIstNichtBuchbar(BuchungsBasis):
         self.art.aktiv = False
         self.art.save(update_fields=["aktiv"])
 
-    def test_uebersicht_bietet_ihn_nicht_mehr_an(self):
+    def test_kein_buchungsweg_lässt_die_terminart_durch(self):
         self.assertEqual(Termin.objects.buchbar().count(), 0)
 
-    def test_formular_ueber_die_adresse_antwortet_mit_409(self):
         antwort = self.client.get(reverse("termine:buchen", args=[self.termin.pk]))
         self.assertEqual(antwort.status_code, 409)
 
-    def test_reservieren_verweigert(self):
         with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
             buchungs_service.reservieren(
                 self.termin.pk, name="Max Muster", email="max@example.org"
@@ -69,7 +67,7 @@ class LoeschenAufKundenwunschErreichtDenKunden(BuchungsBasis):
     „Gelöscht“ steht. Deshalb wird beim Löschen direkt verschickt.
     """
 
-    def test_storno_mails_tragen_noch_die_alte_adresse(self):
+    def test_storno_mail_trägt_die_alte_adresse_und_die_daten_sind_weg(self):
         """Ausdrücklich auf dem Betriebsweg geprüft.
 
         Im Testlauf verschickt `mail` sonst direkt und die Warteschlange käme
@@ -94,10 +92,6 @@ class LoeschenAufKundenwunschErreichtDenKunden(BuchungsBasis):
         self.assertIn("max@example.org", empfaenger)
         self.assertIn(self.fahrlehrer.email, empfaenger)
         self.assertNotIn("", empfaenger)
-
-    def test_daten_sind_danach_weg(self):
-        buchung = self.bestaetigen(self.reservieren())
-        self.mit_commit(buchungs_service.daten_loeschen, buchung)
 
         buchung.refresh_from_db()
         self.assertEqual(buchung.name, "Gelöscht")
@@ -138,7 +132,7 @@ class SperrzeitTypIstImmerGueltig(TestCase):
         )
         self.client.force_login(self.chefin)
 
-    def test_formular_liefert_ohne_angabe_einen_leeren_wert(self):
+    def test_ohne_angabe_wird_der_leere_wert_zu_einem_gueltigen_typ(self):
         form = SperrzeitForm(
             data={
                 "fahrlehrer": self.fahrlehrer.pk,
@@ -150,7 +144,6 @@ class SperrzeitTypIstImmerGueltig(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["typ"], "")
 
-    def test_gespeichert_wird_trotzdem_ein_gueltiger_typ(self):
         self.client.post(
             reverse("termine:sperrzeit_anlegen"),
             {
@@ -404,26 +397,24 @@ class KlassenAuswahlAusEinerQuelle(TestCase):
     Buchungsformular heraus, obwohl sie dort angeboten wurde.
     """
 
-    def test_eigene_klasse_ist_in_den_einstellungen_waehlbar(self):
+    def test_eigene_klasse_ist_in_auswahl_und_buchungsformular_die_selbe(self):
+        from termine.forms import BuchungsForm
+
         Fuehrerscheinklasse.objects.create(code="B", name="PKW", reihenfolge=0)
         Fuehrerscheinklasse.objects.create(code="B78", name="PKW Sonderfall", reihenfolge=1)
 
         form = GlobaleEinstellungenForm(instance=FahrschulEinstellungen.get_solo())
         codes = [code for code, _ in form.fields["aktive_fuehrerscheinklassen"].choices]
-
         self.assertIn("B78", codes)
 
-    def test_gefilterte_auswahl_bleibt_im_buchungsformular_erhalten(self):
-        from termine.forms import BuchungsForm
-
-        Fuehrerscheinklasse.objects.create(code="B", name="PKW", reihenfolge=0)
-        Fuehrerscheinklasse.objects.create(code="B78", name="PKW Sonderfall", reihenfolge=1)
         einst = FahrschulEinstellungen.get_solo()
         einst.aktive_fuehrerscheinklassen = ["B78"]
         einst.save(update_fields=["aktive_fuehrerscheinklassen"])
 
         art = Terminart.objects.create(name="Beratung", dauer_minuten=60)
-        codes = [code for code, _ in BuchungsForm(terminart=art).fields["fuehrerscheinklasse"].choices]
+        codes = [
+            code for code, _ in BuchungsForm(terminart=art).fields["fuehrerscheinklasse"].choices
+        ]
 
         self.assertIn("B78", codes)
         self.assertNotIn("B", codes)

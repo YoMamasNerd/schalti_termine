@@ -2,7 +2,7 @@
 
 Django maskiert in Vorlagen von sich aus – aber genau darauf verlässt man sich
 so lange, bis jemand ein `|safe` einbaut, um „die Nachricht schöner
-darzustellen". Diese Tests schicken die üblichen Nutzlasten durch eine echte
+darzustellen“. Diese Tests schicken die üblichen Nutzlasten durch eine echte
 Buchung und lesen nach, was auf den Seiten ankommt: bei der Kundin selbst und
 im internen Bereich, wo die Fahrschule die Nachricht liest.
 """
@@ -57,6 +57,31 @@ class Basis(TestCase):
         daten.update(felder)
         return buchungs_service.reservieren(self.termin.pk, **daten)
 
+    def neuer_termin(self, tage_voraus: int = 4) -> Termin:
+        """Ein weiterer Termin – reservieren kann einen Termin nur einmal."""
+        beginn = (timezone.now() + dt.timedelta(days=tage_voraus)).replace(
+            hour=10, minute=0, second=0, microsecond=0
+        )
+        return Termin.objects.create(
+            fahrlehrer=self.anna,
+            terminart=self.art,
+            beginn=beginn,
+            ende=beginn + dt.timedelta(minutes=30),
+        )
+
+    def buchung_auf_neuem_termin(self, **felder) -> Buchung:
+        tage_voraus = felder.pop("tage_voraus", 4)
+        daten = {
+            "name": "Lena Hoffmann",
+            "email": "lena@example.org",
+            "telefon": "0176 1234567",
+            "nachricht": "",
+        }
+        daten.update(felder)
+        return buchungs_service.reservieren(
+            self.neuer_termin(tage_voraus).pk, **daten
+        )
+
 
 class KeinScriptKommtDurch(Basis):
     def test_kundenseite_maskiert_name_und_nachricht(self):
@@ -73,8 +98,8 @@ class KeinScriptKommtDurch(Basis):
         self.assertIn("&lt;script&gt;", inhalt)
 
     def test_buchungsliste_der_fahrschule_maskiert_ebenso(self):
-        buchung = self.buchung_mit(
-            name=NUTZLASTEN["attribut"], nachricht=NUTZLASTEN["element"]
+        buchung = self.buchung_auf_neuem_termin(
+            tage_voraus=4, name=NUTZLASTEN["attribut"], nachricht=NUTZLASTEN["element"]
         )
         buchungs_service.bestaetigen(buchung)
 
@@ -91,7 +116,9 @@ class KeinScriptKommtDurch(Basis):
         self.assertIn("&quot;&gt;", inhalt)
 
     def test_tagesplanung_maskiert_den_namen_am_termin(self):
-        buchung = self.buchung_mit(name=NUTZLASTEN["einfach"])
+        buchung = self.buchung_auf_neuem_termin(
+            tage_voraus=5, name=NUTZLASTEN["einfach"]
+        )
         buchungs_service.bestaetigen(buchung)
 
         chef = get_user_model().objects.create_superuser("chef", password="geheim123")
@@ -210,7 +237,9 @@ class VoidAuthGruppenSynchronisationTest(TestCase):
         from termine.social_adapter import VoidAuthSocialAccountAdapter
 
         lehrer = Fahrlehrer.objects.create(name="Max Mustermann", email="max@example.org")
-        user = get_user_model().objects.create_user("max_user", first_name="Max", last_name="Mustermann", email="max@example.org")
+        user = get_user_model().objects.create_user(
+            "max_user", first_name="Max", last_name="Mustermann", email="max@example.org"
+        )
         user.is_staff = True
         user.save()
 
@@ -232,4 +261,3 @@ class VoidAuthGruppenSynchronisationTest(TestCase):
         # Fahrlehrer sollte mit Benutzer verknüpft sein
         self.assertEqual(lehrer.benutzer, user)
         self.assertEqual(user.fahrlehrer, lehrer)
-

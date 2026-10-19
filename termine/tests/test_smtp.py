@@ -23,7 +23,8 @@ class SmtpModellUndFormTest(TestCase):
     def setUp(self):
         self.einst = FahrschulEinstellungen.get_solo()
 
-    def test_standard_ohne_host(self):
+    def test_konfiguration_kommt_aus_der_datenbank(self):
+        """Ohne Host läuft der Versand über die Konsole, mit Host über SMTP."""
         self.einst.email_host = ""
         self.einst.save()
         cfg = self.einst.get_effective_email_config()
@@ -31,7 +32,6 @@ class SmtpModellUndFormTest(TestCase):
         self.assertEqual(cfg["host"], "")
         self.assertEqual(cfg["backend"], "django.core.mail.backends.console.EmailBackend")
 
-    def test_db_konfiguration_hat_vorrang(self):
         self.einst.email_host = "smtp.schaltwerk.de"
         self.einst.email_port = 587
         self.einst.email_user = "beratung@schaltwerk.de"
@@ -51,30 +51,21 @@ class SmtpModellUndFormTest(TestCase):
         self.assertFalse(cfg["use_ssl"])
         self.assertEqual(cfg["from_email"], "Fahrschule Schaltwerk <beratung@schaltwerk.de>")
 
-    def test_form_validiert_korrekt(self):
+    def test_form_lässt_nur_eine_verschlüsselung_zu(self):
+        daten = {
+            "email_host": "smtp.beispiel.de",
+            "email_port": 587,
+            "email_user": "user@beispiel.de",
+            "email_password": "pass",
+            "email_from": "Info <info@beispiel.de>",
+        }
         form = SmtpEinstellungenForm(
-            data={
-                "email_host": "smtp.beispiel.de",
-                "email_port": 587,
-                "email_user": "user@beispiel.de",
-                "email_password": "pass",
-                "email_use_tls": True,
-                "email_use_ssl": False,
-                "email_from": "Info <info@beispiel.de>",
-            }
+            data={**daten, "email_use_tls": True, "email_use_ssl": False}
         )
-        self.assertTrue(form.is_valid())
+        self.assertTrue(form.is_valid(), form.errors)
 
-    def test_form_schliesst_tls_und_ssl_gleichzeitig_aus(self):
         form = SmtpEinstellungenForm(
-            data={
-                "email_host": "smtp.beispiel.de",
-                "email_port": 587,
-                "email_user": "user@beispiel.de",
-                "email_password": "pass",
-                "email_use_tls": True,
-                "email_use_ssl": True,
-            }
+            data={**daten, "email_use_tls": True, "email_use_ssl": True}
         )
         self.assertFalse(form.is_valid())
         self.assertIn("email_use_ssl", form.errors)
@@ -91,53 +82,52 @@ class SmtpModellUndFormTest(TestCase):
 
 
 class SmtpLiveTestServiceTest(TestCase):
-    @patch("smtplib.SMTP")
-    def test_auth_erfolgreich_starttls(self, mock_smtp_cls):
-        mock_server = MagicMock()
-        mock_server.ehlo.return_value = (250, b"ok")
-        mock_server.has_extn.return_value = True
-        mock_smtp_cls.return_value = mock_server
+    def test_auth_erfolgreich_starttls(self):
+        with patch("smtplib.SMTP") as mock_smtp_cls:
+            mock_server = MagicMock()
+            mock_server.ehlo.return_value = (250, b"ok")
+            mock_server.has_extn.return_value = True
+            mock_smtp_cls.return_value = mock_server
 
-        ergebnis = teste_smtp_authentifizierung(
-            host="smtp.strato.de",
-            port=587,
-            user="user@strato.de",
-            password="secretpassword",
-            use_tls=True,
-            use_ssl=False,
-        )
+            ergebnis = teste_smtp_authentifizierung(
+                host="smtp.strato.de",
+                port=587,
+                user="user@strato.de",
+                password="secretpassword",
+                use_tls=True,
+                use_ssl=False,
+            )
 
-        self.assertTrue(ergebnis.ok)
-        self.assertIn("erfolgreich", ergebnis.meldung)
-        mock_server.starttls.assert_called_once()
-        mock_server.login.assert_called_once_with("user@strato.de", "secretpassword")
-        mock_server.quit.assert_called_once()
+            self.assertTrue(ergebnis.ok)
+            self.assertIn("erfolgreich", ergebnis.meldung)
+            mock_server.starttls.assert_called_once()
+            mock_server.login.assert_called_once_with("user@strato.de", "secretpassword")
+            mock_server.quit.assert_called_once()
 
-    @patch("smtplib.SMTP_SSL")
-    def test_auth_erfolgreich_ssl(self, mock_ssl_cls):
-        mock_server = MagicMock()
-        mock_server.ehlo.return_value = (250, b"ok")
-        mock_ssl_cls.return_value = mock_server
+    def test_auth_erfolgreich_ssl(self):
+        with patch("smtplib.SMTP_SSL") as mock_ssl_cls:
+            mock_server = MagicMock()
+            mock_server.ehlo.return_value = (250, b"ok")
+            mock_ssl_cls.return_value = mock_server
 
-        ergebnis = teste_smtp_authentifizierung(
-            host="smtp.gmail.com",
-            port=465,
-            user="user@gmail.com",
-            password="app-password",
-            use_tls=False,
-            use_ssl=True,
-        )
+            ergebnis = teste_smtp_authentifizierung(
+                host="smtp.gmail.com",
+                port=465,
+                user="user@gmail.com",
+                password="app-password",
+                use_tls=False,
+                use_ssl=True,
+            )
 
-        self.assertTrue(ergebnis.ok)
-        mock_server.login.assert_called_once_with("user@gmail.com", "app-password")
-        mock_server.quit.assert_called_once()
+            self.assertTrue(ergebnis.ok)
+            mock_server.login.assert_called_once_with("user@gmail.com", "app-password")
+            mock_server.quit.assert_called_once()
 
-    def test_kein_host_angegeben(self):
+    def test_unvollstaendige_eingaben_werden_abgewiesen(self):
         ergebnis = teste_smtp_authentifizierung(host="", port=587)
         self.assertFalse(ergebnis.ok)
         self.assertIn("Kein SMTP-Host", ergebnis.meldung)
 
-    def test_benutzer_ohne_passwort(self):
         with patch("smtplib.SMTP") as mock_smtp_cls:
             mock_server = MagicMock()
             mock_server.has_extn.return_value = True
@@ -148,76 +138,75 @@ class SmtpLiveTestServiceTest(TestCase):
                 password="",
                 use_tls=False,
             )
-            self.assertFalse(ergebnis.ok)
-            self.assertIn("kein Passwort", ergebnis.meldung)
+        self.assertFalse(ergebnis.ok)
+        self.assertIn("kein Passwort", ergebnis.meldung)
 
-    @patch("smtplib.SMTP")
-    def test_starttls_nicht_unterstuetzt(self, mock_smtp_cls):
-        mock_server = MagicMock()
-        mock_server.has_extn.return_value = False
-        mock_smtp_cls.return_value = mock_server
-
-        ergebnis = teste_smtp_authentifizierung(
-            host="smtp.example.org",
-            port=587,
-            use_tls=True,
-            use_ssl=False,
-        )
+        with patch("smtplib.SMTP") as mock_smtp_cls:
+            mock_server = MagicMock()
+            mock_server.has_extn.return_value = False
+            mock_smtp_cls.return_value = mock_server
+            ergebnis = teste_smtp_authentifizierung(
+                host="smtp.example.org",
+                port=587,
+                use_tls=True,
+                use_ssl=False,
+            )
         self.assertFalse(ergebnis.ok)
         self.assertIn("STARTTLS", ergebnis.meldung)
 
-    @patch("smtplib.SMTP")
-    def test_auth_fehler_535(self, mock_smtp_cls):
+    def test_auth_fehler_535(self):
         import smtplib
 
-        mock_server = MagicMock()
-        mock_server.has_extn.return_value = True
-        mock_server.login.side_effect = smtplib.SMTPAuthenticationError(535, b"Authentication credentials invalid")
-        mock_smtp_cls.return_value = mock_server
-
-        ergebnis = teste_smtp_authentifizierung(
-            host="smtp.example.org",
-            user="falsch@example.org",
-            password="wrong",
-            use_tls=True,
-        )
+        with patch("smtplib.SMTP") as mock_smtp_cls:
+            mock_server = MagicMock()
+            mock_server.has_extn.return_value = True
+            mock_server.login.side_effect = smtplib.SMTPAuthenticationError(
+                535, b"Authentication credentials invalid"
+            )
+            mock_smtp_cls.return_value = mock_server
+            ergebnis = teste_smtp_authentifizierung(
+                host="smtp.example.org",
+                user="falsch@example.org",
+                password="wrong",
+                use_tls=True,
+            )
         self.assertFalse(ergebnis.ok)
         self.assertIn("Authentifizierung", ergebnis.meldung)
         self.assertIn("535", ergebnis.meldung)
 
-    @patch("smtplib.SMTP")
-    def test_timeout_fehler(self, mock_smtp_cls):
-        mock_smtp_cls.side_effect = socket.timeout("timed out")
-        ergebnis = teste_smtp_authentifizierung(host="smtp.unreachable.org")
+    def test_timeout_fehler(self):
+        with patch("smtplib.SMTP") as mock_smtp_cls:
+            mock_smtp_cls.side_effect = socket.timeout("timed out")
+            ergebnis = teste_smtp_authentifizierung(host="smtp.unreachable.org")
         self.assertFalse(ergebnis.ok)
         self.assertIn("Zeitüberschreitung", ergebnis.meldung)
 
-    @patch("smtplib.SMTP")
-    def test_dns_aufloesungsfehler(self, mock_smtp_cls):
-        mock_smtp_cls.side_effect = socket.gaierror(-2, "Name or service not known")
-        ergebnis = teste_smtp_authentifizierung(host="nicht-existent.invalid")
+    def test_dns_aufloesungsfehler(self):
+        with patch("smtplib.SMTP") as mock_smtp_cls:
+            mock_smtp_cls.side_effect = socket.gaierror(-2, "Name or service not known")
+            ergebnis = teste_smtp_authentifizierung(host="nicht-existent.invalid")
         self.assertFalse(ergebnis.ok)
         self.assertIn("DNS-Fehler", ergebnis.meldung)
 
-    @patch("termine.services.smtp.teste_smtp_authentifizierung")
-    @patch("django.core.mail.EmailMultiAlternatives.send")
-    def test_sende_test_email_erfolgreich(self, mock_send, mock_auth):
-        mock_auth.return_value = SmtpTestErgebnis(True, "Auth ok")
-        mock_send.return_value = 1
+    def test_test_email_wird_versendet_oder_abgewiesen(self):
+        with patch(
+            "termine.services.smtp.teste_smtp_authentifizierung"
+        ) as mock_auth, patch("django.core.mail.EmailMultiAlternatives.send") as mock_send:
+            mock_auth.return_value = SmtpTestErgebnis(True, "Auth ok")
+            mock_send.return_value = 1
 
-        ergebnis = sende_test_email(
-            empfaenger="tester@beispiel.de",
-            host="smtp.beispiel.de",
-            port=587,
-            user="user@beispiel.de",
-            password="pwd",
-            from_email="Info <info@beispiel.de>",
-        )
+            ergebnis = sende_test_email(
+                empfaenger="tester@beispiel.de",
+                host="smtp.beispiel.de",
+                port=587,
+                user="user@beispiel.de",
+                password="pwd",
+                from_email="Info <info@beispiel.de>",
+            )
         self.assertTrue(ergebnis.ok)
         self.assertIn("erfolgreich an „tester@beispiel.de“", ergebnis.meldung)
         mock_send.assert_called_once()
 
-    def test_sende_test_email_ungueltige_adresse(self):
         ergebnis = sende_test_email(
             empfaenger="ungueltig",
             host="smtp.beispiel.de",
@@ -292,12 +281,53 @@ class SmtpViewsTest(TestCase):
         self.assertEqual(self.globale_einst.email_port, 465)
         self.assertTrue(self.globale_einst.email_use_ssl)
 
-    def test_normaler_mitarbeiter_kann_smtp_nicht_speichern(self):
-        self.client.force_login(self.mitarbeiter_user)
-        url = reverse("termine:einstellungen")
+    def test_smtp_test_ajax_erfolg(self):
+        with patch(
+            "termine.staff_views.einstellungen.teste_smtp_authentifizierung"
+        ) as mock_test:
+            mock_test.return_value = SmtpTestErgebnis(True, "Authentifizierung erfolgreich!")
+            self.client.force_login(self.chef)
 
-        # Nicht-Inhaber POST mit form_art=smtp wird ignoriert
-        self.client.post(            url,
+            antwort = self.client.post(
+                reverse("termine:smtp_test"),
+                {
+                    "email_host": "smtp.strato.de",
+                    "email_port": "587",
+                    "email_user": "kontakt@strato.de",
+                    "email_password": "pwd",
+                    "email_use_tls": "true",
+                    "aktion": "auth",
+                },
+            )
+        self.assertEqual(antwort.status_code, 200)
+        data = antwort.json()
+        self.assertTrue(data["ok"])
+        self.assertIn("Authentifizierung erfolgreich", data["meldung"])
+
+    def test_smtp_test_ajax_mail_versand(self):
+        with patch("termine.staff_views.einstellungen.sende_test_email") as mock_mail:
+            mock_mail.return_value = SmtpTestErgebnis(True, "Test-E-Mail gesendet")
+            self.client.force_login(self.chef)
+
+            antwort = self.client.post(
+                reverse("termine:smtp_test"),
+                {
+                    "email_host": "smtp.strato.de",
+                    "test_empfaenger": "admin@strato.de",
+                    "aktion": "mail",
+                },
+            )
+        self.assertEqual(antwort.status_code, 200)
+        data = antwort.json()
+        self.assertTrue(data["ok"])
+        mock_mail.assert_called_once()
+
+    def test_nur_inhaber_darf_smtp_bedienen(self):
+        """Mitarbeiter können weder die Konfiguration ändern noch den Test auslösen."""
+        self.client.force_login(self.mitarbeiter_user)
+
+        self.client.post(
+            reverse("termine:einstellungen"),
             {
                 "form_art": "smtp",
                 "email_host": "hacked.smtp.org",
@@ -306,46 +336,5 @@ class SmtpViewsTest(TestCase):
         self.globale_einst.refresh_from_db()
         self.assertNotEqual(self.globale_einst.email_host, "hacked.smtp.org")
 
-    @patch("termine.staff_views.einstellungen.teste_smtp_authentifizierung")
-    def test_smtp_test_ajax_erfolg(self, mock_test):
-        mock_test.return_value = SmtpTestErgebnis(True, "Authentifizierung erfolgreich!")
-        self.client.force_login(self.chef)
-
-        antwort = self.client.post(
-            reverse("termine:smtp_test"),
-            {
-                "email_host": "smtp.strato.de",
-                "email_port": "587",
-                "email_user": "kontakt@strato.de",
-                "email_password": "pwd",
-                "email_use_tls": "true",
-                "aktion": "auth",
-            },
-        )
-        self.assertEqual(antwort.status_code, 200)
-        data = antwort.json()
-        self.assertTrue(data["ok"])
-        self.assertIn("Authentifizierung erfolgreich", data["meldung"])
-
-    @patch("termine.staff_views.einstellungen.sende_test_email")
-    def test_smtp_test_ajax_mail_versand(self, mock_mail):
-        mock_mail.return_value = SmtpTestErgebnis(True, "Test-E-Mail gesendet")
-        self.client.force_login(self.chef)
-
-        antwort = self.client.post(
-            reverse("termine:smtp_test"),
-            {
-                "email_host": "smtp.strato.de",
-                "test_empfaenger": "admin@strato.de",
-                "aktion": "mail",
-            },
-        )
-        self.assertEqual(antwort.status_code, 200)
-        data = antwort.json()
-        self.assertTrue(data["ok"])
-        mock_mail.assert_called_once()
-
-    def test_smtp_test_ajax_nur_fuer_inhaber(self):
-        self.client.force_login(self.mitarbeiter_user)
         antwort = self.client.post(reverse("termine:smtp_test"), {})
         self.assertEqual(antwort.status_code, 403)

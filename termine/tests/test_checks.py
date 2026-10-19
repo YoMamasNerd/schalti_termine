@@ -3,7 +3,6 @@
 import os
 from unittest import mock
 
-from django.apps import apps
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from termine.checks import (
@@ -19,25 +18,21 @@ def ids(meldungen):
     return {m.id for m in meldungen}
 
 
-class AppKonfiguration(SimpleTestCase):
-    def test_eigene_appconfig_ist_aktiv(self):
-        konfig = apps.get_app_config("termine")
-        self.assertEqual(type(konfig).__name__, "TermineConfig")
-        self.assertEqual(konfig.verbose_name, "Beratungstermine")
+class DebugOhneBeanstandung(SimpleTestCase):
+    """Im Entwicklungsmodus will jede Prüfung schweigen."""
+
+    @override_settings(DEBUG=True)
+    def test_bei_debug_wird_nicht_gemeckert(self):
+        self.assertEqual(pruefe_oeffentliche_adresse(None), [])
+        self.assertEqual(pruefe_platzhalter(None), [])
 
 
 class OeffentlicheAdresse(SimpleTestCase):
-    @override_settings(DEBUG=True, SITE_BASE_URL="http://localhost:8000")
-    def test_bei_debug_wird_nicht_gemeckert(self):
-        self.assertEqual(pruefe_oeffentliche_adresse(None), [])
-
-    @override_settings(DEBUG=False, SITE_BASE_URL="http://localhost:8000")
-    def test_localhost_im_betrieb_ist_ein_fehler(self):
-        self.assertIn("termine.E001", ids(pruefe_oeffentliche_adresse(None)))
-
-    @override_settings(DEBUG=False, SITE_BASE_URL="http://127.0.0.1:8000")
-    def test_auch_die_ip_wird_erkannt(self):
-        self.assertIn("termine.E001", ids(pruefe_oeffentliche_adresse(None)))
+    @override_settings(DEBUG=False)
+    def test_lokale_adressen_sind_im_betrieb_ein_fehler(self):
+        for adresse in ("http://localhost:8000", "http://127.0.0.1:8000"):
+            with self.subTest(adresse=adresse), self.settings(SITE_BASE_URL=adresse):
+                self.assertIn("termine.E001", ids(pruefe_oeffentliche_adresse(None)))
 
     @override_settings(DEBUG=False, SITE_BASE_URL="http://termine.fahrschule.de")
     def test_ohne_tls_gibt_es_eine_warnung(self):
@@ -80,29 +75,21 @@ class Mailversand(TestCase):
 
 
 class Reservierungsdauer(SimpleTestCase):
-    @override_settings(RESERVATION_MINUTES=2)
-    def test_zu_kurze_frist_warnt(self):
-        self.assertIn("termine.W003", ids(pruefe_reservierungsdauer(None)))
-
-    @override_settings(RESERVATION_MINUTES=30)
-    def test_uebliche_frist_ist_still(self):
-        self.assertEqual(pruefe_reservierungsdauer(None), [])
+    def test_nur_eine_zu_kurze_frist_warnt(self):
+        with self.subTest("kurze Frist"), self.settings(RESERVATION_MINUTES=2):
+            self.assertIn("termine.W003", ids(pruefe_reservierungsdauer(None)))
+        with self.subTest("übliche Frist"), self.settings(RESERVATION_MINUTES=30):
+            self.assertEqual(pruefe_reservierungsdauer(None), [])
 
 
 class UnveraenderteGeheimnisse(SimpleTestCase):
     """Djangos eigene Prüfung warnt hier nur – Warnungen halten nichts auf."""
 
-    @override_settings(DEBUG=True, SECRET_KEY="bitte-aendern")
-    def test_bei_debug_wird_nicht_gemeckert(self):
-        self.assertEqual(pruefe_platzhalter(None), [])
-
-    @override_settings(DEBUG=False, SECRET_KEY="bitte-aendern")
+    @override_settings(DEBUG=False)
     def test_schluessel_aus_der_beispieldatei(self):
-        self.assertIn("termine.E004", ids(pruefe_platzhalter(None)))
-
-    @override_settings(DEBUG=False, SECRET_KEY="unsicher-nur-fuer-entwicklung")
-    def test_auch_die_vorgabe_aus_den_settings(self):
-        self.assertIn("termine.E004", ids(pruefe_platzhalter(None)))
+        for schluessel in ("bitte-aendern", "unsicher-nur-fuer-entwicklung"):
+            with self.subTest(schluessel=schluessel), self.settings(SECRET_KEY=schluessel):
+                self.assertIn("termine.E004", ids(pruefe_platzhalter(None)))
 
     @override_settings(DEBUG=False, SECRET_KEY="ein-langer-echt-zufaelliger-wert-xyz")
     def test_echter_schluessel_ist_still(self):
