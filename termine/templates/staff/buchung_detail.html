@@ -236,6 +236,46 @@
           {% endif %}
         </div>
 
+        <!-- Fahrlehrer wechseln -->
+        <div class="karte" style="margin-bottom:1.5rem; border-top:4px solid var(--marke-dunkel)">
+          <h2 style="margin-top:0; font-size:1.15rem; margin-bottom:0.5rem">
+            👤 Fahrlehrer wechseln
+          </h2>
+          <p class="leer" style="font-size:0.88rem; margin-bottom:1rem">
+            Nur der Fahrlehrer wechselt, Datum und Uhrzeit bleiben. Der Kunde wird nicht benachrichtigt.
+          </p>
+
+          {% if wechsel_kandidaten %}
+            {% for k in wechsel_kandidaten %}
+              <form method="post" action="{% url 'termine:buchung_fahrlehrer_wechseln' buchung.pk %}"
+                    style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.5rem 0; border-bottom:1px solid var(--linie)">
+                {% csrf_token %}
+                <input type="hidden" name="fahrlehrer_id" value="{{ k.fahrlehrer.pk }}">
+                <span style="font-weight:600">{{ k.fahrlehrer.name }}</span>
+                <span style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap">
+                  {% if k.verfuegbar %}
+                    <span class="marke-status status-frei" style="font-size:0.78rem; padding:2px 8px">frei</span>
+                    <button class="knopf knopf--primaer knopf--klein" type="submit"
+                            onclick="return confirm('Termin wirklich zu {{ k.fahrlehrer.name }} umhängen? Datum und Uhrzeit bleiben, der Kunde wird nicht benachrichtigt.');">
+                      Termin umhängen
+                    </button>
+                  {% else %}
+                    <span class="marke-status status-gebucht" style="font-size:0.78rem; padding:2px 8px">belegt</span>
+                    <button class="knopf knopf--leise knopf--klein" type="submit" disabled
+                            title="Belegt oder gesperrt im Zeitfenster dieses Termins.">
+                      Termin umhängen
+                    </button>
+                  {% endif %}
+                </span>
+              </form>
+            {% endfor %}
+          {% else %}
+            <p class="leer" style="font-size:0.9rem; margin:0">
+              Es gibt keine weiteren Fahrlehrer, auf die dieser Termin umgehängt werden könnte.
+            </p>
+          {% endif %}
+        </div>
+
         <!-- Termin absagen (Stornieren) -->
         <div class="karte" style="border-top:4px solid var(--rot)">
           <h2 style="margin-top:0; font-size:1.15rem; color:var(--rot); margin-bottom:0.5rem">

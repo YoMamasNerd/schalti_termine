@@ -96,6 +96,11 @@ urlpatterns = [
         name="buchung_verschieben",
     ),
     path(
+        "intern/buchungen/<int:pk>/fahrlehrer-wechseln/",
+        staff_views.buchung_fahrlehrer_wechseln,
+        name="buchung_fahrlehrer_wechseln",
+    ),
+    path(
         "intern/buchungen/<int:pk>/wieder-einbuchen/",
         staff_views.buchung_wieder_einbuchen,
         name="buchung_wieder_einbuchen",

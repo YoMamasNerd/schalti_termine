@@ -4,6 +4,7 @@ import datetime as dt
 
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
+from django.core import mail
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -583,6 +584,114 @@ class Randfaelle(BackendBasis):
         termin2.refresh_from_db()
         self.assertEqual(termin1.status, Termin.Status.FREI)
         self.assertEqual(termin2.status, Termin.Status.GEBUCHT)
+
+    def test_fahrlehrer_wechseln_haengt_termin_komplett_um(self):
+        termin = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
+        termin.status = Termin.Status.GEBUCHT
+        termin.save()
+        b = Buchung.objects.create(
+            termin=termin, name="Sarah Schulz", email="sarah@example.com",
+            status=Buchung.Status.BESTAETIGT,
+        )
+        alter_pk, alter_beginn, alter_ende = termin.pk, termin.beginn, termin.ende
+
+        buchungs_service.fahrlehrer_wechseln(b, self.tom)
+
+        termin.refresh_from_db()
+        b.refresh_from_db()
+        self.assertEqual(termin.fahrlehrer, self.tom)
+        self.assertEqual(termin.pk, alter_pk)
+        self.assertEqual(termin.beginn, alter_beginn)
+        self.assertEqual(termin.ende, alter_ende)
+        self.assertEqual(termin.status, Termin.Status.GEBUCHT)
+        self.assertEqual(b.termin_id, termin.pk)
+        self.assertTrue(b.ist_aktiv)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_fahrlehrer_wechseln_blockiert_belegtes_zeitfenster(self):
+        termin = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
+        b = Buchung.objects.create(
+            termin=termin, name="Sarah Schulz", email="sarah@example.com",
+            status=Buchung.Status.BESTAETIGT,
+        )
+        self.termin_fuer(self.tom, tage_voraus=1, stunde=10)
+
+        with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
+            buchungs_service.fahrlehrer_wechseln(b, self.tom)
+
+        termin.refresh_from_db()
+        self.assertEqual(termin.fahrlehrer, self.anna)
+
+    def test_fahrlehrer_wechseln_blockiert_gesperrtes_zeitfenster(self):
+        termin = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
+        b = Buchung.objects.create(
+            termin=termin, name="Sarah Schulz", email="sarah@example.com",
+            status=Buchung.Status.BESTAETIGT,
+        )
+        Sperrzeit.objects.create(
+            fahrlehrer=self.tom, beginn=termin.beginn, ende=termin.ende, grund="Urlaub",
+        )
+
+        with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
+            buchungs_service.fahrlehrer_wechseln(b, self.tom)
+
+        termin.refresh_from_db()
+        self.assertEqual(termin.fahrlehrer, self.anna)
+
+    def test_buchung_fahrlehrer_wechseln_view_haengt_um(self):
+        termin = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
+        b = Buchung.objects.create(
+            termin=termin, name="Sarah Schulz", email="sarah@example.com",
+            status=Buchung.Status.BESTAETIGT,
+        )
+
+        antwort = self.client.post(
+            reverse("termine:buchung_fahrlehrer_wechseln", args=[b.pk]),
+            {"fahrlehrer_id": self.tom.pk},
+        )
+
+        self.assertEqual(antwort.status_code, 302)
+        self.assertEqual(antwort["Location"], reverse("termine:buchung_detail", args=[b.pk]))
+        termin.refresh_from_db()
+        self.assertEqual(termin.fahrlehrer, self.tom)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_buchung_fahrlehrer_wechseln_view_lehnt_kollision_und_fremde_id_ab(self):
+        termin = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
+        b = Buchung.objects.create(
+            termin=termin, name="Sarah Schulz", email="sarah@example.com",
+            status=Buchung.Status.BESTAETIGT,
+        )
+        url = reverse("termine:buchung_fahrlehrer_wechseln", args=[b.pk])
+        self.termin_fuer(self.tom, tage_voraus=1, stunde=10)
+
+        antwort = self.client.post(url, {"fahrlehrer_id": self.tom.pk}, follow=True)
+        self.assertContains(antwort, "bereits belegt oder gesperrt")
+
+        antwort = self.client.post(url, {"fahrlehrer_id": 99999}, follow=True)
+        self.assertContains(antwort, "nicht zur Auswahl")
+
+        termin.refresh_from_db()
+        self.assertEqual(termin.fahrlehrer, self.anna)
+
+    def test_buchung_detail_zeigt_wechsel_kandidaten_mit_verfuegbarkeit(self):
+        termin = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
+        b = Buchung.objects.create(
+            termin=termin, name="Sarah Schulz", email="sarah@example.com",
+            status=Buchung.Status.BESTAETIGT,
+        )
+        url = reverse("termine:buchung_detail", args=[b.pk])
+
+        kandidaten = self.client.get(url).context["wechsel_kandidaten"]
+        self.assertEqual([k["fahrlehrer"] for k in kandidaten], [self.tom])
+        self.assertTrue(kandidaten[0]["verfuegbar"])
+
+        self.termin_fuer(self.tom, tage_voraus=1, stunde=10)
+        antwort = self.client.get(url)
+
+        self.assertFalse(antwort.context["wechsel_kandidaten"][0]["verfuegbar"])
+        self.assertContains(antwort, ">belegt</span>")
+        self.assertContains(antwort, "title=\"Belegt oder gesperrt im Zeitfenster dieses Termins.\"")
 
     def test_buchung_wieder_einbuchen_view(self):
         termin1 = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
