@@ -21,6 +21,7 @@ from .buchungen import (
     buchung_wieder_einbuchen,
     buchungsliste,
     historie,
+    wechsel_live_check,
 )
 from .common import inhaber, mitarbeiter
 from .dashboard import dashboard
@@ -94,4 +95,5 @@ __all__ = [
     "terminart_loeschen",
     "terminartenliste",
     "termine_anlegen",
+    "wechsel_live_check",
 ]

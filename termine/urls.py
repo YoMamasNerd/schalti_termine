@@ -101,6 +101,11 @@ urlpatterns = [
         name="buchung_fahrlehrer_wechseln",
     ),
     path(
+        "intern/buchungen/<int:pk>/wechsel-live-check/",
+        staff_views.wechsel_live_check,
+        name="wechsel_live_check",
+    ),
+    path(
         "intern/buchungen/<int:pk>/wieder-einbuchen/",
         staff_views.buchung_wieder_einbuchen,
         name="buchung_wieder_einbuchen",

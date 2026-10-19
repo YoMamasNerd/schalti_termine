@@ -1,16 +1,18 @@
 """Tests für den internen Bereich: Zugriffsschutz, Tagesplanung, Absagen."""
 
 import datetime as dt
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
 from django.core import mail
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from termine.models import Buchung, Fahrlehrer, RhythmusRegel, Sperrzeit, Termin, Terminart
 from termine.services import buchung as buchungs_service
+from termine.services.fsm_client import FsmError, FsmTermin
 
 
 class BackendBasis(TestCase):
@@ -973,4 +975,102 @@ class HistorieTests(BackendBasis):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Verfallen am:")
         self.assertContains(resp, "Bestätigungsfrist abgelaufen")
+
+
+class WechselLiveCheck(BackendBasis):
+    """AJAX-Live-Prüfung aller Wechsel-Kandidaten gegen den FSM-Kalender."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.login(username="chef", password="geheim123")
+        termin = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
+        self.buchung = Buchung.objects.create(
+            termin=termin, name="Sarah Schulz", email="sarah@example.com",
+            status=Buchung.Status.BESTAETIGT,
+        )
+        self.tom.fsm_id = "fsm-tom"
+        self.tom.fsm_sync_aktiv = True
+        self.tom.save()
+        self.lee = Fahrlehrer.objects.create(
+            name="Lee Fast", email="lee@example.org", bundesland="BW",
+            vorlauf_stunden=0, fsm_id="fsm-lee", fsm_sync_aktiv=True,
+        )
+        self.url = reverse("termine:wechsel_live_check", args=[self.buchung.pk])
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_fsm_konflikt_markiert_belegt_und_freien_bleibt_frei(self):
+        termin = self.buchung.termin
+        konflikt = FsmTermin(
+            id="fsm-1", von=termin.beginn, bis=termin.ende,
+            fahrlehrer_id="fsm-lee", terminart="FS", titel="Fahrstunde Müller",
+        )
+        mock_client = MagicMock()
+        mock_client.get_termine.side_effect = (
+            lambda fsm_id, start, end, refresh=False: [konflikt] if fsm_id == "fsm-lee" else []
+        )
+
+        with patch("termine.staff_views.buchungen.FsmClient", return_value=mock_client):
+            antwort = self.client.post(self.url)
+
+        self.assertEqual(antwort.status_code, 200)
+        daten = antwort.json()
+        self.assertTrue(daten["ok"])
+        ergebnisse = {e["pk"]: e for e in daten["ergebnisse"]}
+        self.assertEqual(len(ergebnisse), 2)
+        self.assertFalse(ergebnisse[self.lee.pk]["verfuegbar"])
+        self.assertEqual(ergebnisse[self.lee.pk]["fsm"], "live")
+        self.assertEqual(ergebnisse[self.lee.pk]["konflikte"], ["Fahrstunde Müller"])
+        self.assertTrue(ergebnisse[self.tom.pk]["verfuegbar"])
+        self.assertEqual(ergebnisse[self.tom.pk]["konflikte"], [])
+        # Jeder Live-Abruf umgeht den Gateway-Cache
+        self.assertEqual(len(mock_client.get_termine.call_args_list), 2)
+        for call in mock_client.get_termine.call_args_list:
+            self.assertIs(call.kwargs.get("refresh"), True)
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_fsm_fehler_liefert_unbekannt_lokal_belebt_bleibt_belegt(self):
+        Termin.objects.create(
+            fahrlehrer=self.tom, terminart=self.art,
+            beginn=self.buchung.termin.beginn, ende=self.buchung.termin.ende,
+        )
+        mock_client = MagicMock()
+        mock_client.get_termine.side_effect = FsmError("Gateway nicht erreichbar")
+
+        with patch("termine.staff_views.buchungen.FsmClient", return_value=mock_client):
+            antwort = self.client.post(self.url)
+
+        daten = antwort.json()
+        self.assertTrue(daten["ok"])
+        ergebnisse = {e["pk"]: e for e in daten["ergebnisse"]}
+        self.assertIsNone(ergebnisse[self.lee.pk]["verfuegbar"])
+        self.assertEqual(ergebnisse[self.lee.pk]["fsm"], "fehler")
+        self.assertEqual(ergebnisse[self.lee.pk]["meldung"], "Gateway nicht erreichbar")
+        self.assertIs(ergebnisse[self.tom.pk]["verfuegbar"], False)
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_kandidat_ohne_fsm_sync_wird_rein_lokal_geprueft(self):
+        self.tom.fsm_sync_aktiv = False
+        self.tom.save()
+        mock_client = MagicMock()
+        mock_client.get_termine.return_value = []
+
+        with patch("termine.staff_views.buchungen.FsmClient", return_value=mock_client):
+            antwort = self.client.post(self.url)
+
+        daten = antwort.json()
+        self.assertTrue(daten["ok"])
+        ergebnisse = {e["pk"]: e for e in daten["ergebnisse"]}
+        self.assertEqual(ergebnisse[self.tom.pk]["fsm"], "aus")
+        self.assertIs(ergebnisse[self.tom.pk]["verfuegbar"], True)
+        # Kein Gateway-Call für den Kandidaten ohne FSM-Sync
+        self.assertEqual(len(mock_client.get_termine.call_args_list), 1)
+        self.assertEqual(mock_client.get_termine.call_args_list[0].args[0], "fsm-lee")
+
+    def test_ohne_login_zur_anmeldung(self):
+        self.client.logout()
+
+        antwort = self.client.post(self.url)
+
+        self.assertEqual(antwort.status_code, 302)
+        self.assertIn("/intern/anmelden/", antwort["Location"])
 

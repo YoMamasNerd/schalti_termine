@@ -7,6 +7,7 @@ import datetime as dt
 from django.contrib import messages
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.formats import date_format
@@ -19,6 +20,8 @@ from ..models import (
     Termin,
 )
 from ..services import buchung as buchungs_service
+from ..services.fsm_client import FsmClient, FsmError
+from ..services.fsm_sync import is_fsm_aktiv_fuer_fahrlehrer
 from ..services.planung import (
     lokal,
 )
@@ -135,6 +138,68 @@ def buchung_detail(request, pk: int):
             "wechsel_kandidaten": wechsel_kandidaten,
         },
     )
+
+@mitarbeiter
+@require_POST
+def wechsel_live_check(request, pk: int):
+    """AJAX: Prüft alle Wechsel-Kandidaten live gegen den FSM-Kalender.
+
+    `refresh=True` umgeht den Gateway-Cache – die Badges der Kandidatenliste
+    auf der Detailseite zeigen sonst nur den Stand des letzten Syncs.
+    """
+    erlaubt = _erlaubte_fahrlehrer(request.user)
+    buchung = get_object_or_404(
+        Buchung.objects.select_related("termin", "termin__fahrlehrer", "termin__terminart"),
+        pk=pk,
+        termin__fahrlehrer__in=erlaubt,
+    )
+    if not buchung.ist_aktiv:
+        return JsonResponse({"ok": False, "meldung": "Buchung ist nicht mehr aktiv."}, status=400)
+
+    termin = buchung.termin
+    client = FsmClient()
+    ergebnisse = []
+    for fl in erlaubt.exclude(pk=termin.fahrlehrer_id).order_by("reihenfolge", "name"):
+        lokal_frei = not (
+            Sperrzeit.objects.filter(
+                fahrlehrer=fl,
+                beginn__lt=termin.ende,
+                ende__gt=termin.beginn,
+            ).exists()
+            or Termin.objects.filter(
+                fahrlehrer=fl,
+                beginn__lt=termin.ende,
+                ende__gt=termin.beginn,
+            ).exists()
+        )
+        fsm = "aus"
+        konflikte = []
+        meldung = None
+        if is_fsm_aktiv_fuer_fahrlehrer(fl):
+            fsm = "live"
+            try:
+                events = client.get_termine(fl.fsm_id, termin.beginn, termin.ende, refresh=True)
+                konflikte = [ev.titel for ev in events if ev.von < termin.ende and ev.bis > termin.beginn]
+            except FsmError as exc:
+                fsm = "fehler"
+                meldung = str(exc)
+        if not lokal_frei or konflikte:
+            verfuegbar = False
+        elif fsm == "fehler":
+            verfuegbar = None
+        else:
+            verfuegbar = True
+        ergebnisse.append(
+            {
+                "pk": fl.pk,
+                "name": fl.name,
+                "verfuegbar": verfuegbar,
+                "fsm": fsm,
+                "konflikte": konflikte,
+                "meldung": meldung,
+            }
+        )
+    return JsonResponse({"ok": True, "ergebnisse": ergebnisse})
 
 @mitarbeiter
 @require_POST

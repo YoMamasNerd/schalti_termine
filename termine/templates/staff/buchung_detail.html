@@ -1,5 +1,6 @@
 {% extends "staff/base_staff.html" %}
 {% load i18n %}
+{% load static %}
 
 {% block titel %}Buchung {{ buchung.referenz }} – {{ SITE_NAME }}{% endblock %}
 
@@ -237,7 +238,7 @@
         </div>
 
         <!-- Fahrlehrer wechseln -->
-        <div class="karte" style="margin-bottom:1.5rem; border-top:4px solid var(--marke-dunkel)">
+        <div class="karte" id="karte-wechsel" style="margin-bottom:1.5rem; border-top:4px solid var(--marke-dunkel)">
           <h2 style="margin-top:0; font-size:1.15rem; margin-bottom:0.5rem">
             👤 Fahrlehrer wechseln
           </h2>
@@ -246,6 +247,14 @@
           </p>
 
           {% if wechsel_kandidaten %}
+            <form method="post" action="{% url 'termine:wechsel_live_check' buchung.pk %}" style="margin-bottom:1rem">
+              {% csrf_token %}
+              <button type="button" class="knopf knopf--leise knopf--klein" id="btn-live-check">📡 Verfügbarkeit live prüfen</button>
+              <span id="live-check-hinweis" style="display:none; color:var(--rot); font-size:0.85rem"></span>
+              <p class="leer" style="font-size:0.8rem; margin:0.4rem 0 0">
+                Prüft alle Kandidaten frisch im FSM-Kalender – der 60-Sekunden-Cache des Gateways wird dabei umgangen.
+              </p>
+            </form>
             {% for k in wechsel_kandidaten %}
               <form method="post" action="{% url 'termine:buchung_fahrlehrer_wechseln' buchung.pk %}"
                     style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.5rem 0; border-bottom:1px solid var(--linie)">
@@ -254,13 +263,13 @@
                 <span style="font-weight:600">{{ k.fahrlehrer.name }}</span>
                 <span style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap">
                   {% if k.verfuegbar %}
-                    <span class="marke-status status-frei" style="font-size:0.78rem; padding:2px 8px">frei</span>
+                    <span class="marke-status status-frei" data-fl-pk="{{ k.fahrlehrer.pk }}" style="font-size:0.78rem; padding:2px 8px">frei</span>
                     <button class="knopf knopf--primaer knopf--klein" type="submit"
                             onclick="return confirm('Termin wirklich zu {{ k.fahrlehrer.name }} umhängen? Datum und Uhrzeit bleiben, der Kunde wird nicht benachrichtigt.');">
                       Termin umhängen
                     </button>
                   {% else %}
-                    <span class="marke-status status-gebucht" style="font-size:0.78rem; padding:2px 8px">belegt</span>
+                    <span class="marke-status status-gebucht" data-fl-pk="{{ k.fahrlehrer.pk }}" style="font-size:0.78rem; padding:2px 8px">belegt</span>
                     <button class="knopf knopf--leise knopf--klein" type="submit" disabled
                             title="Belegt oder gesperrt im Zeitfenster dieses Termins.">
                       Termin umhängen
@@ -371,4 +380,6 @@
       </div>
     </div>
   </div>
+
+  <script src="{% static 'js/buchung_detail.js' %}" data-live-check-url="{% url 'termine:wechsel_live_check' buchung.pk %}"></script>
 {% endblock %}
