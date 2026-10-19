@@ -11,7 +11,7 @@ from __future__ import annotations
 import datetime as dt
 
 from django.contrib.auth import get_user_model
-from django.test import SimpleTestCase, TestCase
+from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
@@ -56,7 +56,6 @@ class AktiverPunkt(TestCase):
         self.assertContains(antwort, reverse("termine:einstellungen"))
         self.assertContains(antwort, "Einstellungen")
 
-
     def test_unterseite_markiert_ihren_bereich(self):
         # Das Regelformular ist eine eigene Adresse, gehört aber zu den Regeln.
         regel = RhythmusRegel.objects.create(
@@ -89,9 +88,7 @@ class AktiverPunkt(TestCase):
         self.assertContains(antwort, "Tagesplanung")
         self.assertContains(antwort, "Rhythmus-Regeln")
 
-
-class OhneRequest(SimpleTestCase):
-    def test_kein_request_im_kontext_markiert_nichts(self):
+    def test_ohne_request_markiert_der_tag_nichts(self):
         # Fehlerseiten werden ohne den üblichen Kontext gerendert. Der Tag darf
         # dort nichts markieren, aber erst recht nicht scheitern.
         self.assertEqual(aktiv({}, "dashboard"), "")

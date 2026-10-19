@@ -125,7 +125,7 @@ class TerminartenPflegen(Basis):
         self.assertRedirects(antwort, reverse("termine:terminarten"))
         self.assertFalse(Terminart.objects.filter(pk=frei.pk).exists())
 
-    def test_benutzte_terminart_bleibt_stehen(self):
+    def test_benutzte_terminart_bleibt_stehen_und_wird_erklaert(self):
         # PROTECT auf Termin.terminart: Ein Löschversuch endete sonst im
         # ProtectedError – und eine gebuchte Beratung verlöre ihre Bezeichnung.
         self.termin_in(3)
@@ -136,14 +136,13 @@ class TerminartenPflegen(Basis):
         self.assertTrue(Terminart.objects.filter(pk=self.art.pk).exists())
         self.assertIn("wird noch verwendet", " ".join(self.meldungen(antwort)))
 
-    def test_das_formular_erklaert_die_verwendung_statt_zu_loeschen(self):
-        self.termin_in(3)
-        antwort = self.client.get(
+        # Das Formular erklärt die Verwendung, statt den Löschknopf anzubieten.
+        formular = self.client.get(
             reverse("termine:terminart_bearbeiten", args=[self.art.pk])
         )
-        self.assertEqual(antwort.context["verwendung"], {"termine": 1, "regeln": 0})
+        self.assertEqual(formular.context["verwendung"], {"termine": 1, "regeln": 0})
         self.assertNotContains(
-            antwort, reverse("termine:terminart_loeschen", args=[self.art.pk])
+            formular, reverse("termine:terminart_loeschen", args=[self.art.pk])
         )
 
     def test_auch_eine_regel_haelt_die_terminart_fest(self):
@@ -227,14 +226,15 @@ class BuchungshorizontEinstellen(Basis):
         self.assertEqual(Termin.objects.count(), 1)
         self.assertEqual(Termin.objects.buchbar().count(), 0)
 
-    def test_das_buchungsformular_lehnt_einen_termin_dahinter_ab(self):
+    def test_termin_dahinter_wird_auch_vom_formular_und_vom_dienst_abgelehnt(self):
         draussen = self.termin_in(40)
+
+        # Das öffentliche Buchungsformular weist den Termin ab.
         self.client.logout()
         antwort = self.client.get(reverse("termine:buchen", args=[draussen.pk]))
         self.assertEqual(antwort.status_code, 409)
 
-    def test_auch_der_dienst_laesst_sich_nicht_ueberreden(self):
-        draussen = self.termin_in(40)
+        # Und der Dienst lässt sich nicht überreden.
         with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
             buchungs_service.reservieren(
                 draussen.pk, name="Lena", email="lena@example.org"
@@ -303,7 +303,7 @@ class EigeneEinstellungen(Basis):
         felder = self.client.get(reverse("termine:einstellungen")).context["form"].fields
         self.assertIn("aktiv", felder)
 
-    def test_ein_deaktivierter_fahrlehrer_bleibt_erreichbar(self):
+    def test_ein_deaktivierter_fahrlehrer_bleibt_erreichbar_und_ohne_fahrlehrer_wird_angelegt(self):
         # Sonst wäre der Haken bei „Aktiv" eine Einbahnstraße: Der tägliche
         # Betrieb blendet Inaktive aus, und niemand käme je wieder heran.
         self.anna.aktiv = False
@@ -315,7 +315,7 @@ class EigeneEinstellungen(Basis):
         self.assertEqual(antwort.status_code, 200)
         self.assertEqual(antwort.context["fahrlehrer"], self.anna)
 
-    def test_ohne_fahrlehrer_bietet_die_seite_das_anlegen_an(self):
+        # Ohne Fahrlehrer bietet die Seite das Anlegen an.
         self.anna.delete()
         antwort = self.client.get(reverse("termine:einstellungen"))
         self.assertEqual(antwort.status_code, 200)
@@ -340,6 +340,12 @@ class KalenderAboUndSperrzeiten(Basis):
             self.client.get(f"/kalender/{self.anna.feed_token}.ics").status_code, 200
         )
 
+    def test_abo_zuruecksetzen_ohne_fahrlehrer_meldet_das(self):
+        self.anna.delete()
+        antwort = self.client.post(reverse("termine:feed_token_neu"))
+        self.assertRedirects(antwort, reverse("termine:einstellungen"))
+        self.assertIn("Kein Fahrlehrer ausgewählt.", self.meldungen(antwort))
+
     def test_sperrzeit_laesst_sich_wieder_aufheben(self):
         jetzt = timezone.now()
         sperre = Sperrzeit.objects.create(
@@ -351,12 +357,6 @@ class KalenderAboUndSperrzeiten(Basis):
         antwort = self.client.post(reverse("termine:sperrzeit_loeschen", args=[sperre.pk]))
         self.assertEqual(antwort.status_code, 302)
         self.assertFalse(Sperrzeit.objects.filter(pk=sperre.pk).exists())
-
-    def test_abo_zuruecksetzen_ohne_fahrlehrer_meldet_das(self):
-        self.anna.delete()
-        antwort = self.client.post(reverse("termine:feed_token_neu"))
-        self.assertRedirects(antwort, reverse("termine:einstellungen"))
-        self.assertIn("Kein Fahrlehrer ausgewählt.", self.meldungen(antwort))
 
     def test_die_tagesplanung_bietet_das_aufheben_gleich_mit_an(self):
         # Eingetragen wird die Sperrzeit dort; wer sie zu früh beendet, soll
@@ -389,12 +389,11 @@ class KalenderAboUndSperrzeiten(Basis):
 
 
 class FahrlehrerAnlegen(Basis):
-    def test_das_formular_steht_dem_inhaber_offen(self):
-        antwort = self.client.get(reverse("termine:fahrlehrer_neu"))
-        self.assertEqual(antwort.status_code, 200)
-        self.assertIn("name", antwort.context["form"].fields)
-
     def test_der_inhaber_legt_ohne_admin_einen_zweiten_an(self):
+        formular = self.client.get(reverse("termine:fahrlehrer_neu"))
+        self.assertEqual(formular.status_code, 200)
+        self.assertIn("name", formular.context["form"].fields)
+
         antwort = self.client.post(
             reverse("termine:fahrlehrer_neu"),
             {

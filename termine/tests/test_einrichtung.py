@@ -70,32 +70,24 @@ class HinweisAufDenSeiten(TestCase):
         antwort = self.client.get(reverse("termine:login"))
         self.assertContains(antwort, BEFEHL)
 
-    def test_anmeldeseite_schweigt_mit_superuser(self):
-        self.superuser_anlegen()
-        antwort = self.client.get(reverse("termine:login"))
-        self.assertNotContains(antwort, BEFEHL)
-
     def test_admin_anmeldung_weist_ebenfalls_hin(self):
         antwort = self.client.get(reverse("admin:login"))
         self.assertContains(antwort, BEFEHL)
         # Wer schon im Admin steht, braucht keinen Link dorthin.
         self.assertContains(antwort, "Danach melden Sie sich hier an")
 
-    def test_admin_anmeldung_schweigt_mit_superuser(self):
-        self.superuser_anlegen()
-        antwort = self.client.get(reverse("admin:login"))
-        self.assertNotContains(antwort, BEFEHL)
-
     def test_oeffentliche_seite_erklaert_die_leere_installation(self):
         antwort = self.client.get(reverse("termine:start"))
         self.assertContains(antwort, BEFEHL)
 
-    def test_oeffentliche_seite_zeigt_besuchern_keine_befehle(self):
+    def test_mit_superuser_schweigen_alle_drei_seiten(self):
         # Sobald jemand die Installation betreut, ist der leere Kalender eine
         # Sache der Fahrschule und keine Nachricht an die Kundschaft.
         self.superuser_anlegen()
-        antwort = self.client.get(reverse("termine:start"))
-        self.assertNotContains(antwort, BEFEHL)
+        for name in ("termine:login", "admin:login", "termine:start"):
+            with self.subTest(seite=name):
+                antwort = self.client.get(reverse(name))
+                self.assertNotContains(antwort, BEFEHL)
 
     def test_bei_gepflegten_stammdaten_kein_hinweis(self):
         art = Terminart.objects.create(name="Erstberatung", dauer_minuten=30)

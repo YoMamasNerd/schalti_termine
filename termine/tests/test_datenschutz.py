@@ -129,7 +129,7 @@ class LoeschenAufWunsch(Basis):
 
 class NurMitDemEigenenToken(Basis):
     def test_ein_fremder_token_findet_nichts(self):
-        self.buchung_anlegen()
+        self.buchung_anlegen(tage_voraus=8)
         antwort = self.client.post(reverse("termine:buchung_loeschen", args=["a" * 43]))
         self.assertEqual(antwort.status_code, 404)
 
@@ -146,7 +146,7 @@ class NurMitDemEigenenToken(Basis):
         self.assertEqual(andere.name, "Gelöscht")
 
     def test_ein_aufruf_ohne_absenden_loescht_nichts(self):
-        buchung = self.buchung_anlegen()
+        buchung = self.buchung_anlegen(tage_voraus=7)
         antwort = self.client.get(reverse("termine:buchung_loeschen", args=[buchung.token]))
         self.assertEqual(antwort.status_code, 405)
         buchung.refresh_from_db()

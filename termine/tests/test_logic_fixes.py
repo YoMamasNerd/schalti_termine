@@ -17,7 +17,8 @@ class VerschiebenValidierung(BuchungsBasis):
     gelten nicht – nur FREI-Status und Sperrzeiten schützen den Ziel-Slot."""
 
     def test_verschieben_ignoriert_vorlauf(self):
-        buchung = self.bestaetigen(self.reservieren())
+        start = self.neuer_termin(tage_voraus=5, stunde=11)
+        buchung = self.bestaetigen(self.reservieren(termin=start))
         zu_kurz = Termin.objects.create(
             fahrlehrer=self.fahrlehrer,
             terminart=self.art,
@@ -32,28 +33,14 @@ class VerschiebenValidierung(BuchungsBasis):
         self.assertEqual(buchung.termin_id, zu_kurz.pk)
 
     def test_verschieben_ignoriert_horizont(self):
-        buchung = self.bestaetigen(self.reservieren())
+        start = self.neuer_termin(tage_voraus=5, stunde=12)
+        buchung = self.bestaetigen(self.reservieren(termin=start))
         spaeter = self.neuer_termin(tage_voraus=400)
 
         self.mit_commit(buchungs_service.verschieben, buchung, spaeter.pk)
 
         buchung.refresh_from_db()
         self.assertEqual(buchung.termin_id, spaeter.pk)
-
-    def test_verschieben_ablehnung_gesperrt(self):
-        buchung = self.bestaetigen(self.reservieren())
-        ziel = self.neuer_termin(tage_voraus=6)
-        Sperrzeit.objects.create(
-            fahrlehrer=self.fahrlehrer,
-            beginn=ziel.beginn - dt.timedelta(hours=1),
-            ende=ziel.ende + dt.timedelta(hours=1),
-        )
-
-        with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
-            buchungs_service.verschieben(buchung, ziel.pk)
-
-        buchung.refresh_from_db()
-        self.assertEqual(buchung.termin_id, self.termin.pk)
 
     def test_verschieben_auf_fremden_fahrlehrer_als_vertretung(self):
         buchung = self.bestaetigen(self.reservieren())
@@ -88,6 +75,21 @@ class VerschiebenValidierung(BuchungsBasis):
         ziel.refresh_from_db()
         self.assertEqual(buchung.termin_id, ziel.pk)
         self.assertEqual(ziel.status, Termin.Status.GEBUCHT)
+
+    def test_verschieben_ablehnung_gesperrt(self):
+        buchung = self.bestaetigen(self.reservieren())
+        ziel = self.neuer_termin(tage_voraus=6)
+        Sperrzeit.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            beginn=ziel.beginn - dt.timedelta(hours=1),
+            ende=ziel.ende + dt.timedelta(hours=1),
+        )
+
+        with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
+            buchungs_service.verschieben(buchung, ziel.pk)
+
+        buchung.refresh_from_db()
+        self.assertEqual(buchung.termin_id, self.termin.pk)
 
 
 class AblaufVergangenerTermine(BuchungsBasis):

@@ -82,7 +82,7 @@ class Zugriffsschutz(BackendBasis):
         self.assertContains(antwort, "Kunde Anna")
         self.assertNotContains(antwort, "Kunde Tom")
 
-    def test_staff_sieht_alle_buchungen(self):
+    def test_staff_sieht_alle_buchungen_und_kennt_alle_filter(self):
         Buchung.objects.create(
             termin=self.termin_fuer(self.tom), name="Kunde Tom", email="t@example.org",
             status=Buchung.Status.BESTAETIGT,
@@ -92,6 +92,13 @@ class Zugriffsschutz(BackendBasis):
         antwort = self.client.get(reverse("termine:buchungen"))
 
         self.assertContains(antwort, "Kunde Tom")
+
+        # Die Statusfilter der Liste – ein unbekannter Wert fällt auf „alle“
+        # zurück, statt die Seite zu zerlegen.
+        for status in ("aktiv", "vergangen", "offen", "bestaetigt", "storniert", "quatsch"):
+            with self.subTest(status=status):
+                antwort = self.client.get(reverse("termine:buchungen"), {"status": status})
+                self.assertEqual(antwort.status_code, 200)
 
     def test_fahrlehrer_kann_fremde_termine_nicht_loeschen(self):
         fremder = self.termin_fuer(self.tom)
@@ -108,7 +115,7 @@ class Tagesplanung(BackendBasis):
         super().setUp()
         self.client.login(username="chef", password="geheim123")
 
-    def test_wochenansicht_zeigt_die_termine(self):
+    def test_wochenansicht_zeigt_die_termine_und_den_angemeldeten_fahrlehrer(self):
         self.termin_fuer(self.anna, stunde=14)
 
         antwort = self.client.get(
@@ -118,7 +125,6 @@ class Tagesplanung(BackendBasis):
         self.assertEqual(antwort.status_code, 200)
         self.assertContains(antwort, "Anna Berger")
 
-    def test_tagesplanung_vorauswahl_angemeldeter_fahrlehrer(self):
         # Tom mit dem angemeldeten Chef-User verknüpfen (ohne ?fahrlehrer= muss Tom vorausgewählt werden)
         self.tom.benutzer = self.chef
         self.tom.save()
@@ -192,23 +198,22 @@ class Tagesplanung(BackendBasis):
         self.assertEqual(Termin.objects.count(), 0)
         self.assertContains(antwort, "Vergangenheit")
 
-    def test_freien_termin_loeschen(self):
+    def test_freien_termin_loeschen_und_der_gebuchte_bleibt(self):
         termin = self.termin_fuer(self.anna)
 
         self.client.post(reverse("termine:termin_loeschen", args=[termin.pk]))
 
         self.assertFalse(Termin.objects.filter(pk=termin.pk).exists())
 
-    def test_gebuchter_termin_wird_nicht_geloescht(self):
-        termin = self.termin_fuer(self.anna)
-        termin.status = Termin.Status.GEBUCHT
-        termin.save()
+        gebucht = self.termin_fuer(self.anna, stunde=11)
+        gebucht.status = Termin.Status.GEBUCHT
+        gebucht.save()
 
         antwort = self.client.post(
-            reverse("termine:termin_loeschen", args=[termin.pk]), follow=True
+            reverse("termine:termin_loeschen", args=[gebucht.pk]), follow=True
         )
 
-        self.assertTrue(Termin.objects.filter(pk=termin.pk).exists())
+        self.assertTrue(Termin.objects.filter(pk=gebucht.pk).exists())
         self.assertContains(antwort, "belegt")
 
     def test_sperrzeit_raeumt_freie_termine_ab(self):
@@ -309,6 +314,11 @@ class RegelVerwaltung(BackendBasis):
         regel = RhythmusRegel.objects.get()
         self.assertEqual(regel.wochentage, [1, 3])
         self.assertGreater(Termin.objects.count(), 0)
+
+        # Die Vorschau des Formulars zeigt, was die Regel erzeugen würde.
+        vorschau = self.client.get(reverse("termine:regel_bearbeiten", args=[regel.pk]))
+        self.assertEqual(vorschau.status_code, 200)
+        self.assertGreater(len(vorschau.context["vorschau_tage"]), 0)
 
     def test_regel_ohne_wochentag_wird_abgelehnt(self):
         antwort = self.client.post(
@@ -434,7 +444,7 @@ class Randfaelle(BackendBasis):
         meldungen = [str(m) for m in get_messages(antwort.wsgi_request)]
         self.assertIn("Kein Fahrlehrer ausgewählt.", meldungen)
 
-    def test_belegtes_zeitfenster_wird_gemeldet(self):
+    def test_belegtes_und_zu_kurzes_zeitfenster_werden_gemeldet(self):
         tag = self.montag + dt.timedelta(days=2)
         daten = {
             "fahrlehrer": self.anna.pk, "terminart": self.art.pk,
@@ -446,7 +456,7 @@ class Randfaelle(BackendBasis):
 
         self.assertContains(antwort, "bereits belegt")
 
-    def test_zu_kurzes_zeitfenster_wird_gemeldet(self):
+        # Ein Fenster, das kürzer ist als ein Termin, ergibt gar keinen.
         antwort = self.client.post(
             reverse("termine:termine_anlegen"),
             {
@@ -459,7 +469,7 @@ class Randfaelle(BackendBasis):
 
         self.assertContains(antwort, "kein einziger Termin")
 
-    def test_sperrzeit_warnt_vor_bereits_gebuchten_terminen(self):
+    def test_sperrzeit_warnt_vor_gebuchten_terminen_und_meldet_fehlerhafte_zeitraeume(self):
         tag = self.montag + dt.timedelta(days=2)
         beginn = timezone.make_aware(dt.datetime.combine(tag, dt.time(14, 0)))
         termin = Termin.objects.create(
@@ -481,7 +491,8 @@ class Randfaelle(BackendBasis):
 
         self.assertContains(antwort, "bereits gebuchte Termine")
 
-    def test_fehlerhafte_sperrzeit_wird_gemeldet(self):
+        # Ein Zeitraum, der vor seinem eigenen Beginn endet, wird abgelehnt –
+        # die erste Sperrzeit bleibt davon unberührt.
         antwort = self.client.post(
             reverse("termine:sperrzeit_anlegen"),
             {"fahrlehrer": self.anna.pk,
@@ -490,14 +501,8 @@ class Randfaelle(BackendBasis):
             follow=True,
         )
 
-        self.assertEqual(Sperrzeit.objects.count(), 0)
+        self.assertEqual(Sperrzeit.objects.count(), 1)
         self.assertContains(antwort, "nach dem Beginn")
-
-    def test_buchungsliste_kennt_alle_filter(self):
-        for status in ("aktiv", "vergangen", "offen", "bestaetigt", "storniert", "quatsch"):
-            with self.subTest(status=status):
-                antwort = self.client.get(reverse("termine:buchungen"), {"status": status})
-                self.assertEqual(antwort.status_code, 200)
 
     def test_absage_einer_beendeten_buchung_ist_folgenlos(self):
         buchung = Buchung.objects.create(
@@ -511,19 +516,7 @@ class Randfaelle(BackendBasis):
 
         self.assertContains(antwort, "bereits beendet")
 
-    def test_regelformular_zeigt_eine_vorschau(self):
-        regel = RhythmusRegel.objects.create(
-            fahrlehrer=self.anna, terminart=self.art,
-            wochentage=[0, 1, 2, 3, 4], beginn=dt.time(9, 0), ende=dt.time(11, 0),
-            gueltig_ab=timezone.localdate(),
-        )
-
-        antwort = self.client.get(reverse("termine:regel_bearbeiten", args=[regel.pk]))
-
-        self.assertEqual(antwort.status_code, 200)
-        self.assertGreater(len(antwort.context["vorschau_tage"]), 0)
-
-    def test_loeschen_kehrt_zur_herkunftsseite_zurueck(self):
+    def test_loeschen_kehrt_zur_herkunftsseite_zurueck_und_ignoriert_fremde(self):
         termin = self.termin_fuer(self.anna)
         herkunft = f"/intern/planung/?woche={self.montag:%Y-%m-%d}"
 
@@ -534,11 +527,10 @@ class Randfaelle(BackendBasis):
 
         self.assertEqual(antwort["Location"], f"http://testserver{herkunft}")
 
-    def test_fremde_herkunftsseite_wird_ignoriert(self):
-        termin = self.termin_fuer(self.anna)
-
+        # Eine Herkunftsseite außerhalb dieser Installation wird ignoriert.
+        fremder = self.termin_fuer(self.anna, stunde=11)
         antwort = self.client.post(
-            reverse("termine:termin_loeschen", args=[termin.pk]),
+            reverse("termine:termin_loeschen", args=[fremder.pk]),
             HTTP_REFERER="https://boese.example/weiterleitung",
         )
 
@@ -610,35 +602,27 @@ class Randfaelle(BackendBasis):
         self.assertTrue(b.ist_aktiv)
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_fahrlehrer_wechseln_blockiert_belegtes_zeitfenster(self):
-        termin = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
-        b = Buchung.objects.create(
-            termin=termin, name="Sarah Schulz", email="sarah@example.com",
-            status=Buchung.Status.BESTAETIGT,
-        )
-        self.termin_fuer(self.tom, tage_voraus=1, stunde=10)
+    def test_fahrlehrer_wechseln_blockiert_belegtes_und_gesperrtes_zeitfenster(self):
+        for fall, stunde in (("belegt", 10), ("gesperrt", 11)):
+            with self.subTest(fall=fall):
+                termin = self.termin_fuer(self.anna, tage_voraus=1, stunde=stunde)
+                b = Buchung.objects.create(
+                    termin=termin, name="Sarah Schulz", email="sarah@example.com",
+                    status=Buchung.Status.BESTAETIGT,
+                )
+                if fall == "belegt":
+                    self.termin_fuer(self.tom, tage_voraus=1, stunde=stunde)
+                else:
+                    Sperrzeit.objects.create(
+                        fahrlehrer=self.tom, beginn=termin.beginn, ende=termin.ende,
+                        grund="Urlaub",
+                    )
 
-        with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
-            buchungs_service.fahrlehrer_wechseln(b, self.tom)
+                with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
+                    buchungs_service.fahrlehrer_wechseln(b, self.tom)
 
-        termin.refresh_from_db()
-        self.assertEqual(termin.fahrlehrer, self.anna)
-
-    def test_fahrlehrer_wechseln_blockiert_gesperrtes_zeitfenster(self):
-        termin = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
-        b = Buchung.objects.create(
-            termin=termin, name="Sarah Schulz", email="sarah@example.com",
-            status=Buchung.Status.BESTAETIGT,
-        )
-        Sperrzeit.objects.create(
-            fahrlehrer=self.tom, beginn=termin.beginn, ende=termin.ende, grund="Urlaub",
-        )
-
-        with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
-            buchungs_service.fahrlehrer_wechseln(b, self.tom)
-
-        termin.refresh_from_db()
-        self.assertEqual(termin.fahrlehrer, self.anna)
+                termin.refresh_from_db()
+                self.assertEqual(termin.fahrlehrer, self.anna)
 
     def test_buchung_fahrlehrer_wechseln_view_haengt_um(self):
         termin = self.termin_fuer(self.anna, tage_voraus=1, stunde=10)
@@ -646,11 +630,9 @@ class Randfaelle(BackendBasis):
             termin=termin, name="Sarah Schulz", email="sarah@example.com",
             status=Buchung.Status.BESTAETIGT,
         )
+        url = reverse("termine:buchung_fahrlehrer_wechseln", args=[b.pk])
 
-        antwort = self.client.post(
-            reverse("termine:buchung_fahrlehrer_wechseln", args=[b.pk]),
-            {"fahrlehrer_id": self.tom.pk},
-        )
+        antwort = self.client.post(url, {"fahrlehrer_id": self.tom.pk})
 
         self.assertEqual(antwort.status_code, 302)
         self.assertEqual(antwort["Location"], reverse("termine:buchung_detail", args=[b.pk]))
@@ -828,7 +810,7 @@ class HistorieTests(BackendBasis):
         self.t1 = self.termin_fuer(self.anna, stunde=10)
         self.t2 = self.termin_fuer(self.tom, stunde=14)
 
-    def test_historie_ansicht_laedt(self):
+    def test_historie_ansicht_zeigt_buchungen_und_stornos(self):
         Buchung.objects.create(            termin=self.t1,
             name="Max Mustermann",
             email="max@example.org",
@@ -854,7 +836,7 @@ class HistorieTests(BackendBasis):
         self.assertContains(antwort, "Terminabsage wegen Krankheit")
         self.assertEqual(len(antwort.context["ereignisse"]), 2)
 
-    def test_historie_filter_aktion(self):
+    def test_historie_filter_aktion_und_suchbegriff(self):
         Buchung.objects.create(
             termin=self.t1,
             name="Max Mustermann",
@@ -882,24 +864,11 @@ class HistorieTests(BackendBasis):
         self.assertEqual(len(resp_buchung.context["ereignisse"]), 1)
         self.assertEqual(resp_buchung.context["ereignisse"][0]["kunde_name"], "Max Mustermann")
 
-    def test_historie_filter_suchbegriff(self):
-        Buchung.objects.create(
-            termin=self.t1,
-            name="Erika Musterfrau",
-            email="erika@example.org",
-            status=Buchung.Status.BESTAETIGT,
-        )
-        Buchung.objects.create(
-            termin=self.t2,
-            name="Hans Meier",
-            email="hans@example.org",
-            status=Buchung.Status.BESTAETIGT,
-        )
-
-        resp = self.client.get(reverse("termine:historie"), {"q": "Erika"})
+        # Der Suchbegriff greift auf den Namen.
+        resp = self.client.get(reverse("termine:historie"), {"q": "Lisa"})
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.context["ereignisse"]), 1)
-        self.assertEqual(resp.context["ereignisse"][0]["kunde_name"], "Erika Musterfrau")
+        self.assertEqual(resp.context["ereignisse"][0]["kunde_name"], "Lisa Schmidt")
 
     def test_historie_paginierung(self):
         # 25 Buchungen erstellen
@@ -1063,7 +1032,8 @@ class WechselLiveCheck(BackendBasis):
         self.assertEqual(ergebnisse[self.tom.pk]["konflikte"], ["Termin: Müller"])
 
     @override_settings(FSM_SYNC_ENABLED=True)
-    def test_sync_fehler_liefert_unbekannt(self):
+    def test_sync_fehler_liefert_unbekannt_und_ohne_fsm_sync_wird_lokal_geprueft(self):
+        # Ein Gateway-Fehler lässt die Verfügbarkeit offen.
         with patch(
             "termine.staff_views.buchungen.sync_blocker_fuer_fahrlehrer",
             side_effect=FsmError("Gateway nicht erreichbar"),
@@ -1077,8 +1047,7 @@ class WechselLiveCheck(BackendBasis):
         self.assertEqual(ergebnisse[self.lee.pk]["fsm"], "fehler")
         self.assertEqual(ergebnisse[self.lee.pk]["meldung"], "Gateway nicht erreichbar")
 
-    @override_settings(FSM_SYNC_ENABLED=True)
-    def test_kandidat_ohne_fsm_sync_wird_rein_lokal_geprueft(self):
+        # Ein Kandidat ohne FSM-Sync wird rein lokal geprüft.
         self.tom.fsm_sync_aktiv = False
         self.tom.save()
 

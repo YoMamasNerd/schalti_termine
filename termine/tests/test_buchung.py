@@ -73,7 +73,7 @@ class BuchungsBasis(TestCase):
 
 
 class DoppelOptIn(BuchungsBasis):
-    def test_reservierung_blockiert_den_termin_und_schickt_eine_mail(self):
+    def test_reservierung_sperrt_den_termin_und_schickt_eine_mail(self):
         buchung = self.reservieren()
         self.termin.refresh_from_db()
 
@@ -83,7 +83,7 @@ class DoppelOptIn(BuchungsBasis):
         self.assertEqual(len(django_mail.outbox), 1)
         self.assertIn(buchung.token, django_mail.outbox[0].body)
 
-    def test_bestaetigung_macht_die_buchung_verbindlich(self):
+    def test_bestaetigung_macht_die_buchung_verbindlich_und_schickt_den_kalendereintrag(self):
         buchung = self.reservieren()
         django_mail.outbox.clear()
 
@@ -98,14 +98,8 @@ class DoppelOptIn(BuchungsBasis):
         empfaenger = {adresse for nachricht in django_mail.outbox for adresse in nachricht.to}
         self.assertEqual(empfaenger, {"max@example.org", "anna@example.org"})
 
-    def test_bestaetigungsmail_enthaelt_kalendereintrag(self):
-        buchung = self.reservieren()
-        django_mail.outbox.clear()  # die Anfrage-Mail selbst hat noch keinen Anhang
-
-        self.bestaetigen(buchung)
-
+        # Die Mail an den Kunden trägt den Kalendereintrag als Anhang.
         kunden_mail = next(n for n in django_mail.outbox if "max@example.org" in n.to)
-
         anhaenge = {name: inhalt for name, inhalt, _ in kunden_mail.attachments}
         self.assertIn("termin.ics", anhaenge)
         # Django gibt Text-Anhänge bereits dekodiert zurück.
@@ -124,18 +118,16 @@ class DoppelOptIn(BuchungsBasis):
         self.assertEqual(nochmal.status, Buchung.Status.BESTAETIGT)
         self.assertEqual(len(django_mail.outbox), anzahl_mails)  # keine zweite Mail
 
-    def test_abgelaufene_reservierung_kann_nicht_bestaetigt_werden(self):
+    def test_abgelaufene_reservierung_wird_verfallen_und_benachrichtigt_den_kunden(self):
         buchung = self.reservieren()
         buchung.reserviert_bis = timezone.now() - dt.timedelta(minutes=1)
         buchung.save()
 
+        # Eine abgelaufene Reservierung lässt sich nicht mehr bestätigen.
         with self.assertRaises(buchungs_service.BuchungsFehler):
             buchungs_service.bestaetigen(buchung)
 
-    def test_abgelaufene_reservierung_gibt_den_termin_frei(self):
-        buchung = self.reservieren()
-        buchung.reserviert_bis = timezone.now() - dt.timedelta(minutes=1)
-        buchung.save()
+        django_mail.outbox.clear()  # Bestätigungsanforderung zählt nicht mit
 
         anzahl = buchungs_service.abgelaufene_reservierungen_freigeben()
 
@@ -146,14 +138,6 @@ class DoppelOptIn(BuchungsBasis):
         self.assertIsNotNone(buchung.verfallen_am)
         self.assertIsNone(buchung.reserviert_bis)
         self.assertEqual(self.termin.status, Termin.Status.FREI)
-
-    def test_abgelaufene_reservierung_benachrichtigt_den_kunden(self):
-        buchung = self.reservieren()
-        buchung.reserviert_bis = timezone.now() - dt.timedelta(minutes=1)
-        buchung.save()
-        django_mail.outbox.clear()  # Bestätigungsanforderung zählt nicht mit
-
-        self.assertEqual(buchungs_service.abgelaufene_reservierungen_freigeben(), 1)
 
         self.assertEqual(len(django_mail.outbox), 1)
         mail = django_mail.outbox[0]
@@ -262,7 +246,7 @@ class Storno(BuchungsBasis):
 
 
 class Erinnerungen(BuchungsBasis):
-    def test_erinnerung_geht_genau_einmal_raus(self):
+    def test_erinnerung_geht_genau_einmal_raus_und_ferne_termine_werden_vergessen(self):
         morgen = self.neuer_termin(tage_voraus=0)
         morgen.beginn = timezone.now() + dt.timedelta(hours=5)
         morgen.ende = morgen.beginn + dt.timedelta(minutes=30)
@@ -275,8 +259,8 @@ class Erinnerungen(BuchungsBasis):
         # Ein zweiter Lauf darf nicht noch einmal erinnern.
         self.assertEqual(buchungs_service.erinnerungen_versenden(stunden_vorher=24), 0)
 
-    def test_weit_entfernte_termine_werden_nicht_erinnert(self):
-        self.bestaetigen(self.reservieren())  # in 5 Tagen
+        # Ein Termin in fünf Tagen wird nicht erinnert.
+        self.bestaetigen(self.reservieren())
         django_mail.outbox.clear()
 
         self.assertEqual(buchungs_service.erinnerungen_versenden(stunden_vorher=24), 0)
@@ -284,31 +268,27 @@ class Erinnerungen(BuchungsBasis):
 
 
 class Datenschutz(BuchungsBasis):
-    def test_alte_buchungen_werden_anonymisiert(self):
-        buchung = self.bestaetigen(self.reservieren())
+    def test_anonymisierung_trifft_nur_buchungen_ausserhalb_der_frist(self):
+        alt = self.bestaetigen(self.reservieren())
         # Termin künstlich weit in die Vergangenheit schieben.
         Termin.objects.filter(pk=self.termin.pk).update(
             beginn=timezone.now() - dt.timedelta(days=400),
             ende=timezone.now() - dt.timedelta(days=400) + dt.timedelta(minutes=30),
         )
 
+        aktuell = self.bestaetigen(self.reservieren(self.neuer_termin(tage_voraus=6)))
+
         anzahl = buchungs_service.alte_buchungen_anonymisieren(tage=180)
 
-        buchung.refresh_from_db()
+        alt.refresh_from_db()
+        aktuell.refresh_from_db()
         self.assertEqual(anzahl, 1)
-        self.assertEqual(buchung.email, "")
-        self.assertEqual(buchung.telefon, "")
-        self.assertEqual(buchung.nachricht, "")
-        self.assertNotEqual(buchung.name, "Max Muster")
-        self.assertIsNotNone(buchung.anonymisiert_am)
-
-    def test_aktuelle_buchungen_bleiben_unangetastet(self):
-        buchung = self.bestaetigen(self.reservieren())
-
-        self.assertEqual(buchungs_service.alte_buchungen_anonymisieren(tage=180), 0)
-
-        buchung.refresh_from_db()
-        self.assertEqual(buchung.email, "max@example.org")
+        self.assertEqual(alt.email, "")
+        self.assertEqual(alt.telefon, "")
+        self.assertEqual(alt.nachricht, "")
+        self.assertNotEqual(alt.name, "Max Muster")
+        self.assertIsNotNone(alt.anonymisiert_am)
+        self.assertEqual(aktuell.email, "max@example.org")
 
 
 class IcsFeed(BuchungsBasis):
@@ -337,12 +317,18 @@ class IcsFeed(BuchungsBasis):
 
 
 class OeffentlicheSeiten(BuchungsBasis):
-    def test_startseite_zeigt_freie_termine(self):
+    def test_startseite_zeigt_freie_termine_und_der_buchen_weg_verschwindet(self):
         antwort = self.client.get(reverse("termine:start"))
 
         self.assertEqual(antwort.status_code, 200)
         self.assertContains(antwort, "Beratungstermin buchen")
         self.assertContains(antwort, self.termin.beginn_lokal.strftime("%H:%M"))
+        self.assertContains(antwort, f'href="/buchen/{self.termin.pk}/"')
+
+        self.bestaetigen(self.reservieren())
+
+        belegt = self.client.get(reverse("termine:start"))
+        self.assertNotContains(belegt, f'href="/buchen/{self.termin.pk}/"')
 
     def test_buchungsformular_wird_angezeigt(self):
         antwort = self.client.get(reverse("termine:buchen", args=[self.termin.pk]))
@@ -369,28 +355,23 @@ class OeffentlicheSeiten(BuchungsBasis):
         self.assertEqual(buchung.status, Buchung.Status.OFFEN)
         self.assertIsNotNone(buchung.einwilligung_am)
 
-    def test_ohne_datenschutzhaken_keine_buchung(self):
-        antwort = self.client.post(
-            reverse("termine:buchen", args=[self.termin.pk]),
+    def test_ohne_datenschutzhaken_keine_buchung_und_der_honigtopf_faengt_bots_ab(self):
+        for daten in (
             {"name": "Max Muster", "email": "max@example.org", "website": ""},
-        )
-
-        self.assertEqual(antwort.status_code, 200)
-        self.assertEqual(Buchung.objects.count(), 0)
-
-    def test_honigtopf_faengt_bots_ab(self):
-        antwort = self.client.post(
-            reverse("termine:buchen", args=[self.termin.pk]),
             {
                 "name": "Bot",
                 "email": "bot@example.org",
                 "datenschutz": "on",
                 "website": "http://spam.example",
             },
-        )
+        ):
+            with self.subTest(daten=daten):
+                antwort = self.client.post(
+                    reverse("termine:buchen", args=[self.termin.pk]), daten
+                )
 
-        self.assertEqual(antwort.status_code, 200)
-        self.assertEqual(Buchung.objects.count(), 0)
+                self.assertEqual(antwort.status_code, 200)
+                self.assertEqual(Buchung.objects.count(), 0)
 
     def test_aufruf_des_links_bestaetigt_noch_nichts(self):
         # Postfach-Scanner rufen Links vorab ab. Täte der Aufruf schon die
@@ -404,7 +385,7 @@ class OeffentlicheSeiten(BuchungsBasis):
         self.assertEqual(buchung.status, Buchung.Status.OFFEN)
         self.assertContains(antwort, "Termin verbindlich buchen")
 
-    def test_der_knopf_bucht_verbindlich(self):
+    def test_der_knopf_bucht_verbindlich_und_der_zweite_aufruf_zeigt_den_zustand(self):
         buchung = self.reservieren()
 
         antwort = self.client.post(reverse("termine:bestaetigen", args=[buchung.token]))
@@ -414,11 +395,9 @@ class OeffentlicheSeiten(BuchungsBasis):
         self.assertEqual(buchung.status, Buchung.Status.BESTAETIGT)
         self.assertContains(antwort, "gebucht")
 
-    def test_zweiter_aufruf_zeigt_den_bestaetigten_zustand(self):
-        buchung = self.bestaetigen(self.reservieren())
-        antwort = self.client.get(reverse("termine:bestaetigen", args=[buchung.token]))
-        self.assertContains(antwort, "steht bereits")
-        self.assertNotContains(antwort, "Termin verbindlich buchen")
+        zweiter = self.client.get(reverse("termine:bestaetigen", args=[buchung.token]))
+        self.assertContains(zweiter, "steht bereits")
+        self.assertNotContains(zweiter, "Termin verbindlich buchen")
 
     def test_abgelaufene_reservierung_bietet_keinen_knopf_an(self):
         buchung = self.reservieren()
@@ -453,7 +432,7 @@ class OeffentlicheSeiten(BuchungsBasis):
         self.assertContains(antwort, "leider weg", status_code=409)
 
     def test_ohne_auswahlmoeglichkeit_keine_filterleiste(self):
-        """Ein Fahrlehrer, eine Terminart – der Kunde soll nichts auswählen müssen."""
+        # Ein Fahrlehrer, eine Terminart – der Kunde soll nichts auswählen müssen.
         antwort = self.client.get(reverse("termine:start"))
 
         self.assertNotContains(antwort, 'name="fahrlehrer"')
@@ -463,7 +442,7 @@ class OeffentlicheSeiten(BuchungsBasis):
         self.assertContains(antwort, "buchungsbereich")
 
     def test_keine_fahrlehrer_auswahl_fuer_kunden(self):
-        """Kunden sehen keine Fahrlehrer-Auswahl auf der öffentlichen Seite."""
+        # Kunden sehen keine Fahrlehrer-Auswahl auf der öffentlichen Seite.
         Fahrlehrer.objects.create(
             name="Tom Keller", email="tom@example.org", bundesland="BE", vorlauf_stunden=1
         )
@@ -480,13 +459,6 @@ class OeffentlicheSeiten(BuchungsBasis):
 
         self.assertContains(antwort, 'name="art"')
         self.assertContains(antwort, "Alle Terminarten")
-
-    def test_gebuchte_termine_verschwinden_von_der_startseite(self):
-        self.bestaetigen(self.reservieren())
-
-        antwort = self.client.get(reverse("termine:start"))
-
-        self.assertNotContains(antwort, f'href="/buchen/{self.termin.pk}/"')
 
 
 class RobusteParameter(BuchungsBasis):
@@ -522,15 +494,15 @@ class RobusteParameter(BuchungsBasis):
 
         self.assertEqual(antwort.status_code, 404)
 
+    def test_unbekannter_termin_ist_404(self):
+        antwort = self.client.get(reverse("termine:buchen", args=[999999]))
+        self.assertEqual(antwort.status_code, 404)
+
     def test_eigene_seite_eines_fahrlehrers_zeigt_dessen_termine(self):
         antwort = self.client.get(reverse("termine:fahrlehrer", args=[self.fahrlehrer.slug]))
 
         self.assertEqual(antwort.status_code, 200)
         self.assertContains(antwort, self.termin.beginn_lokal.strftime("%H:%M"))
-
-    def test_unbekannter_termin_ist_404(self):
-        antwort = self.client.get(reverse("termine:buchen", args=[999999]))
-        self.assertEqual(antwort.status_code, 404)
 
     def test_kein_rueckwaertsblaettern_vor_den_aktuellen_monat(self):
         heute = timezone.localdate()
@@ -547,7 +519,6 @@ class RobusteParameter(BuchungsBasis):
 
         # Alle aktuellen Termine löschen
         Termin.objects.all().delete()
-        timezone.localdate()
         # Horizont erweitern
         einst = FahrschulEinstellungen.get_solo()
         einst.horizont_wochen = 12
@@ -579,7 +550,7 @@ class LogOhnePersonenbezug(BuchungsBasis):
     werden nicht mit anonymisiert.
     """
 
-    def test_reservierung_protokolliert_die_referenz_statt_der_adresse(self):
+    def test_der_log_nennt_nur_die_referenz_und_nie_die_adresse(self):
         with self.assertLogs("termine.services.buchung", level="INFO") as protokoll:
             buchung = self.reservieren()
 
@@ -587,8 +558,6 @@ class LogOhnePersonenbezug(BuchungsBasis):
         self.assertIn(str(buchung.referenz), zeilen)
         self.assertNotIn(buchung.email, zeilen)
 
-    def test_auch_bestaetigung_und_storno_nennen_nur_die_referenz(self):
-        buchung = self.reservieren()
         with self.assertLogs("termine.services.buchung", level="INFO") as protokoll:
             self.mit_commit(buchungs_service.bestaetigen, buchung)
             self.mit_commit(buchungs_service.stornieren, buchung)
@@ -601,7 +570,7 @@ class LogOhnePersonenbezug(BuchungsBasis):
 class ReservierungsdauerEinstellbar(BuchungsBasis):
     """Die Bestätigungsfrist ist global konfigurierbar statt nur per ENV."""
 
-    def test_die_frist_aus_den_einstellungen_gilt(self):
+    def test_die_frist_aus_den_einstellungen_gilt_und_ohne_wert_greift_das_setting(self):
         from termine.models import FahrschulEinstellungen
 
         einst = FahrschulEinstellungen.get_solo()
@@ -618,46 +587,38 @@ class ReservierungsdauerEinstellbar(BuchungsBasis):
             )
             self.assertIn("120 Minuten", django_mail.outbox[0].body)
 
-    def test_leeres_feld_faellt_auf_das_setting_zurueck(self):
-        from termine.models import FahrschulEinstellungen
-
-        einst = FahrschulEinstellungen.get_solo()
+        # Ohne Wert in der Datenbank gilt der Wert aus den Einstellungen.
         einst.reservierung_minuten = None
         einst.save()
+        django_mail.outbox.clear()
 
         with self.settings(RESERVATION_MINUTES=45):
-            buchung = self.reservieren()
+            buchung = self.reservieren(self.neuer_termin(tage_voraus=6, stunde=14))
 
             self.assertAlmostEqual(
                 buchung.reserviert_bis,
                 timezone.now() + dt.timedelta(minutes=45),
                 delta=dt.timedelta(seconds=10),
             )
-            self.assertIn("45 Minuten", django_mail.outbox[0].body)
+            # Die Anfrage-Mail nennt die geltende Frist.
+            anfrage = next(
+                m for m in django_mail.outbox if "max@example.org" in m.to
+            )
+            self.assertIn("45 Minuten", anfrage.body)
 
-    def test_frist_unter_fuenf_minuten_wird_abgewiesen(self):
+    def test_die_frist_muss_zwischen_fuenf_minuten_und_24_stunden_liegen(self):
         from termine.forms import GlobaleEinstellungenForm
         from termine.models import FahrschulEinstellungen
 
         einst = FahrschulEinstellungen.get_solo()
-        form = GlobaleEinstellungenForm(
-            data={**self.globale_form_daten(), "reservierung_minuten": "3"},
-            instance=einst,
-        )
-        self.assertFalse(form.is_valid())
-        self.assertIn("reservierung_minuten", form.errors)
-
-    def test_frist_oberhalb_24_stunden_wird_abgewiesen(self):
-        from termine.forms import GlobaleEinstellungenForm
-        from termine.models import FahrschulEinstellungen
-
-        einst = FahrschulEinstellungen.get_solo()
-        form = GlobaleEinstellungenForm(
-            data={**self.globale_form_daten(), "reservierung_minuten": "1500"},
-            instance=einst,
-        )
-        self.assertFalse(form.is_valid())
-        self.assertIn("reservierung_minuten", form.errors)
+        for wert in ("3", "1500"):
+            with self.subTest(wert=wert):
+                form = GlobaleEinstellungenForm(
+                    data={**self.globale_form_daten(), "reservierung_minuten": wert},
+                    instance=einst,
+                )
+                self.assertFalse(form.is_valid())
+                self.assertIn("reservierung_minuten", form.errors)
 
     def globale_form_daten(self) -> dict:
         return {
@@ -719,6 +680,11 @@ class VerfalleneBuchungWiederEinbuchenTests(BuchungsBasis):
         self.assertEqual(aktualisiert.termin_id, neuer_termin.pk)
         self.assertEqual(neuer_termin.status, Termin.Status.GEBUCHT)
 
+    def test_einbuchen_nicht_moeglich_wenn_buchung_nicht_verfallen(self):
+        buchung = self.reservieren()
+        with self.assertRaises(buchungs_service.BuchungsFehler):
+            buchungs_service.verfallene_buchung_einbuchen(buchung)
+
     def test_einbuchen_nicht_moeglich_wenn_termin_bereits_gebucht(self):
         buchung = self.reservieren()
         buchung.status = Buchung.Status.VERFALLEN
@@ -728,10 +694,5 @@ class VerfalleneBuchungWiederEinbuchenTests(BuchungsBasis):
         self.termin.save()
 
         with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
-            buchungs_service.verfallene_buchung_einbuchen(buchung)
-
-    def test_einbuchen_nicht_moeglich_wenn_buchung_nicht_verfallen(self):
-        buchung = self.reservieren()
-        with self.assertRaises(buchungs_service.BuchungsFehler):
             buchungs_service.verfallene_buchung_einbuchen(buchung)
 

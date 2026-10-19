@@ -140,12 +140,38 @@ class MailUndKalender(Basis):
         # Ein Name mit Zeilenumbruch wäre der klassische Versuch, eigene
         # Kopfzeilen unterzuschieben. Django lehnt das ab – hier steht, dass
         # es die Buchung trotzdem nicht zerreißt.
-        buchung = self.buchung_mit(name="Max\nBcc: fremder@example.org")
-        buchungs_service.bestaetigen(buchung)
+        #
+        # Die Mails hängen an transaction.on_commit: ohne
+        # captureOnCommitCallbacks(execute=True) wird keine einzige versendet,
+        # die outbox bliebe leer und die Prüfung unten liefere stets
+        # „bestanden“, ohne etwas geprüft zu haben.
+        with self.captureOnCommitCallbacks(execute=True):
+            buchung = self.buchung_mit(name="Max\nBcc: fremder@example.org")
+            buchungs_service.bestaetigen(buchung)
+
+        # Der Angriff darf die Buchung nicht kippen.
+        buchung.refresh_from_db()
+        self.termin.refresh_from_db()
+        self.assertEqual(buchung.status, Buchung.Status.BESTAETIGT)
+        self.assertEqual(self.termin.status, Termin.Status.GEBUCHT)
+
+        # Kontrolle: Eine leere outbox würde die Schleife unten gar nicht
+        # betreten – der Test wäre dann wieder eine Vakuum-Assertion.
+        self.assertGreater(len(django_mail.outbox), 0)
 
         for nachricht in django_mail.outbox:
             self.assertNotIn("\n", nachricht.subject)
+            self.assertNotIn("\r", nachricht.subject)
             self.assertNotIn("Bcc:", nachricht.subject)
+            # Das eigentliche Ziel des Angriffs: ein zusätzlicher Empfänger
+            # in den Kopfzeilen. Der darf nirgends aufgetaucht sein.
+            empfaenger = " ".join(
+                list(nachricht.to)
+                + list(nachricht.cc)
+                + list(nachricht.bcc)
+                + list(nachricht.reply_to or [])
+            )
+            self.assertNotIn("fremder@example.org", empfaenger)
 
     def test_kalendereintrag_bricht_nicht_aus_seinem_feld_aus(self):
         buchung = self.buchung_mit(

@@ -70,7 +70,8 @@ class MailserverStreikt(AusfallBasis):
         self.assertEqual(self.termin.status, Termin.Status.RESERVIERT)
 
     def test_bestaetigung_ueberlebt_einen_smtp_fehler(self):
-        buchung = self.reservieren()
+        termin = self.neuer_termin(tage_voraus=6)
+        buchung = self.reservieren(termin=termin)
 
         with self.assertLogs("termine.services.mail", level="ERROR"):
             with patch(
@@ -80,12 +81,13 @@ class MailserverStreikt(AusfallBasis):
                     buchungs_service.bestaetigen(buchung)
 
         buchung.refresh_from_db()
-        self.termin.refresh_from_db()
+        termin.refresh_from_db()
         self.assertEqual(buchung.status, Buchung.Status.BESTAETIGT)
-        self.assertEqual(self.termin.status, Termin.Status.GEBUCHT)
+        self.assertEqual(termin.status, Termin.Status.GEBUCHT)
 
     def test_storno_ueberlebt_einen_smtp_fehler(self):
-        buchung = self.reservieren()
+        termin = self.neuer_termin(tage_voraus=7)
+        buchung = self.reservieren(termin=termin)
         with self.captureOnCommitCallbacks(execute=True):
             buchungs_service.bestaetigen(buchung)
 
@@ -97,9 +99,9 @@ class MailserverStreikt(AusfallBasis):
                     buchungs_service.stornieren(buchung, von="kunde")
 
         buchung.refresh_from_db()
-        self.termin.refresh_from_db()
+        termin.refresh_from_db()
         self.assertEqual(buchung.status, Buchung.Status.STORNIERT)
-        self.assertEqual(self.termin.status, Termin.Status.FREI)
+        self.assertEqual(termin.status, Termin.Status.FREI)
 
     def test_erinnerung_ohne_versand_wird_nicht_abgehakt(self):
         """Scheitert der Versand, muss der nächste Lauf es erneut versuchen."""
@@ -135,15 +137,16 @@ class TerminNichtVerfuegbar(AusfallBasis):
             buchungs_service.reservieren(pk, name="Max", email="max@example.org")
 
     def test_termin_innerhalb_einer_sperrzeit(self):
+        ziel = self.neuer_termin(tage_voraus=6)
         Sperrzeit.objects.create(
             fahrlehrer=self.fahrlehrer,
-            beginn=self.termin.beginn - dt.timedelta(hours=1),
-            ende=self.termin.ende + dt.timedelta(hours=1),
+            beginn=ziel.beginn - dt.timedelta(hours=1),
+            ende=ziel.ende + dt.timedelta(hours=1),
             grund="Urlaub",
         )
 
         with self.assertRaises(buchungs_service.TerminNichtVerfuegbar):
-            self.reservieren()
+            self.reservieren(termin=ziel)
 
     def test_wettlauf_zweier_interessenten(self):
         """Kommt der Unique-Index zuerst, wird daraus eine saubere Absage."""
@@ -169,7 +172,7 @@ class TerminNichtVerfuegbar(AusfallBasis):
         self.assertEqual(ergebnis.status, Buchung.Status.VERFALLEN)
 
     def test_bestaetigen_einer_stornierten_buchung_scheitert(self):
-        buchung = self.reservieren()
+        buchung = self.reservieren(termin=self.neuer_termin(tage_voraus=6))
         buchung.status = Buchung.Status.STORNIERT
         buchung.save()
 
