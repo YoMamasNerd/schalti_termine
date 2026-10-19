@@ -331,20 +331,29 @@ class Mindestvorlauf(Basis):
         from termine.models import FahrschulEinstellungen
 
         einst = FahrschulEinstellungen.get_solo()
-        einst.vorlauf_stunden = 30
+        einst.vorlauf_stunden = 4
         einst.save()
         tom = Fahrlehrer.objects.create(
-            name="Tom Keller", email="tom@example.org", bundesland="BY"
+            name="Tom Keller", email="tom@example.org", bundesland="BY",
+            vorlauf_stunden=48,
         )
 
-        annas_zu_kurz = self.termin_in(20)
+        # Der globale Vorlauf allein würde Annas Termin in 10 Stunden zulassen –
+        # Toms eigener Vorlauf von 48 Stunden macht seinen Termin in 20 Stunden
+        # unbuchbar, obwohl der globale Wert ihn zulassen würde.
+        annas_passt = self.termin_in(10)
         toms_zu_kurz = self.termin_in(20, fahrlehrer=tom)
-        toms_passt = self.termin_in(35, fahrlehrer=tom)
+        toms_passt = self.termin_in(72, fahrlehrer=tom)
+
+        self.assertNotEqual(
+            self.anna.fruehester_start(), tom.fruehester_start(),
+            "Beide Fahrlehrer muessen unterschiedliche Vorlaufzeiten haben.",
+        )
 
         buchbar = list(Termin.objects.buchbar())
-        self.assertIn(toms_passt, buchbar)
-        self.assertNotIn(annas_zu_kurz, buchbar)
+        self.assertIn(annas_passt, buchbar)
         self.assertNotIn(toms_zu_kurz, buchbar)
+        self.assertIn(toms_passt, buchbar)
 
     def test_ohne_aktive_fahrlehrer_ist_nichts_buchbar(self):
         self.termin_in(48)
