@@ -14,6 +14,8 @@ from django.views.decorators.http import require_POST
 
 from ..models import (
     Buchung,
+    Fahrlehrer,
+    Sperrzeit,
     Termin,
 )
 from ..services import buchung as buchungs_service
@@ -101,6 +103,27 @@ def buchung_detail(request, pk: int):
         and not buchung.termin.ist_gesperrt()
     )
 
+    # Andere Fahrlehrer, auf die der Termin umgehängt werden könnte –
+    # mit Verfügbarkeit im Zeitfenster (gleiche Abfragen wie der Service).
+    wechsel_kandidaten = []
+    if buchung.ist_aktiv:
+        for fl in erlaubt.exclude(pk=buchung.termin.fahrlehrer_id).order_by(
+            "reihenfolge", "name"
+        ):
+            verfuegbar = not (
+                Sperrzeit.objects.filter(
+                    fahrlehrer=fl,
+                    beginn__lt=buchung.termin.ende,
+                    ende__gt=buchung.termin.beginn,
+                ).exists()
+                or Termin.objects.filter(
+                    fahrlehrer=fl,
+                    beginn__lt=buchung.termin.ende,
+                    ende__gt=buchung.termin.beginn,
+                ).exists()
+            )
+            wechsel_kandidaten.append({"fahrlehrer": fl, "verfuegbar": verfuegbar})
+
     return render(
         request,
         "staff/buchung_detail.html",
@@ -109,6 +132,7 @@ def buchung_detail(request, pk: int):
             "andere_buchungen": andere_buchungen,
             "freie_termine": freie_termine,
             "original_termin_verfuegbar": original_termin_verfuegbar,
+            "wechsel_kandidaten": wechsel_kandidaten,
         },
     )
 
@@ -131,6 +155,34 @@ def buchung_verschieben(request, pk: int):
         messages.success(
             request,
             f"Termin für {buchung.name} erfolgreich auf {date_format(buchung.termin.beginn_lokal, 'SHORT_DATE_FORMAT')}, {buchung.termin.beginn_lokal:%H:%M} Uhr verschoben.",
+        )
+    except buchungs_service.BuchungsFehler as exc:
+        messages.error(request, str(exc))
+
+    return redirect("termine:buchung_detail", pk=buchung.pk)
+
+@mitarbeiter
+@require_POST
+def buchung_fahrlehrer_wechseln(request, pk: int):
+    erlaubt = _erlaubte_fahrlehrer(request.user)
+    buchung = get_object_or_404(Buchung, pk=pk, termin__fahrlehrer__in=erlaubt)
+
+    ziel = None
+    fahrlehrer_id = request.POST.get("fahrlehrer_id")
+    if fahrlehrer_id:
+        try:
+            ziel = erlaubt.filter(aktiv=True).get(pk=int(fahrlehrer_id))
+        except (Fahrlehrer.DoesNotExist, ValueError):
+            pass
+    if ziel is None:
+        messages.error(request, "Dieser Fahrlehrer existiert nicht oder steht nicht zur Auswahl.")
+        return redirect("termine:buchung_detail", pk=buchung.pk)
+
+    try:
+        buchung = buchungs_service.fahrlehrer_wechseln(buchung, ziel)
+        messages.success(
+            request,
+            f"Termin für {buchung.name} auf Fahrlehrer {ziel.name} umgehängt, Datum und Uhrzeit bleiben. Der Kunde wurde nicht benachrichtigt.",
         )
     except buchungs_service.BuchungsFehler as exc:
         messages.error(request, str(exc))

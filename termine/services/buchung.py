@@ -21,7 +21,7 @@ from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from ..models import Buchung, Termin
+from ..models import Buchung, Fahrlehrer, Sperrzeit, Termin
 from ..models.einstellungen import FahrschulEinstellungen
 from . import fsm_sync, mail
 
@@ -283,6 +283,87 @@ def verschieben(
         buchung.referenz,
         alter_beginn,
         neuer_termin.beginn,
+    )
+    return buchung
+
+
+@transaction.atomic
+def fahrlehrer_wechseln(buchung: Buchung, ziel_fahrlehrer: Fahrlehrer) -> Buchung:
+    """Hängt einen gebuchten Termin intern auf einen anderen Fahrlehrer um.
+
+    Der Termin wandert komplett: gleicher Datensatz, Zeit und Status bleiben,
+    nur der Fahrlehrer wechselt. Der alte Fahrlehrer verliert den Slot – er
+    wird nicht wieder freigegeben – und der Kunde erfährt nichts davon.
+    """
+    buchung = (
+        Buchung.objects.select_for_update()
+        .select_related("termin", "termin__fahrlehrer", "termin__terminart")
+        .get(pk=buchung.pk)
+    )
+
+    if not buchung.ist_aktiv:
+        raise BuchungsFehler("Nur aktive Buchungen können umgehängt werden.")
+
+    termin = (
+        Termin.objects.select_for_update()
+        .select_related("fahrlehrer", "terminart")
+        .get(pk=buchung.termin_id)
+    )
+
+    if ziel_fahrlehrer.pk == termin.fahrlehrer_id:
+        return buchung
+
+    # Der Ziel-Fahrlehrer darf im Zeitfenster weder gebucht noch gesperrt
+    # sein; dieselbe Abfrage deckt den Unique-Index (fahrlehrer, beginn) ab.
+    if (
+        Sperrzeit.objects.filter(
+            fahrlehrer=ziel_fahrlehrer, beginn__lt=termin.ende, ende__gt=termin.beginn
+        ).exists()
+        or Termin.objects.filter(
+            fahrlehrer=ziel_fahrlehrer, beginn__lt=termin.ende, ende__gt=termin.beginn
+        ).exists()
+    ):
+        raise TerminNichtVerfuegbar(
+            f"{ziel_fahrlehrer.name} ist im Zeitfenster dieses Termins bereits belegt oder gesperrt."
+        )
+
+    alter_fahrlehrer = termin.fahrlehrer
+    # Vor dem Save merken und dann leeren: Bliebe die alte FSM-Termin-ID
+    # stehen, würde ein späterer FSM-Export den Eintrag des ALTEN Fahrlehrers
+    # aktualisieren, statt beim neuen einen anzulegen.
+    alte_fsm_termin_id = termin.fsm_termin_id
+    termin.fahrlehrer = ziel_fahrlehrer
+    termin.fsm_termin_id = ""
+    termin.save(update_fields=["fahrlehrer", "fsm_termin_id", "geaendert_am"])
+
+    def _nach_wechsel():
+        if alte_fsm_termin_id:
+            fsm_sync.async_loesche_fsm_termine([alte_fsm_termin_id])
+        fsm_sync.async_buche_in_fsm(buchung)
+        from .logging import log_event
+
+        log_event(
+            kategorie="buchung",
+            aktion="fahrlehrer_gewechselt",
+            titel=(
+                f"Buchung {buchung.referenz}: Fahrlehrer {alter_fahrlehrer.name} "
+                f"zu {ziel_fahrlehrer.name} gewechselt ({termin.beginn_lokal:%d.%m.%Y})"
+            ),
+            details={
+                "referenz": str(buchung.referenz),
+                "termin_id": termin.pk,
+                "alter_fahrlehrer_id": alter_fahrlehrer.pk,
+                "neuer_fahrlehrer_id": ziel_fahrlehrer.pk,
+            },
+        )
+
+    transaction.on_commit(_nach_wechsel)
+
+    logger.info(
+        "Buchung %s von Fahrlehrer %s zu %s umgehängt",
+        buchung.referenz,
+        alter_fahrlehrer.pk,
+        ziel_fahrlehrer.pk,
     )
     return buchung
 

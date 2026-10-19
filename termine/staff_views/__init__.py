@@ -16,6 +16,7 @@ Re-Exporte unten halten `urls.py` und den Sammeltest in test_zugriff.py
 from .buchungen import (
     buchung_absagen,
     buchung_detail,
+    buchung_fahrlehrer_wechseln,
     buchung_verschieben,
     buchung_wieder_einbuchen,
     buchungsliste,
@@ -58,6 +59,7 @@ from .stammdaten import (
 __all__ = [
     "buchung_absagen",
     "buchung_detail",
+    "buchung_fahrlehrer_wechseln",
     "buchung_verschieben",
     "buchung_wieder_einbuchen",
     "buchungsliste",
