@@ -21,7 +21,7 @@ from ..models import (
 )
 from ..services import buchung as buchungs_service
 from ..services.fsm_client import FsmClient, FsmError
-from ..services.fsm_sync import is_fsm_aktiv_fuer_fahrlehrer
+from ..services.fsm_sync import is_fsm_aktiv_fuer_fahrlehrer, sync_blocker_fuer_fahrlehrer
 from ..services.planung import (
     lokal,
 )
@@ -142,10 +142,13 @@ def buchung_detail(request, pk: int):
 @mitarbeiter
 @require_POST
 def wechsel_live_check(request, pk: int):
-    """AJAX: Prüft alle Wechsel-Kandidaten live gegen den FSM-Kalender.
+    """AJAX: Prüft alle Wechsel-Kandidaten gegen das echte Kalenderbild der Fahrlehrer.
 
-    `refresh=True` umgeht den Gateway-Cache – die Badges der Kandidatenliste
-    auf der Detailseite zeigen sonst nur den Stand des letzten Syncs.
+    Pro Kandidat läuft zuerst ein Live-Abgleich mit dem FSM-Kalender
+    (`refresh=True`, umgeht den Gateway-Cache) – er heilt die lokale
+    Sperrzeit-Kopie, damit veraltete FSM-Sperrzeiten nicht mehr vetoen.
+    Erst danach wird die Verfügbarkeit aus den lokalen Queries gelesen;
+    `fsm` sagt, ob der Abgleich live lief, fehlschlug oder nicht aktiv ist.
     """
     erlaubt = _erlaubte_fahrlehrer(request.user)
     buchung = get_object_or_404(
@@ -158,32 +161,41 @@ def wechsel_live_check(request, pk: int):
 
     termin = buchung.termin
     client = FsmClient()
+    jetzt_override = lokal(timezone.localdate(), dt.time.min)
     ergebnisse = []
     for fl in erlaubt.exclude(pk=termin.fahrlehrer_id).order_by("reihenfolge", "name"):
-        lokal_frei = not (
-            Sperrzeit.objects.filter(
-                fahrlehrer=fl,
-                beginn__lt=termin.ende,
-                ende__gt=termin.beginn,
-            ).exists()
-            or Termin.objects.filter(
-                fahrlehrer=fl,
-                beginn__lt=termin.ende,
-                ende__gt=termin.beginn,
-            ).exists()
-        )
         fsm = "aus"
-        konflikte = []
         meldung = None
         if is_fsm_aktiv_fuer_fahrlehrer(fl):
             fsm = "live"
             try:
-                events = client.get_termine(fl.fsm_id, termin.beginn, termin.ende, refresh=True)
-                konflikte = [ev.titel for ev in events if ev.von < termin.ende and ev.bis > termin.beginn]
+                # Heilung vor Bewertung: ohne Live-Abgleich vetoen stale
+                # FSM-Sperrzeiten aus der lokalen Kopie.
+                sync_blocker_fuer_fahrlehrer(
+                    fl, jetzt_override=jetzt_override, client=client, refresh=True
+                )
             except FsmError as exc:
                 fsm = "fehler"
                 meldung = str(exc)
-        if not lokal_frei or konflikte:
+        konflikte = list(
+            Sperrzeit.objects.filter(
+                fahrlehrer=fl,
+                beginn__lt=termin.ende,
+                ende__gt=termin.beginn,
+            ).values_list("grund", flat=True)
+        )
+        for t in Termin.objects.filter(
+            fahrlehrer=fl,
+            beginn__lt=termin.ende,
+            ende__gt=termin.beginn,
+        ):
+            kunde = (
+                t.buchungen.filter(status__in=Buchung.AKTIVE_STATUS)
+                .values_list("name", flat=True)
+                .first()
+            )
+            konflikte.append(f"Termin: {kunde or t.terminart.name}")
+        if konflikte:
             verfuegbar = False
         elif fsm == "fehler":
             verfuegbar = None
