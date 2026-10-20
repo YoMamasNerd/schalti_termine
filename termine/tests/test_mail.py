@@ -96,15 +96,15 @@ class ZweiFassungen(MailBasis):
                 self.assertIn(self.art.name, text)
                 self.assertNotIn("<", text)
 
-    def test_der_kalendereintrag_haengt_weiter_an(self):
+    def test_anhang_und_bestaetigungslink_stehen_in_beiden_fassungen(self):
         """Anhang und zweite Fassung dürfen sich nicht gegenseitig verdrängen."""
         mail_service.buchung_bestaetigt_kunde(self.buchung)
         nachricht, _, html = self.letzte()
         self.assertEqual([name for name, _, _ in nachricht.attachments], ["termin.ics"])
         self.assertIn("<html", html)
 
-    def test_der_bestaetigungslink_steht_in_beiden_fassungen(self):
-        """Das Double-Opt-in hängt an diesem Link – er darf nirgends fehlen."""
+        # Das Double-Opt-in hängt an diesem Link – er darf nirgends fehlen.
+        django_mail.outbox.clear()
         mail_service.bestaetigung_anfordern(self.buchung)
         _, text, html = self.letzte()
         self.assertIn(self.buchung.bestaetigungs_url, text)
@@ -133,6 +133,11 @@ class Gestalt(MailBasis):
         self.assertIn("text-transform:uppercase", html)
         self.assertIn(f"4px double {AKZENT}", html)
 
+    def test_die_dunkle_fassung_ist_hinterlegt(self):
+        mail_service.erinnerung(self.buchung)
+        _, _, html = self.letzte()
+        self.assertIn("prefers-color-scheme: dark", html)
+
     def test_mails_an_die_fahrschule_bleiben_sachlich(self):
         """Der interne Bereich verzichtet auf Versalien und roten Strich."""
         for versenden in (
@@ -145,11 +150,6 @@ class Gestalt(MailBasis):
                 _, _, html = self.letzte()
                 self.assertNotIn("text-transform:uppercase", html)
                 self.assertNotIn("double", html)
-
-    def test_die_dunkle_fassung_ist_hinterlegt(self):
-        mail_service.erinnerung(self.buchung)
-        _, _, html = self.letzte()
-        self.assertIn("prefers-color-scheme: dark", html)
 
 
 class RechtlicheLinks(MailBasis):

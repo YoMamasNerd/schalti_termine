@@ -38,7 +38,7 @@ SSO_AN = override_settings(
 
 @SSO_AN
 class AutoRedirectTest(TestCase):
-    def test_get_leitet_in_oidc_flow(self):
+    def test_der_get_leitet_in_den_oidc_flow(self):
         antwort = self.client.get(reverse("termine:login"))
         self.assertEqual(antwort.status_code, 302)
         self.assertEqual(antwort["Location"], SSO_LOGIN)
@@ -53,7 +53,7 @@ class AutoRedirectTest(TestCase):
         self.assertEqual(antwort.status_code, 200)
         self.assertTemplateUsed(antwort, "staff/anmelden.html")
 
-    def test_angemeldeter_nutzer_wird_nicht_umgeleitet(self):
+    def test_angemeldete_nutzer_werden_nicht_umgeleitet(self):
         get_user_model().objects.create_user("chef", password="geheim123")
         self.client.login(username="chef", password="geheim123")
         # Angemeldete sehen wie bisher das Formular (stock LoginView), der
@@ -62,7 +62,7 @@ class AutoRedirectTest(TestCase):
         self.assertEqual(antwort.status_code, 200)
         self.assertTemplateUsed(antwort, "staff/anmelden.html")
 
-    def test_post_login_bleibt_lokal(self):
+    def test_der_lokale_login_bleibt_lokal(self):
         get_user_model().objects.create_user("chef", password="geheim123")
         antwort = self.client.post(
             reverse("termine:login"), {"username": "chef", "password": "geheim123"}
@@ -70,7 +70,7 @@ class AutoRedirectTest(TestCase):
         self.assertEqual(antwort.status_code, 302)
         self.assertEqual(antwort["Location"], "/intern/")
 
-    def test_logout_endet_mit_sso_gleich_null(self):
+    def test_der_logout_endet_mit_sso_gleich_null(self):
         get_user_model().objects.create_user("chef", password="geheim123")
         self.client.login(username="chef", password="geheim123")
         antwort = self.client.post(reverse("termine:logout"))

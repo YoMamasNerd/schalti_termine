@@ -120,12 +120,9 @@ class FsmClientTests(SimpleTestCase):
 
     @patch("urllib.request.urlopen")
     def test_termin_anlegen_erfolg(self, mock_urlopen):
-        mock_data = {
-            "success": True,
-            "created_ids": ["neue-termin-uuid"],
-            "count": 1,
-        }
-        mock_urlopen.return_value = _mock_response(200, mock_data)
+        mock_urlopen.return_value = _mock_response(
+            200, {"success": True, "created_ids": ["neue-termin-uuid"], "count": 1}
+        )
 
         client = FsmClient()
         von = dt.datetime(2026, 8, 15, 14, 0)
@@ -136,12 +133,12 @@ class FsmClientTests(SimpleTestCase):
 
     @patch("urllib.request.urlopen")
     def test_termin_loeschen_erfolg(self, mock_urlopen):
-        mock_data = {"success": True, "deleted_id": "termin-123"}
-        mock_urlopen.return_value = _mock_response(200, mock_data)
+        mock_urlopen.return_value = _mock_response(
+            200, {"success": True, "deleted_id": "termin-123"}
+        )
 
         client = FsmClient()
-        success = client.termin_loeschen("termin-123")
-        self.assertTrue(success)
+        self.assertTrue(client.termin_loeschen("termin-123"))
 
     @patch("urllib.request.urlopen")
     def test_fehlerbehandlung_401(self, mock_urlopen):

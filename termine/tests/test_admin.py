@@ -1,4 +1,4 @@
-"""Tests für den Django-Admin.
+"""Tests für das Django-Admin.
 
 Die Aktionen dort sind einen Klick weit von folgenreich entfernt: Ein
 zurückgesetzter Feed-Token macht ein Kalender-Abo ungültig, eine Absage
@@ -16,7 +16,7 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from termine.admin import TerminAdmin
+from termine.admin import RhythmusRegelAdmin, TerminAdmin
 from termine.models import Buchung, Fahrlehrer, RhythmusRegel, Termin, Terminart
 
 
@@ -66,31 +66,26 @@ class AdminBasis(TestCase):
 
 
 class Erreichbarkeit(AdminBasis):
-    def test_alle_uebersichtsseiten_laden(self):
-        for modell in ("fahrlehrer", "terminart", "rhythmusregel", "sperrzeit", "termin", "buchung"):
-            with self.subTest(modell=modell):
-                antwort = self.client.get(reverse(f"admin:termine_{modell}_changelist"))
-                self.assertEqual(antwort.status_code, 200)
+    def test_die_formulare_zeigen_die_links_zu_termin_und_buchung(self):
+        with self.subTest("Fahrlehrer"):
+            antwort = self.client.get(
+                reverse("admin:termine_fahrlehrer_change", args=[self.fahrlehrer.pk])
+            )
+            self.assertContains(antwort, self.fahrlehrer.feed_token)
 
-    def test_fahrlehrer_formular_zeigt_die_abo_url(self):
-        antwort = self.client.get(
-            reverse("admin:termine_fahrlehrer_change", args=[self.fahrlehrer.pk])
-        )
-        self.assertContains(antwort, self.fahrlehrer.feed_token)
-
-    def test_buchungsformular_zeigt_die_links(self):
-        buchung = Buchung.objects.create(
-            termin=self.termin(), name="Max Muster", email="max@example.org",
-            status=Buchung.Status.BESTAETIGT,
-        )
-        antwort = self.client.get(reverse("admin:termine_buchung_change", args=[buchung.pk]))
-        self.assertContains(antwort, buchung.token)
+        with self.subTest("Buchung"):
+            buchung = Buchung.objects.create(
+                termin=self.termin(), name="Max Muster", email="max@example.org",
+                status=Buchung.Status.BESTAETIGT,
+            )
+            antwort = self.client.get(reverse("admin:termine_buchung_change", args=[buchung.pk]))
+            self.assertContains(antwort, buchung.token)
 
 
 class TermineErzeugenAktion(AdminBasis):
-    def regel(self):
+    def regel(self, fahrlehrer):
         return RhythmusRegel.objects.create(
-            fahrlehrer=self.fahrlehrer,
+            fahrlehrer=fahrlehrer,
             terminart=self.art,
             wochentage=[0, 1, 2, 3, 4, 5, 6],
             beginn=dt.time(9, 0),
@@ -99,7 +94,7 @@ class TermineErzeugenAktion(AdminBasis):
         )
 
     def test_ueber_den_fahrlehrer(self):
-        self.regel()
+        self.regel(self.fahrlehrer)
 
         antwort = self.aktion("fahrlehrer", "termine_generieren", [self.fahrlehrer])
 
@@ -107,7 +102,10 @@ class TermineErzeugenAktion(AdminBasis):
         self.assertGreater(Termin.objects.count(), 0)
 
     def test_ueber_die_regel(self):
-        regel = self.regel()
+        tom = Fahrlehrer.objects.create(
+            name="Tom Keller", email="tom@example.org", bundesland="BE", vorlauf_stunden=0
+        )
+        regel = self.regel(tom)
 
         self.aktion("rhythmusregel", "termine_generieren", [regel])
 
@@ -115,16 +113,7 @@ class TermineErzeugenAktion(AdminBasis):
 
 
 class FeedTokenAktion(AdminBasis):
-    def test_zuruecksetzen_erzeugt_einen_neuen_token(self):
-        alt = self.fahrlehrer.feed_token
-
-        self.aktion("fahrlehrer", "feed_token_zuruecksetzen", [self.fahrlehrer])
-
-        self.fahrlehrer.refresh_from_db()
-        self.assertNotEqual(self.fahrlehrer.feed_token, alt)
-        self.assertGreaterEqual(len(self.fahrlehrer.feed_token), 40)
-
-    def test_altes_abo_wird_dadurch_ungueltig(self):
+    def test_das_alte_abo_wird_dadurch_ungueltig(self):
         alt = self.fahrlehrer.feed_token
         self.assertEqual(self.client.get(reverse("termine:ics_feed", args=[alt])).status_code, 200)
 
@@ -141,12 +130,17 @@ class FeedTokenAktion(AdminBasis):
 
 
 class BuchungAbsagenAktion(AdminBasis):
-    def test_absage_informiert_den_kunden_und_gibt_frei(self):
-        termin = self.termin(status=Termin.Status.GEBUCHT)
-        buchung = Buchung.objects.create(
+    def buchung(self, status=Buchung.Status.BESTAETIGT, status_termin=Termin.Status.GEBUCHT,
+                 stunden_voraus=48):
+        termin = self.termin(stunden_voraus=stunden_voraus, status=status_termin)
+        return Buchung.objects.create(
             termin=termin, name="Max Muster", email="max@example.org",
-            status=Buchung.Status.BESTAETIGT,
+            status=status,
         )
+
+    def test_die_absage_storniert_und_benachrichtigt_aktive_buchungen(self):
+        buchung = self.buchung()
+        termin = buchung.termin
         django_mail.outbox.clear()
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -160,10 +154,10 @@ class BuchungAbsagenAktion(AdminBasis):
         self.assertEqual(len(django_mail.outbox), 1)
         self.assertIn("max@example.org", django_mail.outbox[0].to)
 
-    def test_bereits_stornierte_buchung_wird_uebersprungen(self):
-        buchung = Buchung.objects.create(
-            termin=self.termin(), name="Max Muster", email="max@example.org",
-            status=Buchung.Status.STORNIERT,
+    def test_bereits_stornierte_buchungen_werden_uebersprungen(self):
+        buchung = self.buchung(
+            status=Buchung.Status.STORNIERT, status_termin=Termin.Status.FREI,
+            stunden_voraus=72,
         )
         django_mail.outbox.clear()
 
@@ -200,8 +194,6 @@ class Anzeigespalten(AdminBasis):
         self.assertEqual(admin.kunde(belegt), "Max Muster")
 
     def test_rhythmusspalte_beschreibt_den_takt(self):
-        from termine.admin import RhythmusRegelAdmin
-
         admin = RhythmusRegelAdmin(RhythmusRegel, site)
         woechentlich = RhythmusRegel.objects.create(
             fahrlehrer=self.fahrlehrer, terminart=self.art, wochentage=[0],

@@ -94,7 +94,7 @@ class FsmSyncTests(TestCase):
         self.assertEqual(sperren[1].fsm_id, "fsm-termin-2")
 
     @override_settings(FSM_SYNC_ENABLED=True)
-    def test_sync_blocker_ueberspringt_eigene_buchungen(self):
+    def test_sync_blocker_ueberspringt_eigene_buchungen_und_strippt_html(self):
         jetzt = timezone.now()
         # Bereits von Schalti angelegter Termin
         Termin.objects.create(
@@ -120,7 +120,7 @@ class FsmSyncTests(TestCase):
                 bis=jetzt + dt.timedelta(days=3, hours=15),
                 fahrlehrer_id="fsm-lehrer-uuid-1",
                 terminart="PS",
-                titel="Fahrstunde",
+                titel='<a href="schueler?id=123"><span class="alt-key">S -B Max Mustermann</span></a>',
             ),
         ]
 
@@ -133,6 +133,8 @@ class FsmSyncTests(TestCase):
         sperren = list(Sperrzeit.objects.filter(fahrlehrer=self.fahrlehrer))
         self.assertEqual(len(sperren), 1)
         self.assertEqual(sperren[0].fsm_id, "fsm-fremder-termin")
+        # Das HTML des FSM-Titels landet bereinigt in der Sperrzeit.
+        self.assertEqual(sperren[0].grund, "FSM: S -B Max Mustermann")
 
     @override_settings(FSM_SYNC_ENABLED=True)
     def test_sync_blocker_entfernt_geloeschte_fsm_termine(self):
@@ -250,7 +252,9 @@ class FsmSyncTests(TestCase):
         self.assertFalse(Termin.objects.filter(pk=termin.pk).exists())
 
     @override_settings(FSM_SYNC_ENABLED=True)
-    def test_sync_entfernt_freien_termin_wenn_in_fsm_geloescht(self):
+    def test_sync_entfernt_freien_termin_und_heutige_sperrzeit_wenn_in_fsm_geloescht(self):
+        """Der manuelle Sync gleicht ab heute 00:00 Uhr ab – auch heute
+        bereits beendete FSM-Termine werden als gelöscht bereinigt."""
         jetzt = timezone.now()
         termin = Termin.objects.create(
             fahrlehrer=self.fahrlehrer,
@@ -261,16 +265,6 @@ class FsmSyncTests(TestCase):
             fsm_termin_id="in-fsm-nicht-mehr-da",
         )
 
-        mock_client = MagicMock()
-        mock_client.get_termine.return_value = []  # FSM liefert diesen Termin nicht mehr
-
-        sync_blocker_fuer_fahrlehrer(self.fahrlehrer, client=mock_client)
-        self.assertFalse(Termin.objects.filter(pk=termin.pk).exists())
-
-    @override_settings(FSM_SYNC_ENABLED=True)
-    def test_sync_entfernt_heutige_fsm_sperrzeit_wenn_in_fsm_geloescht(self):
-        """Der manuelle Sync gleicht ab heute 00:00 Uhr ab – auch heute
-        bereits beendete FSM-Termine werden als gelöscht bereinigt."""
         heute_start = timezone.make_aware(
             dt.datetime.combine(timezone.localdate(), dt.time.min)
         )
@@ -284,17 +278,19 @@ class FsmSyncTests(TestCase):
         )
 
         mock_client = MagicMock()
-        mock_client.get_termine.return_value = []
+        mock_client.get_termine.return_value = []  # FSM liefert diese Termine nicht mehr
 
         sync_blocker_fuer_fahrlehrer(
             self.fahrlehrer, client=mock_client, jetzt_override=heute_start
         )
+
+        self.assertFalse(Termin.objects.filter(pk=termin.pk).exists())
         self.assertFalse(
             Sperrzeit.objects.filter(fsm_id="fsm-heutig-geloescht").exists()
         )
 
     @override_settings(FSM_SYNC_ENABLED=True)
-    def test_sync_refresh_reicht_parameter_durch(self):
+    def test_sync_refresh_reicht_parameter_durch_und_der_button_benutzt_die_route(self):
         """Der manuelle Sync erzwingt einen Live-Abruf im Gateway."""
         mock_client = MagicMock()
         mock_client.get_termine.return_value = []
@@ -309,9 +305,7 @@ class FsmSyncTests(TestCase):
         _, kwargs = mock_client.get_termine.call_args
         self.assertIs(kwargs.get("refresh"), True)
 
-    @override_settings(FSM_SYNC_ENABLED=True)
-    def test_fsm_sync_button_route(self):
-        """Der Sync-Button in der Tagesplanung läuft über die neue Route."""
+        # Der Sync-Button in der Tagesplanung läuft über die neue Route.
         benutzer = get_user_model().objects.create_user("jona", password="geheim123", is_staff=True)
         self.client.force_login(benutzer)
 
@@ -368,27 +362,6 @@ class FsmSyncTests(TestCase):
         )
         mock_client.termin_loeschen.assert_not_called()
 
-    @override_settings(FSM_SYNC_ENABLED=True)
-    def test_strip_html_tags_in_fsm_sperrzeiten(self):
-        jetzt = timezone.now()
-        fsm_termine = [
-            FsmTermin(
-                id="fsm-html-1",
-                von=jetzt + dt.timedelta(days=2, hours=10),
-                bis=jetzt + dt.timedelta(days=2, hours=11),
-                fahrlehrer_id="fsm-lehrer-uuid-1",
-                terminart="PS",
-                titel='<a href="schueler?id=123"><span class="alt-key">S -B Max Mustermann</span></a>',
-            ),
-        ]
-        mock_client = MagicMock()
-        mock_client.get_termine.return_value = fsm_termine
-
-        sync_blocker_fuer_fahrlehrer(self.fahrlehrer, client=mock_client)
-
-        sperre = Sperrzeit.objects.get(fsm_id="fsm-html-1")
-        self.assertEqual(sperre.grund, "FSM: S -B Max Mustermann")
-
 
 class FsmEinstellungenViewTests(TestCase):
     def setUp(self):
@@ -440,7 +413,7 @@ class FsmEinstellungenViewTests(TestCase):
             self.assertTrue(self.fahrlehrer.fsm_sync_aktiv)
 
     @override_settings(FSM_SYNC_ENABLED=True)
-    def test_manueller_sync_button(self):
+    def test_manueller_sync_und_import_von_fahrlehrern(self):
         with patch("termine.staff_views.einstellungen.FsmClient") as mock_cls:
             mock_inst = MagicMock()
             mock_inst.get_termine.return_value = []
@@ -452,8 +425,6 @@ class FsmEinstellungenViewTests(TestCase):
             )
             self.assertRedirects(res, reverse("termine:fsm_einstellungen"))
 
-    @override_settings(FSM_SYNC_ENABLED=True)
-    def test_import_fahrlehrer_button(self):
         with patch("termine.staff_views.einstellungen.FsmClient") as mock_cls:
             mock_inst = MagicMock()
             mock_inst.get_fahrlehrer.return_value = [
@@ -542,6 +513,10 @@ class FsmEinstellungenViewTests(TestCase):
         sperre.refresh_from_db()
         self.assertEqual(sperre.fsm_id, "fsm-sperre-id-123")
 
+        # Ist der FSM-Sync global aus, bleibt die Sperrzeit lokal.
+        with self.settings(FSM_SYNC_ENABLED=False):
+            self.assertEqual(exportiere_sperrzeit_nach_fsm(sperre, client=mock_client), [])
+
     @override_settings(FSM_SYNC_ENABLED=True)
     def test_exportiere_sperrzeit_privat_nach_fsm(self):
         from termine.services.fsm_sync import exportiere_sperrzeit_nach_fsm
@@ -570,16 +545,6 @@ class FsmEinstellungenViewTests(TestCase):
         _, kwargs = mock_client.termin_anlegen.call_args
         self.assertEqual(kwargs["terminart"], "PP")
         self.assertIn("Kinder aus Kita abholen", kwargs["titel"])
-
-    @override_settings(FSM_SYNC_ENABLED=False)
-    def test_sperrzeit_sync_ignoriert_wenn_fsm_deaktiviert(self):
-
-        jetzt = timezone.now()
-        Sperrzeit.objects.create(            fahrlehrer=self.fahrlehrer,
-            beginn=jetzt + dt.timedelta(days=5),
-            ende=jetzt + dt.timedelta(days=6),
-            grund="Urlaub",
-        )
 
     def test_is_theorie_termin(self):
         from termine.services.fsm_sync import is_theorie_termin

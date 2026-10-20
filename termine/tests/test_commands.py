@@ -68,32 +68,33 @@ class TermineGenerieren(KommandoBasis):
         self.assertTrue(Termin.objects.filter(fahrlehrer=self.fahrlehrer).exists())
         self.assertFalse(Termin.objects.filter(fahrlehrer=anderer).exists())
 
-    def test_horizont_laesst_sich_ueberschreiben(self):
+    def test_horizont_und_startdatum_steuern_den_umfang(self):
+        """`--wochen` begrenzt den Horizont, `--ab` verschiebt den Start."""
+        zweiter = Fahrlehrer.objects.create(
+            name="Tom Keller", email="tom@example.org", bundesland="BE", vorlauf_stunden=0
+        )
         self.regel()
+        self.regel(zweiter)
 
-        self.rufe("termine_generieren", "--wochen", "1")
-
+        self.rufe("termine_generieren", "--fahrlehrer", self.fahrlehrer.slug, "--wochen", "1")
         grenze = timezone.now() + dt.timedelta(days=8)
-        self.assertFalse(Termin.objects.filter(beginn__gt=grenze).exists())
-        self.assertTrue(Termin.objects.exists())
+        self.assertFalse(Termin.objects.filter(fahrlehrer=self.fahrlehrer, beginn__gt=grenze).exists())
+        self.assertTrue(Termin.objects.filter(fahrlehrer=self.fahrlehrer).exists())
 
-    def test_startdatum_laesst_sich_setzen(self):
-        self.regel()
         ab = timezone.localdate() + dt.timedelta(days=14)
-
-        self.rufe("termine_generieren", "--ab", ab.isoformat(), "--wochen", "1")
-
-        frueheste = Termin.objects.order_by("beginn").first()
+        self.rufe("termine_generieren", "--fahrlehrer", zweiter.slug, "--ab", ab.isoformat(), "--wochen", "1")
+        frueheste = Termin.objects.filter(fahrlehrer=zweiter).order_by("beginn").first()
         self.assertIsNotNone(frueheste)
         self.assertGreaterEqual(timezone.localtime(frueheste.beginn).date(), ab)
 
-    def test_unbekannter_fahrlehrer_bricht_ab(self):
-        with self.assertRaises(CommandError):
-            self.rufe("termine_generieren", "--fahrlehrer", "gibt-es-nicht")
-
-    def test_kaputtes_datum_bricht_ab(self):
-        with self.assertRaises(CommandError):
-            self.rufe("termine_generieren", "--ab", "17.09.2026")
+    def test_ungueltige_argumente_brichten_ab(self):
+        for args in (
+            ("--fahrlehrer", "gibt-es-nicht"),
+            ("--ab", "17.09.2026"),
+        ):
+            with self.subTest(args=args):
+                with self.assertRaises(CommandError):
+                    self.rufe("termine_generieren", *args)
 
 
 class BuchungenPflegen(KommandoBasis):
@@ -131,20 +132,19 @@ class BuchungenPflegen(KommandoBasis):
         self.assertEqual(alt.email, "")
         self.assertIn("Pflege abgeschlossen", ausgabe)
 
-    def test_erinnerungen_lassen_sich_abschalten(self):
+    def test_einzelne_schritte_lassen_sich_abschalten(self):
+        """Erinnerungen und Anonymisierung lassen sich einzeln abwählen."""
         _, faellig = self.termin_mit_buchung(5, Buchung.Status.BESTAETIGT)
 
         self.rufe("buchungen_pflegen", "--ohne-erinnerungen")
-
         faellig.refresh_from_db()
         self.assertIsNone(faellig.erinnerung_am)
         self.assertEqual(len(django_mail.outbox), 0)
 
-    def test_anonymisierung_laesst_sich_abschalten(self):
+        # Erst danach anlegen: der vorige Lauf hätte die alte Buchung bereits
+        # anonymisiert.
         _, alt = self.termin_mit_buchung(-24 * 400, Buchung.Status.BESTAETIGT)
-
         self.rufe("buchungen_pflegen", "--ohne-anonymisierung")
-
         alt.refresh_from_db()
         self.assertEqual(alt.email, "max@example.org")
 
@@ -153,7 +153,7 @@ class BuchungenPflegen(KommandoBasis):
 
 
 class JobsEinrichten(KommandoBasis):
-    def test_legt_alle_zeitplaene_an(self):
+    def test_legt_alle_zeitplaene_an_und_laeuft_unbegrenzt_weiter(self):
         ausgabe = self.rufe("jobs_einrichten")
 
         self.assertEqual(Schedule.objects.count(), len(JOBS))
@@ -161,39 +161,29 @@ class JobsEinrichten(KommandoBasis):
             self.assertTrue(Schedule.objects.filter(name=name).exists())
             self.assertIn(name, ausgabe)
 
-    def test_zweiter_lauf_erzeugt_keine_duplikate(self):
+        # Ein zweiter Lauf darf nichts doppelt anlegen.
         self.rufe("jobs_einrichten")
-        self.rufe("jobs_einrichten")
-
         self.assertEqual(Schedule.objects.count(), len(JOBS))
-
-    def test_zeitplaene_laufen_unbegrenzt_weiter(self):
-        self.rufe("jobs_einrichten")
 
         for plan in Schedule.objects.all():
             self.assertEqual(plan.repeats, -1, f"{plan.name} würde irgendwann aufhören")
             self.assertIsNotNone(plan.next_run)
 
-    def test_veraltete_jobs_werden_entfernt(self):
+    def test_nur_eigene_veraltete_jobs_werden_entfernt(self):
+        """Andere Apps dürfen eigene Jobs in derselben Tabelle haben."""
         Schedule.objects.create(
             name="Alter Job",
             func="termine.jobs.gibt_es_nicht_mehr",
             schedule_type=Schedule.DAILY,
+        )
+        Schedule.objects.create(
+            name="Backup", func="irgendwas.anderes.sichern", schedule_type=Schedule.DAILY
         )
 
         ausgabe = self.rufe("jobs_einrichten")
 
         self.assertFalse(Schedule.objects.filter(name="Alter Job").exists())
         self.assertIn("veraltete", ausgabe)
-
-    def test_fremde_zeitplaene_bleiben_unberuehrt(self):
-        """Andere Apps dürfen eigene Jobs in derselben Tabelle haben."""
-        Schedule.objects.create(
-            name="Backup", func="irgendwas.anderes.sichern", schedule_type=Schedule.DAILY
-        )
-
-        self.rufe("jobs_einrichten")
-
         self.assertTrue(Schedule.objects.filter(name="Backup").exists())
 
 
@@ -219,8 +209,3 @@ class PflegeSchritteSindUnabhaengig(TestCase):
         self.assertEqual(ende.exception.code, 1)
         self.assertIn("3 alte Buchungen anonymisiert", ausgabe.getvalue())
         self.assertIn("fehlgeschlagen", fehler.getvalue())
-
-    def test_ohne_fehler_endet_die_pflege_still_und_erfolgreich(self):
-        ausgabe = StringIO()
-        call_command("buchungen_pflegen", stdout=ausgabe, stderr=StringIO())
-        self.assertIn("Pflege abgeschlossen", ausgabe.getvalue())

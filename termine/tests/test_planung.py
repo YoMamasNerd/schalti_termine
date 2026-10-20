@@ -324,19 +324,17 @@ class GeneratorVerhalten(BasisDaten):
 
 
 class ManuelleTagesplanung(BasisDaten):
-    def test_zeitfenster_wird_zerlegt(self):
+    def test_zeitfenster_wird_zerlegt_und_belegtes_uebersprungen(self):
+        """Das Fenster wird in Slots geteilt; belegte Slots bleiben unangetastet."""
+        tag = self.montag + dt.timedelta(days=3)
+
         neue, uebersprungen = termine_manuell_anlegen(
-            self.fahrlehrer,
-            self.art,
-            self.montag + dt.timedelta(days=3),
-            dt.time(14, 0),
-            dt.time(17, 0),
+            self.fahrlehrer, self.art, tag, dt.time(14, 0), dt.time(17, 0)
         )
         self.assertEqual(len(neue), 6)
         self.assertEqual(uebersprungen, 0)
 
-    def test_belegte_zeitfenster_werden_uebersprungen(self):
-        tag = self.montag + dt.timedelta(days=3)
+        Termin.objects.all().delete()
         termine_manuell_anlegen(
             self.fahrlehrer, self.art, tag, dt.time(14, 0), dt.time(15, 0)
         )
@@ -396,4 +394,3 @@ class SperrzeitRegelnTests(BasisDaten):
         self.assertIn("16:30", uhrzeiten)
         self.assertIn("17:00", uhrzeiten)
         self.assertIn("17:30", uhrzeiten)
-

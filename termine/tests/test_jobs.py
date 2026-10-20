@@ -98,7 +98,7 @@ class Vorausplanen(JobBasis):
 
 class ReservierungenAufraeumen(JobBasis):
     def test_gibt_abgelaufene_reservierung_frei(self):
-        termin = self.termin()
+        termin = self.termin(stunden_voraus=72)
         termin.status = Termin.Status.RESERVIERT
         termin.save()
         self.buchung(
@@ -114,7 +114,7 @@ class ReservierungenAufraeumen(JobBasis):
         self.assertIn("1", ergebnis)
 
     def test_laesst_frische_reservierung_in_ruhe(self):
-        termin = self.termin()
+        termin = self.termin(stunden_voraus=96)
         termin.status = Termin.Status.RESERVIERT
         termin.save()
         self.buchung(
@@ -179,7 +179,6 @@ class Erinnerungen(JobBasis):
         self.assertIsNone(buchung2.erinnerung_am)
 
 
-
 class Datenpflege(JobBasis):
     def test_anonymisiert_alte_buchungen(self):
         termin = self.termin(stunden_voraus=-24 * 400)
@@ -193,7 +192,7 @@ class Datenpflege(JobBasis):
         self.assertIn("1", ergebnis)
 
     def test_laesst_aktuelle_buchungen_unangetastet(self):
-        buchung = self.buchung(self.termin())
+        buchung = self.buchung(self.termin(stunden_voraus=120))
 
         jobs.datenpflege()
 

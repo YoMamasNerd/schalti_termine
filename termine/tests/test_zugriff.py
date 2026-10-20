@@ -114,7 +114,7 @@ class FahrlehrerSiehtNurSichSelbst(TestCase):
         self.tom = Fahrlehrer.objects.create(name="Tom Kern", email="tom@example.org")
         self.client.login(username="anna", password="geheim123")
 
-    def test_einstellungen_zeigen_den_eigenen_eintrag_auch_bei_fremdem_slug(self):
+    def test_die_einstellungen_zeigen_immer_den_eigenen_eintrag(self):
         antwort = self.client.get(
             f"{reverse('termine:einstellungen')}?fahrlehrer={self.tom.slug}"
         )
@@ -137,7 +137,7 @@ class FahrlehrerSiehtNurSichSelbst(TestCase):
         self.assertEqual(antwort.status_code, 404)
         self.assertTrue(Sperrzeit.objects.filter(pk=fremd.pk).exists())
 
-    def test_fahrlehrer_anlegen_bleibt_dem_inhaber_vorbehalten(self):
+    def test_die_stammdaten_gehoeren_nur_inhaber_oder_buero(self):
         self.assertEqual(self.client.get(reverse("termine:fahrlehrer_neu")).status_code, 403)
         antwort = self.client.post(
             reverse("termine:fahrlehrer_neu"),
@@ -148,12 +148,12 @@ class FahrlehrerSiehtNurSichSelbst(TestCase):
         self.assertFalse(Fahrlehrer.objects.filter(name="Heimlich").exists())
 
     def test_terminarten_und_klassen_nur_fuer_inhaber_oder_buero(self):
-        self.assertEqual(self.client.get(reverse("termine:terminarten")).status_code, 403)
-        self.assertEqual(self.client.get(reverse("termine:terminart_neu")).status_code, 403)
-        self.assertEqual(self.client.get(reverse("termine:klassen")).status_code, 403)
-        self.assertEqual(self.client.get(reverse("termine:klasse_neu")).status_code, 403)
+        for name in ("termine:terminarten", "termine:terminart_neu",
+                     "termine:klassen", "termine:klasse_neu"):
+            with self.subTest(seite=name):
+                self.assertEqual(self.client.get(reverse(name)).status_code, 403)
 
-    def test_globale_regeln_und_smtp_nur_fuer_inhaber(self):
+    def test_die_globale_konfiguration_gehoert_nur_inhaber(self):
         # Fahrlehrer darf keine globalen Einstellungen per POST überschreiben
         antwort_global = self.client.post(
             reverse("termine:einstellungen"),
