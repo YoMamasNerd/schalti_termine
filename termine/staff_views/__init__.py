@@ -36,6 +36,7 @@ from .einstellungen import (
     system_logs,
 )
 from .planung import (
+    fsm_lazy_sync,
     fsm_sync_jetzt,
     generieren,
     kollision_anlegen,
@@ -71,6 +72,7 @@ __all__ = [
     "fahrlehrer_neu",
     "feed_token_neu",
     "fsm_einstellungen",
+    "fsm_lazy_sync",
     "fsm_sync_jetzt",
     "generieren",
     "historie",
