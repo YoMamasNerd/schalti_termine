@@ -357,8 +357,9 @@
   </div>
 
   {% if anstehende_verfallene %}
-    <!-- Anstehende unbestätigte Termine (Kunde kommt evtl. trotzdem) -->
-    <div class="karte" style="border-left:4px solid var(--gelb); margin-bottom:1.5rem">
+    <!-- Anstehende unbestätigte Termine (Kunde kommt evtl. trotzdem), zugeklappt wie die Kollisionen -->
+    <sl-details style="margin-bottom:1.5rem" summary="⚠️ Anstehende unbestätigte Reservierungen ({{ anstehende_verfallene|length }})">
+    <div class="karte" style="border-left:4px solid var(--gelb); margin:0">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem">
         <h2 style="margin:0; font-size:1.1rem; color:var(--text); display:flex; align-items:center; gap:0.5rem">
           ⚠️ Anstehende unbestätigte Reservierungen ({{ anstehende_verfallene|length }})
@@ -415,6 +416,7 @@
         </table>
       </div>
     </div>
+    </sl-details>
   {% endif %}
 
   <!-- Nächste anstehende Buchungen Tabelle -->
