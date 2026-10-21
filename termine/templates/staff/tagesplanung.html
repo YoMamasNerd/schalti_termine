@@ -6,6 +6,13 @@
   <h1>Tagesplanung</h1>
 
   <div id="planungsbereich">
+  {# Lazy-Sync: nur beim ersten frischen Laden feuern – mit frisch=1 fehlt der Trigger, sonst Endlosschleife. #}
+  {% if FSM_SYNC_ENABLED and fahrlehrer.fsm_sync_aktiv and fahrlehrer.fsm_id and not frisch %}
+    <div hidden
+         hx-get="{% url 'termine:fsm_lazy_sync' %}?fahrlehrer={{ fahrlehrer.slug }}{% if woche_param %}&amp;woche={{ woche_param|urlencode }}{% endif %}&amp;frisch=1"
+         hx-trigger="load delay:400ms"
+         hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML"></div>
+  {% endif %}
   <div class="karte knopfreihe" style="margin-bottom:1rem">
     <form method="get" style="display:contents">
       {% if alle_fahrlehrer.count > 1 %}

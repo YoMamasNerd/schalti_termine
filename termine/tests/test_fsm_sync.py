@@ -7,6 +7,7 @@ from io import StringIO
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -21,6 +22,7 @@ from termine.services.fsm_sync import (
     sync_alle_fahrlehrer,
     sync_blocker_fuer_fahrlehrer,
 )
+from termine.services.planung import lokal
 
 
 class FsmSyncTests(TestCase):
@@ -684,6 +686,98 @@ class FsmEinstellungenViewTests(TestCase):
         mock_client.termin_loeschen.assert_called_once_with("entfallene-fsm-id-999")
         termin.refresh_from_db()
         self.assertEqual(termin.fsm_termin_id, "")
+
+
+class LazyFsmSyncTests(TestCase):
+    """Der stille Lazy-Sync-Trigger der Tagesplanung.
+
+    Er feuert bei jedem frischen Seitenaufruf per htmx – deshalb Debounce
+    über den Cache und keine Messages.
+    """
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.fahrlehrer = Fahrlehrer.objects.create(
+            name="Lisa Lazy",
+            slug="lisa-lazy",
+            email="lisa@example.com",
+            fsm_id="fsm-lazy-1",
+            fsm_sync_aktiv=True,
+        )
+        self.benutzer = get_user_model().objects.create_user(
+            "lazy-sync", password="geheim123", is_staff=True
+        )
+        self.client.force_login(self.benutzer)
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_lazy_sync_fuehrt_sync_aus_und_belegt_debounce(self):
+        """Freier Slot: Sync mit Live-Abruf ab heute 00:00 Uhr, danach belegt."""
+        woche = timezone.localdate().isoformat()
+        with patch("termine.services.fsm_sync.sync_blocker_fuer_fahrlehrer") as mock_sync:
+            antwort = self.client.get(
+                reverse("termine:fsm_lazy_sync"),
+                {"fahrlehrer": self.fahrlehrer.slug, "woche": woche},
+            )
+        self.assertRedirects(
+            antwort,
+            f"/intern/planung/?fahrlehrer={self.fahrlehrer.slug}&woche={woche}&frisch=1",
+        )
+        mock_sync.assert_called_once()
+        kwargs = mock_sync.call_args.kwargs
+        self.assertIs(kwargs["refresh"], True)
+        self.assertEqual(kwargs["jetzt_override"], lokal(timezone.localdate(), dt.time.min))
+        self.assertIsNotNone(cache.get(f"fsm_lazy_sync:{self.fahrlehrer.pk}"))
+
+        with self.subTest("Kaputter woche-Parameter fällt weg"):
+            with patch("termine.services.fsm_sync.sync_blocker_fuer_fahrlehrer") as mock_sync:
+                antwort = self.client.get(
+                    reverse("termine:fsm_lazy_sync"),
+                    {"fahrlehrer": self.fahrlehrer.slug, "woche": "kein-datum"},
+                )
+            self.assertRedirects(
+                antwort, f"/intern/planung/?fahrlehrer={self.fahrlehrer.slug}&frisch=1"
+            )
+            mock_sync.assert_not_called()  # Debounce-Slot aus dem ersten Request
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_lazy_sync_springt_sync_im_debounce_fenster_ueber(self):
+        cache.set(f"fsm_lazy_sync:{self.fahrlehrer.pk}", True, 120)
+        with patch("termine.services.fsm_sync.sync_blocker_fuer_fahrlehrer") as mock_sync:
+            antwort = self.client.get(
+                reverse("termine:fsm_lazy_sync"), {"fahrlehrer": self.fahrlehrer.slug}
+            )
+        self.assertEqual(antwort.status_code, 302)
+        mock_sync.assert_not_called()
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_lazy_sync_uebersteht_gateway_fehler(self):
+        with patch(
+            "termine.services.fsm_sync.sync_blocker_fuer_fahrlehrer",
+            side_effect=RuntimeError("Gateway nicht erreichbar"),
+        ):
+            antwort = self.client.get(
+                reverse("termine:fsm_lazy_sync"), {"fahrlehrer": self.fahrlehrer.slug}
+            )
+        self.assertEqual(antwort.status_code, 302)
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_trigger_feuert_nur_ohne_frisch_param(self):
+        url = reverse("termine:tagesplanung")
+
+        antwort = self.client.get(url, {"fahrlehrer": self.fahrlehrer.slug})
+        self.assertContains(antwort, "fsm-sync/lazy/")
+        self.assertContains(antwort, 'hx-trigger="load delay:400ms"')
+        # frisch taucht nur im Lazy-Trigger auf, nicht in normalen Links/Buttons.
+        self.assertEqual(
+            antwort.content.count(b"frisch=1"), antwort.content.count(b"fsm-sync/lazy/")
+        )
+
+        antwort = self.client.get(
+            url, {"fahrlehrer": self.fahrlehrer.slug, "frisch": "1"}
+        )
+        self.assertNotContains(antwort, "fsm-sync/lazy/")
+        self.assertNotContains(antwort, "frisch=")
 
 
 

@@ -7,13 +7,14 @@ import logging
 
 from django.conf import settings
 from django.contrib import messages
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.formats import date_format
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from ..forms import (
     SperrzeitForm,
@@ -57,6 +58,9 @@ def tagesplanung(request):
     except ValueError:
         start_tag = heute
     end_tag = start_tag + dt.timedelta(days=6)
+    # Für den Lazy-Sync-Trigger im Template: nur mitschleifen, wenn die
+    # aktuelle Seite überhaupt über einen woche-Parameter lief.
+    woche_param = start_tag.isoformat() if roh_woche else ""
 
     termine = (
         Termin.objects.filter(
@@ -256,6 +260,8 @@ def tagesplanung(request):
         {
             "fahrlehrer": fahrlehrer,
             "alle_fahrlehrer": erlaubt,
+            "woche_param": woche_param,
+            "frisch": request.GET.get("frisch") == "1",
             "start_tag": start_tag,
             "end_tag": end_tag,
             "montag": start_tag,
@@ -318,6 +324,49 @@ def fsm_sync_jetzt(request):
         logger.warning("FSM-Sync: Manueller Sync für %s fehlgeschlagen: %s", fahrlehrer.pk, exc)
         messages.error(request, "FSM-Synchronisierung fehlgeschlagen – bitte später erneut versuchen.")
     return redirect(f"{reverse('termine:tagesplanung')}?fahrlehrer={fahrlehrer.slug}")
+
+
+@mitarbeiter
+@require_GET
+def fsm_lazy_sync(request):
+    """Stiller FSM-Abgleich beim ersten Laden der Tagesplanung (Lazy-Trigger im Template).
+
+    Wie fsm_sync_jetzt mit Live-Abruf, aber ohne Messages: Der Trigger feuert
+    bei jedem frischen Seitenaufruf, Toast-Spam wäre die Folge. Ein Cache-Slot
+    pro Fahrlehrer drosselt zusätzlich – der Sync ist bidirektional, ein
+    ungefilterter Aufruf pro Seitenaufruf wäre zu teuer.
+    """
+    slug = request.GET.get("fahrlehrer")
+    woche = request.GET.get("woche", "")
+    fahrlehrer = (
+        _erlaubte_fahrlehrer(request.user).filter(slug=slug).first() if slug else None
+    )
+    ziel = reverse("termine:tagesplanung")
+    if fahrlehrer is None:
+        return redirect(ziel)
+    ziel += f"?fahrlehrer={fahrlehrer.slug}"
+    try:
+        dt.date.fromisoformat(woche)
+    except ValueError:
+        woche = ""
+    if woche:
+        ziel += f"&woche={woche}"
+    ziel += "&frisch=1"
+
+    from ..services.fsm_sync import is_fsm_aktiv_fuer_fahrlehrer, sync_blocker_fuer_fahrlehrer
+
+    if is_fsm_aktiv_fuer_fahrlehrer(fahrlehrer):
+        # shortcut: Debounce wirkt nur pro Worker-Prozess (Standard-LocMem-Cache, kein CACHES konfiguriert), auf Redis aufrüsten sobald mehrere Worker/Prozesse laufen
+        if cache.add(f"fsm_lazy_sync:{fahrlehrer.pk}", True, 120):
+            try:
+                sync_blocker_fuer_fahrlehrer(
+                    fahrlehrer,
+                    jetzt_override=lokal(timezone.localdate(), dt.time.min),
+                    refresh=True,
+                )
+            except Exception as exc:
+                logger.warning("FSM-Sync: Lazy-Sync für %s fehlgeschlagen: %s", fahrlehrer.pk, exc)
+    return redirect(ziel)
 
 
 @mitarbeiter

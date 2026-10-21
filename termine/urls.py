@@ -71,6 +71,7 @@ urlpatterns = [
     path("intern/planung/sperrzeit/", staff_views.sperrzeit_anlegen, name="sperrzeit_anlegen"),
     path("intern/planung/generieren/", staff_views.generieren, name="generieren"),
     path("intern/planung/fsm-sync/", staff_views.fsm_sync_jetzt, name="fsm_sync_jetzt"),
+    path("intern/planung/fsm-sync/lazy/", staff_views.fsm_lazy_sync, name="fsm_lazy_sync"),
     path(
         "intern/kollisionen/anlegen/",
         staff_views.kollision_anlegen,
