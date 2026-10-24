@@ -1,5 +1,5 @@
 # Stage 1: Build stage – install deps with uv into a venv
-FROM python:3.15-slim@sha256:2da676046630d7bf14c6764ae1143dc7fa0377a53f94bf5a642f0b214aca5bce AS builder
+FROM python:3.15-slim@sha256:044d5bd747976e21f8bc4d746c3479b19a84bb8ae6261b802acdd26b29036c93 AS builder
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 RUN uv sync --frozen --no-dev --no-install-project
 
 # Stage 2: Final runtime image
-FROM python:3.15-slim@sha256:2da676046630d7bf14c6764ae1143dc7fa0377a53f94bf5a642f0b214aca5bce
+FROM python:3.15-slim@sha256:044d5bd747976e21f8bc4d746c3479b19a84bb8ae6261b802acdd26b29036c93
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
