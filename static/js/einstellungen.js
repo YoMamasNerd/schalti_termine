@@ -1,20 +1,18 @@
 (function() {
-const scriptEl = document.currentScript;
-  const schalter = document.querySelectorAll('.tab-schalter');
-  const inhalte = document.querySelectorAll('.tab-inhalt');
+  const scriptEl = document.currentScript;
 
   window.aktiviereTab = function(tabId) {
     if (!tabId || !document.getElementById(tabId)) {
-      tabId = 'tab-mein-profil';
+      tabId = 'tab-fahrlehrer';
     }
-    schalter.forEach(btn => {
+    document.querySelectorAll('.tab-schalter').forEach(btn => {
       if (btn.getAttribute('data-tab') === tabId) {
         btn.classList.add('active');
       } else {
         btn.classList.remove('active');
       }
     });
-    inhalte.forEach(inhalt => {
+    document.querySelectorAll('.tab-inhalt').forEach(inhalt => {
       if (inhalt.id === tabId) {
         inhalt.style.display = 'block';
       } else {
@@ -23,21 +21,35 @@ const scriptEl = document.currentScript;
     });
   };
 
-  schalter.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tabId = btn.getAttribute('data-tab');
-      aktiviereTab(tabId);
-      window.location.hash = tabId;
+  function bindeTabs() {
+    document.querySelectorAll('.tab-schalter').forEach(btn => {
+      if (btn.dataset.tabBound) return;
+      btn.dataset.tabBound = '1';
+      btn.addEventListener('click', () => {
+        const tabId = btn.getAttribute('data-tab');
+        aktiviereTab(tabId);
+        history.replaceState(null, '', '#' + tabId);
+      });
     });
-  });
 
-  // Hash aus URL lesen
-  if (window.location.hash) {
-    const hashId = window.location.hash.replace('#', '');
-    if (document.getElementById(hashId)) {
-      aktiviereTab(hashId);
+    if (window.location.hash) {
+      const hashId = window.location.hash.replace('#', '');
+      if (document.getElementById(hashId)) {
+        aktiviereTab(hashId);
+      }
     }
   }
+
+  bindeTabs();
+  window.addEventListener('hashchange', () => {
+    const hashId = window.location.hash.replace('#', '');
+    if (hashId && document.getElementById(hashId)) {
+      aktiviereTab(hashId);
+    }
+  });
+  document.body.addEventListener('htmx:afterSwap', () => {
+    bindeTabs();
+  });
 
   // Hilfsfunktion Zwischenablage
   window.kopiereInZwischenablage = function(text, label = 'Text') {

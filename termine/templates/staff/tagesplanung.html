@@ -32,17 +32,31 @@
       <strong style="margin-left:0.5rem">{{ start_tag|date:"j. F" }} – {{ end_tag|date:"j. F Y" }}</strong>
       <noscript><button class="knopf knopf--klein" type="submit">Wechseln</button></noscript>
     </form>
-    {% if FSM_SYNC_ENABLED %}
-      <form method="post" action="{% url 'termine:fsm_sync_jetzt' %}" style="margin-left:auto"
-            hx-post="{% url 'termine:fsm_sync_jetzt' %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML">
+    <div style="margin-left:auto; display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap">
+      <form method="post" action="{% url 'termine:generieren' %}" style="margin:0"
+            hx-post="{% url 'termine:generieren' %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML">
         {% csrf_token %}
         <input type="hidden" name="fahrlehrer" value="{{ fahrlehrer.slug }}">
         <button class="knopf knopf--leise knopf--klein" type="submit"
-                title="FSM-Termine und Belegungszeiten jetzt live abgleichen">
-          <sl-icon name="arrow-clockwise"></sl-icon> FSM synchronisieren
+                title="Rhythmus-Regeln für die nächsten {{ horizont_wochen }} Wochen ausrollen">
+          ⚡ Jetzt vorausplanen
         </button>
       </form>
-    {% endif %}
+      <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:regeln' %}?fahrlehrer={{ fahrlehrer.slug }}">
+        Regeln bearbeiten
+      </a>
+      {% if FSM_SYNC_ENABLED %}
+        <form method="post" action="{% url 'termine:fsm_sync_jetzt' %}" style="margin:0"
+              hx-post="{% url 'termine:fsm_sync_jetzt' %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML">
+          {% csrf_token %}
+          <input type="hidden" name="fahrlehrer" value="{{ fahrlehrer.slug }}">
+          <button class="knopf knopf--leise knopf--klein" type="submit"
+                  title="FSM-Termine und Belegungszeiten jetzt live abgleichen">
+            <sl-icon name="arrow-clockwise"></sl-icon> FSM synchronisieren
+          </button>
+        </form>
+      {% endif %}
+    </div>
   </div>
 
   <div class="woche">
@@ -112,18 +126,20 @@
                 </span>
               </div>
             {% else %}
-              <div class="plan-slot plan-slot--sperre {% if eintrag.ist_fsm %}plan-slot--sperre-fsm{% else %}plan-slot--sperre-urlaub{% endif %}"
+              <div class="plan-slot plan-slot--sperre {% if eintrag.ist_fsm %}plan-slot--sperre-fsm{% elif eintrag.ist_regel_sperre %}plan-slot--sperre-regel{% else %}plan-slot--sperre-urlaub{% endif %}"
                    title="{{ eintrag.titel }}">
                 <span>
                   {% if eintrag.ist_ganztaegig %}
                     <span class="badge-ganztaegig">Urlaub</span>
                   {% else %}
-                    {% if eintrag.ist_fsm %}<span class="badge-fsm">FSM</span>{% endif %}
+                    {% if eintrag.ist_fsm %}<span class="badge-fsm">FSM</span>{% elif eintrag.ist_regel_sperre %}<span class="badge-regel">Regel</span>{% endif %}
                     {{ eintrag.beginn_uhrzeit }}–{{ eintrag.ende_uhrzeit }}
                   {% endif %}
                   <span class="name">{{ eintrag.titel|truncatechars:28 }}</span>
                 </span>
-                {% if not eintrag.ist_fsm %}
+                {% if eintrag.ist_regel_sperre and eintrag.regel_id %}
+                  <a class="weg" href="{% url 'termine:regel_bearbeiten' eintrag.regel_id %}" title="Rhythmus-Regel bearbeiten" aria-label="Rhythmus-Regel bearbeiten" style="text-decoration:none; font-size:0.85rem">⚙</a>
+                {% elif not eintrag.ist_fsm %}
                   <form method="post" action="{% url 'termine:sperrzeit_loeschen' eintrag.sperre.pk %}"
                         style="display:inline"
                         hx-post="{% url 'termine:sperrzeit_loeschen' eintrag.sperre.pk %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML"
@@ -154,11 +170,11 @@
     <div class="karte">
       <h2>Termine für einen Tag anlegen</h2>
       <p class="leer">
-        Das ist die schnelle Einzelplanung: Tag, Zeitfenster und Terminart wählen –
-        die App zerlegt das Fenster automatisch in einzelne Termine für <strong>{{ fahrlehrer.name }}</strong>.
+        Schnelle Einzelplanung: Tag, Zeitfenster und Terminart wählen –
+        das Fenster wird automatisch in einzelne Termine für <strong>{{ fahrlehrer.name }}</strong> zerlegt.
       </p>
       <form method="post" action="{% url 'termine:termine_anlegen' %}"
-              hx-post="{% url 'termine:termine_anlegen' %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML">
+            hx-post="{% url 'termine:termine_anlegen' %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML">
         {% csrf_token %}
         <input type="hidden" name="fahrlehrer" value="{{ fahrlehrer.pk }}">
         <input type="hidden" name="fahrlehrer_slug" value="{{ fahrlehrer.slug }}">
@@ -171,45 +187,24 @@
       </form>
     </div>
 
-    <div>
-      <div class="karte">
-        <h2>Automatisch nach Rhythmus planen</h2>
-        <p class="leer">
-          Erzeugt aus den Rhythmus-Regeln von {{ fahrlehrer.name }} die Termine für die
-          nächsten {{ horizont_wochen }} Wochen. Feiertage in
-          {{ fahrlehrer.get_bundesland_display }} werden dabei übersprungen.
-          Gebuchte Termine bleiben immer unangetastet.
-        </p>
-        <div class="knopfreihe">
-          <form method="post" action="{% url 'termine:generieren' %}"
-                  hx-post="{% url 'termine:generieren' %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML">
-            {% csrf_token %}
-            <input type="hidden" name="fahrlehrer" value="{{ fahrlehrer.slug }}">
-            <button class="knopf" type="submit">Jetzt vorausplanen</button>
-          </form>
-          <a class="knopf knopf--leise" href="{% url 'termine:regeln' %}">Regeln bearbeiten</a>
-        </div>
-      </div>
-
-      <div class="karte">
-        <h2>Urlaub / Abwesenheit</h2>
-        <p class="leer">
-          Sperrt einen Zeitraum komplett für <strong>{{ fahrlehrer.name }}</strong>. Freie Termine darin werden gelöscht,
-          und die automatische Planung lässt den Zeitraum aus.
-        </p>
-        <form method="post" action="{% url 'termine:sperrzeit_anlegen' %}"
+    <div class="karte">
+      <h2>Urlaub / Abwesenheit eintragen</h2>
+      <p class="leer">
+        Sperrt einen Zeitraum komplett für <strong>{{ fahrlehrer.name }}</strong>. Freie Termine darin werden gelöscht,
+        und die automatische Planung lässt den Zeitraum aus.
+      </p>
+      <form method="post" action="{% url 'termine:sperrzeit_anlegen' %}"
             hx-post="{% url 'termine:sperrzeit_anlegen' %}" hx-target="#planungsbereich" hx-select="#planungsbereich" hx-swap="outerHTML">
-          {% csrf_token %}
-          <input type="hidden" name="fahrlehrer" value="{{ fahrlehrer.pk }}">
-          <input type="hidden" name="fahrlehrer_slug" value="{{ fahrlehrer.slug }}">
-          {% for feld in sperr_form %}
-            {% if feld.name != "fahrlehrer" %}
-              {% include "termine/_feld.html" with feld=feld %}
-            {% endif %}
-          {% endfor %}
-          <button class="knopf knopf--leise" type="submit">Sperrzeit eintragen</button>
-        </form>
-      </div>
+        {% csrf_token %}
+        <input type="hidden" name="fahrlehrer" value="{{ fahrlehrer.pk }}">
+        <input type="hidden" name="fahrlehrer_slug" value="{{ fahrlehrer.slug }}">
+        {% for feld in sperr_form %}
+          {% if feld.name != "fahrlehrer" %}
+            {% include "termine/_feld.html" with feld=feld %}
+          {% endif %}
+        {% endfor %}
+        <button class="knopf knopf--leise" type="submit">Sperrzeit eintragen</button>
+      </form>
     </div>
   </div>
   </div>

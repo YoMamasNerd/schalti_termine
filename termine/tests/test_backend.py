@@ -361,6 +361,105 @@ class RegelVerwaltung(BackendBasis):
         self.assertTrue(Termin.objects.filter(pk=gebucht.pk).exists())
         self.assertEqual(RhythmusRegel.objects.count(), 0)
 
+    def test_regel_toggle_aktiv_pausiert_und_reaktiviert(self):
+        regel = RhythmusRegel.objects.create(
+            fahrlehrer=self.anna,
+            terminart=self.art,
+            wochentage=[0, 1, 2, 3, 4, 5, 6],
+            beginn=dt.time(9, 0),
+            ende=dt.time(11, 0),
+            gueltig_ab=timezone.localdate(),
+            aktiv=True,
+        )
+        frei = self.termin_fuer(self.anna, stunde=10)
+        frei.regel = regel
+        frei.herkunft = Termin.Herkunft.REGEL
+        frei.save()
+
+        # Pausieren
+        antwort = self.client.post(
+            reverse("termine:regel_toggle_aktiv", args=[regel.pk]), follow=True
+        )
+        self.assertEqual(antwort.status_code, 200)
+        regel.refresh_from_db()
+        self.assertFalse(regel.aktiv)
+        self.assertFalse(Termin.objects.filter(pk=frei.pk).exists())
+
+        # Reaktivieren
+        antwort = self.client.post(
+            reverse("termine:regel_toggle_aktiv", args=[regel.pk]), follow=True
+        )
+        self.assertEqual(antwort.status_code, 200)
+        regel.refresh_from_db()
+        self.assertTrue(regel.aktiv)
+        self.assertGreater(Termin.objects.filter(regel=regel).count(), 0)
+
+    def test_regel_live_vorschau_und_kopie_vorlage(self):
+        regel = RhythmusRegel.objects.create(
+            fahrlehrer=self.anna,
+            terminart=self.art,
+            bezeichnung="Montags-Block",
+            wochentage=[0],
+            beginn=dt.time(14, 0),
+            ende=dt.time(16, 0),
+            gueltig_ab=timezone.localdate(),
+        )
+        kopie_antwort = self.client.get(
+            f"{reverse('termine:regel_neu')}?kopie_von={regel.pk}"
+        )
+        self.assertEqual(kopie_antwort.status_code, 200)
+        self.assertContains(kopie_antwort, "Montags-Block (Kopie)")
+
+        vorschau_antwort = self.client.post(
+            reverse("termine:regel_vorschau"),
+            {
+                "fahrlehrer": self.anna.pk,
+                "regel_art": "angebot",
+                "terminart": self.art.pk,
+                "wochentage": ["0", "2"],
+                "beginn": "14:00",
+                "ende": "16:00",
+                "intervall_wochen": "1",
+                "gueltig_ab": timezone.localdate().isoformat(),
+                "aktiv": "on",
+            },
+        )
+        self.assertEqual(vorschau_antwort.status_code, 200)
+        self.assertContains(vorschau_antwort, "Vorschau im Horizont")
+
+    def test_regel_fahrlehrer_wechsel_raeumt_alten_fahrlehrer_ab(self):
+        regel = RhythmusRegel.objects.create(
+            fahrlehrer=self.anna,
+            terminart=self.art,
+            wochentage=[0, 1, 2, 3, 4, 5, 6],
+            beginn=dt.time(9, 0),
+            ende=dt.time(10, 0),
+            gueltig_ab=timezone.localdate(),
+        )
+        frei_anna = self.termin_fuer(self.anna, stunde=9)
+        frei_anna.regel = regel
+        frei_anna.herkunft = Termin.Herkunft.REGEL
+        frei_anna.save()
+
+        antwort = self.client.post(
+            reverse("termine:regel_bearbeiten", args=[regel.pk]),
+            {
+                "fahrlehrer": self.tom.pk,
+                "regel_art": "angebot",
+                "terminart": self.art.pk,
+                "wochentage": ["0", "1", "2", "3", "4", "5", "6"],
+                "beginn": "09:00",
+                "ende": "10:00",
+                "intervall_wochen": "1",
+                "gueltig_ab": timezone.localdate().isoformat(),
+                "aktiv": "on",
+                "speichern_und_generieren": "1",
+            },
+        )
+        self.assertEqual(antwort.status_code, 302)
+        self.assertFalse(Termin.objects.filter(pk=frei_anna.pk).exists())
+        self.assertGreater(Termin.objects.filter(fahrlehrer=self.tom, regel=regel).count(), 0)
+
 
 class Uebersichtsseite(BackendBasis):
     """Die Landeseite nach dem Anmelden – bisher nur als Redirect geprüft."""

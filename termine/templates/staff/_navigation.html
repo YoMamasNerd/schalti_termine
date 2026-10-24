@@ -1,20 +1,20 @@
 {% load navigation %}
-{% aktiv 'dashboard' as hier %}
+{% aktiv 'dashboard' 'kollision_anlegen' 'kollision_ignorieren' 'kollision_ignorier_rueckgangig' as hier %}
 <a class="filter-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:dashboard' %}">
   <i class="bi bi-speedometer2"></i> Übersicht
 </a>
 
-{% aktiv 'tagesplanung' 'termine_anlegen' 'sperrzeit_anlegen' 'generieren' as hier %}
+{% aktiv 'tagesplanung' 'termine_anlegen' 'sperrzeit_anlegen' 'generieren' 'fsm_sync_jetzt' 'termin_loeschen' as hier %}
 <a class="filter-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:tagesplanung' %}">
   <i class="bi bi-calendar2-week"></i> Tagesplanung
 </a>
 
-{% aktiv 'regeln' 'regel_neu' 'regel_bearbeiten' as hier %}
+{% aktiv 'regeln' 'regel_neu' 'regel_bearbeiten' 'regel_vorschau' 'regel_toggle_aktiv' 'regel_loeschen' as hier %}
 <a class="filter-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:regeln' %}">
   <i class="bi bi-sliders"></i> Rhythmus-Regeln
 </a>
 
-{% aktiv 'buchungen' 'buchung_detail' 'buchung_verschieben' 'buchung_absagen' as hier %}
+{% aktiv 'buchungen' 'buchung_detail' 'buchung_verschieben' 'buchung_fahrlehrer_wechseln' 'buchung_wieder_einbuchen' 'buchung_absagen' as hier %}
 <a class="filter-pill {{ hier }}" {% if hier %}aria-current="page"{% endif %} href="{% url 'termine:buchungen' %}">
   <i class="bi bi-calendar-check"></i> Buchungen
 </a>

@@ -3,14 +3,45 @@
 {% block titel %}Buchungen – {{ SITE_NAME }}{% endblock %}
 
 {% block inhalt %}
-  <h1>Buchungen</h1>
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem">
+    <div>
+      <h1 style="margin:0 0 0.25rem">Buchungen</h1>
+      <p class="leer" style="margin:0; font-size:0.92rem">
+        Anstehende und vergangene Beratungstermine, Reservierungen und Kundenkontakte.
+      </p>
+    </div>
+    <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:historie' %}{% if gewaehlter_slug %}?fahrlehrer={{ gewaehlter_slug }}{% endif %}">
+      📊 Aktivitäten &amp; Historie &rarr;
+    </a>
+  </div>
 
-  <div class="knopfreihe" style="margin-bottom:1rem">
-    <a class="knopf {% if status != 'aktiv' %}knopf--leise{% endif %} knopf--klein" href="?status=aktiv">Anstehend</a>
-    <a class="knopf {% if status != 'vergangen' %}knopf--leise{% endif %} knopf--klein" href="?status=vergangen">Vergangen</a>
-    {% for wert, beschriftung in status_optionen %}
-      <a class="knopf {% if status != wert %}knopf--leise{% endif %} knopf--klein" href="?status={{ wert }}">{{ beschriftung }}</a>
-    {% endfor %}
+  <div class="karte" style="padding:0.9rem 1.1rem; margin-bottom:1.25rem">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.85rem">
+      <div class="knopfreihe" style="margin:0">
+        <a class="knopf {% if status != 'aktiv' %}knopf--leise{% endif %} knopf--klein" href="?status=aktiv{% if gewaehlter_slug %}&amp;fahrlehrer={{ gewaehlter_slug }}{% endif %}{% if q %}&amp;q={{ q|urlencode }}{% endif %}">Anstehend</a>
+        <a class="knopf {% if status != 'vergangen' %}knopf--leise{% endif %} knopf--klein" href="?status=vergangen{% if gewaehlter_slug %}&amp;fahrlehrer={{ gewaehlter_slug }}{% endif %}{% if q %}&amp;q={{ q|urlencode }}{% endif %}">Vergangen</a>
+        {% for wert, beschriftung in status_optionen %}
+          <a class="knopf {% if status != wert %}knopf--leise{% endif %} knopf--klein" href="?status={{ wert }}{% if gewaehlter_slug %}&amp;fahrlehrer={{ gewaehlter_slug }}{% endif %}{% if q %}&amp;q={{ q|urlencode }}{% endif %}">{{ beschriftung }}</a>
+        {% endfor %}
+      </div>
+
+      <form method="get" style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; margin:0">
+        <input type="hidden" name="status" value="{{ status }}">
+        {% if alle_fahrlehrer|length > 1 %}
+          <select name="fahrlehrer" style="width:auto; padding:0.38rem 0.65rem; font-size:0.88rem" onchange="this.form.submit()" aria-label="Fahrlehrer filtern">
+            <option value="">Alle Fahrlehrer</option>
+            {% for fl in alle_fahrlehrer %}
+              <option value="{{ fl.slug }}" {% if gewaehlter_slug == fl.slug %}selected{% endif %}>{{ fl.name }}</option>
+            {% endfor %}
+          </select>
+        {% endif %}
+        <input type="search" name="q" value="{{ q }}" placeholder="Name, E-Mail, Tel., #Ref…" style="width:210px; padding:0.38rem 0.65rem; font-size:0.88rem">
+        <button class="knopf knopf--klein" type="submit">Suchen</button>
+        {% if q or gewaehlter_slug %}
+          <a class="knopf knopf--leise knopf--klein" href="?status={{ status }}">×</a>
+        {% endif %}
+      </form>
+    </div>
   </div>
 
   <div class="karte">

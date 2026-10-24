@@ -4,6 +4,12 @@
 {% block titel %}Fahrschulmanager (FSM) – {{ SITE_NAME }}{% endblock %}
 
 {% block inhalt %}
+  <div style="margin-bottom:1rem">
+    <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:einstellungen' %}#tab-system">
+      &larr; Zurück zu den Einstellungen
+    </a>
+  </div>
+
   <h1>Fahrschulmanager (FSM)</h1>
   <p>
     Verknüpfe die lokalen Fahrlehrer mit ihren Profilen im Fahrschulmanager.
@@ -12,25 +18,20 @@
     Kundendaten aktualisiert.
   </p>
 
-  <p class="knopfreihe">
-    <a class="knopf knopf--leise" href="{% url 'termine:einstellungen' %}">Zu den Einstellungen</a>
-    <a class="knopf knopf--leise" href="{% url 'termine:terminarten' %}">Terminarten verwalten</a>
-  </p>
-
   <!-- FSM Status & Sofort-Sync -->
   <div class="karte" style="margin-bottom: 1.5rem">
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem">
       <div>
         <h2 style="margin:0 0 0.25rem">Verbindungsstatus</h2>
         {% if fsm_fehler %}
-          <span class="marke-status status-gebucht" style="background:#fee2e2; color:#991b1b">
+          <span class="marke-status status-gebucht">
             Verbindungsfehler zur FSM-API
           </span>
-          <p class="leer" style="margin:0.5rem 0 0; color:#dc2626">
+          <p class="leer" style="margin:0.5rem 0 0; color:var(--rot)">
             {{ fsm_fehler }}
           </p>
         {% else %}
-          <span class="marke-status status-frei" style="background:#dcfce7; color:#166534">
+          <span class="marke-status status-frei">
             Verbunden mit Fahrschulmanager
           </span>
           <p class="leer" id="fsm-sync-status-text" style="margin:0.5rem 0 0">

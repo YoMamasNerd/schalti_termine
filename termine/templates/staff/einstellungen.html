@@ -32,26 +32,20 @@
     {# --- Tab-Leiste im Schalti UI Design --- #}
     <div id="einstellungen-bereich">
     <div class="einstellungen-tabs" role="tablist">
-      <button type="button" class="tab-schalter active" data-tab="tab-mein-profil" role="tab">
-        <sl-icon name="person" class="tab-icon"></sl-icon>
-        <span>Mein Benutzerkonto</span>
-      </button>
-      <button type="button" class="tab-schalter" data-tab="tab-fahrlehrer" role="tab">
+      <button type="button" class="tab-schalter active" data-tab="tab-fahrlehrer" role="tab">
         <sl-icon name="clock-history" class="tab-icon"></sl-icon>
         <span>Fahrlehrer-Zeiten</span>
+      </button>
+      <button type="button" class="tab-schalter" data-tab="tab-urlaube" role="tab">
+        <sl-icon name="calendar2-range" class="tab-icon"></sl-icon>
+        <span>Urlaube &amp; Sperrzeiten</span>
+        {% if sperrzeiten %}<span class="tab-badge">{{ sperrzeiten|length }}</span>{% endif %}
       </button>
       {% if ist_inhaber %}
         <button type="button" class="tab-schalter" data-tab="tab-buchung" role="tab">
           <sl-icon name="sliders" class="tab-icon"></sl-icon>
           <span>Globale Buchungsregeln</span>
         </button>
-      {% endif %}
-      <button type="button" class="tab-schalter" data-tab="tab-urlaube" role="tab">
-        <sl-icon name="calendar2-range" class="tab-icon"></sl-icon>
-        <span>Urlaube &amp; Sperrzeiten</span>
-        {% if sperrzeiten %}<span class="tab-badge">{{ sperrzeiten.count }}</span>{% endif %}
-      </button>
-      {% if ist_inhaber %}
         <button type="button" class="tab-schalter" data-tab="tab-stammdaten" role="tab">
           <sl-icon name="folder2-open" class="tab-icon"></sl-icon>
           <span>Stammdaten &amp; Kataloge</span>
@@ -61,19 +55,23 @@
           <span>Schnittstellen &amp; System</span>
         </button>
       {% endif %}
+      <button type="button" class="tab-schalter" data-tab="tab-mein-profil" role="tab">
+        <sl-icon name="person" class="tab-icon"></sl-icon>
+        <span>Mein Benutzerkonto</span>
+      </button>
     </div>
-
-    {% include "staff/_einstellungen_profil.html" %}
 
     {% include "staff/_einstellungen_fahrlehrer.html" %}
 
-    {% include "staff/_einstellungen_buchung.html" %}
-
     {% include "staff/_einstellungen_sperrzeiten.html" %}
+
+    {% include "staff/_einstellungen_buchung.html" %}
 
     {% include "staff/_einstellungen_stammdaten.html" %}
 
     {% include "staff/_einstellungen_system.html" %}
+
+    {% include "staff/_einstellungen_profil.html" %}
 
     {% include "staff/_messages_oob.html" %}
     <style>

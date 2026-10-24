@@ -3,15 +3,15 @@
 {% block titel %}Führerscheinklassen verwalten – {{ SITE_NAME }}{% endblock %}
 
 {% block inhalt %}
-  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem">
-    <h1>Führerscheinklassen</h1>
-    <a class="knopf" href="{% url 'termine:klasse_neu' %}">+ Neue Klasse anlegen</a>
-  </div>
-
   <div style="margin-bottom:1rem">
-    <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:einstellungen' %}#tab-buchung">
+    <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:einstellungen' %}#tab-stammdaten">
       &larr; Zurück zu den Einstellungen
     </a>
+  </div>
+
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem">
+    <h1 style="margin:0">Führerscheinklassen</h1>
+    <a class="knopf" href="{% url 'termine:klasse_neu' %}">+ Neue Klasse anlegen</a>
   </div>
 
   <div class="karte">
@@ -41,11 +41,9 @@
               </td>
               <td>{{ k.name }}</td>
               <td>
-                {% if k.aktiv %}
-                  <span class="status status--gebucht" style="font-size:0.75rem">Aktiv</span>
-                {% else %}
-                  <span class="status status--entfallen" style="font-size:0.75rem">Inaktiv</span>
-                {% endif %}
+                <span class="marke-status {% if k.aktiv %}status-frei{% else %}status-gebucht{% endif %}">
+                  {% if k.aktiv %}aktiv{% else %}inaktiv{% endif %}
+                </span>
               </td>
               <td>{{ k.reihenfolge }}</td>
               <td style="text-align:right">

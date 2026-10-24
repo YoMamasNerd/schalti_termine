@@ -127,6 +127,33 @@ class RhythmusRegel(models.Model):
     def wochentage_kurz(self) -> str:
         return ", ".join(WOCHENTAG_KURZ[t] for t in sorted(self.wochentage) if t in WOCHENTAG_KURZ)
 
+    @property
+    def wochentage_chips(self) -> list[dict]:
+        """Liefert alle 7 Wochentage (Mo–So) mit Aktiv-Status für die UI."""
+        aktive = set(self.wochentage or [])
+        return [
+            {"tag": idx, "kuerzel": WOCHENTAG_KURZ[idx], "aktiv": idx in aktive}
+            for idx in range(7)
+        ]
+
+    @property
+    def ist_diese_woche_aktiv(self) -> bool:
+        """Prüft bei mehrwöchigem Rhythmus, ob die aktuelle Kalenderwoche im Intervall liegt."""
+        if not self.aktiv:
+            return False
+        heute = timezone.localdate()
+        montag = heute - dt.timedelta(days=heute.weekday())
+        sonntag = montag + dt.timedelta(days=6)
+        if self.gueltig_ab > sonntag:
+            return False
+        if self.gueltig_bis and self.gueltig_bis < montag:
+            return False
+        if self.intervall_wochen > 1:
+            referenz_montag = self.referenzwoche - dt.timedelta(days=self.referenzwoche.weekday())
+            wochen_differenz = (montag - referenz_montag).days // 7
+            return (wochen_differenz % self.intervall_wochen) == 0
+        return True
+
     def gilt_am(self, tag: dt.date) -> bool:
         """Greift diese Regel an diesem Kalendertag?
 
@@ -156,6 +183,7 @@ class Sperrzeit(models.Model):
 
     class Herkunft(models.TextChoices):
         MANUELL = "manuell", "Manuell"
+        REGEL = "regel", "Rhythmus-Regel"
         FSM = "fsm", "FSM-Import"
 
     Typ = SperrzeitTyp

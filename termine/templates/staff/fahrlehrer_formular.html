@@ -3,8 +3,10 @@
 {% block titel %}Fahrlehrer anlegen – {{ SITE_NAME }}{% endblock %}
 
 {% block inhalt %}
+  <div style="margin-bottom:1rem">
+    <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:einstellungen' %}#tab-stammdaten">&larr; Zurück zu den Einstellungen</a>
+  </div>
   <h1>Fahrlehrer anlegen</h1>
-  <p><a href="{% url 'termine:einstellungen' %}">&larr; Zurück zu den Einstellungen</a></p>
 
   <div class="raster-zwei">
     <form class="karte" method="post" novalidate>

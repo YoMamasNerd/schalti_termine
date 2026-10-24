@@ -466,6 +466,7 @@ def sync_blocker_fuer_fahrlehrer(
         loesche_termin_aus_fsm(t_entfallen, client=client)
 
     # Bereits von Schalti erzeugte FSM-IDs (aktive Beratungstermine und eigene Sperrzeiten)
+    eigene_herkuenfte = [Sperrzeit.Herkunft.MANUELL, Sperrzeit.Herkunft.REGEL]
     eigene_fsm_ids = set(
         Termin.objects.filter(fahrlehrer=fahrlehrer)
         .exclude(fsm_termin_id="")
@@ -473,7 +474,7 @@ def sync_blocker_fuer_fahrlehrer(
         .values_list("fsm_termin_id", flat=True)
     )
     for raw_fsm_id in (
-        Sperrzeit.objects.filter(fahrlehrer=fahrlehrer, herkunft=Sperrzeit.Herkunft.MANUELL)
+        Sperrzeit.objects.filter(fahrlehrer=fahrlehrer, herkunft__in=eigene_herkuenfte)
         .exclude(fsm_id="")
         .values_list("fsm_id", flat=True)
     ):
@@ -482,15 +483,15 @@ def sync_blocker_fuer_fahrlehrer(
             if fid_clean:
                 eigene_fsm_ids.add(fid_clean)
 
-    # Eigene manuelle Sperrzeiten ohne FSM-ID nach FSM exportieren
-    manuelle_sperren = Sperrzeit.objects.filter(
+    # Eigene Sperrzeiten (manuell & aus Rhythmus-Regeln) ohne FSM-ID nach FSM exportieren
+    eigene_sperren = Sperrzeit.objects.filter(
         fahrlehrer=fahrlehrer,
-        herkunft=Sperrzeit.Herkunft.MANUELL,
+        herkunft__in=eigene_herkuenfte,
         beginn__gte=jetzt,
         beginn__lte=ende,
         fsm_id="",
     )
-    for s in manuelle_sperren:
+    for s in eigene_sperren:
         created_ids = exportiere_sperrzeit_nach_fsm(s, client=client)
         eigene_fsm_ids.update(created_ids)
 

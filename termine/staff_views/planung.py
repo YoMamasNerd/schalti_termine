@@ -210,6 +210,11 @@ def tagesplanung(request):
             ist_ganztaegig = (s.ende - s.beginn).total_seconds() >= 82800 or (
                 s.beginn.date() < tag < s.ende.date()
             )
+            ist_regel_sperre = bool(s.regel_id) or s.herkunft == Sperrzeit.Herkunft.REGEL
+            ist_fsm_sperre = not ist_regel_sperre and (
+                s.herkunft == Sperrzeit.Herkunft.FSM
+                or (bool(s.fsm_id) and (s.grund or "").strip().startswith("FSM:"))
+            )
             eintraege.append(
                 {
                     "art": "sperre",
@@ -217,8 +222,10 @@ def tagesplanung(request):
                     "beginn_uhrzeit": s_beginn.strftime("%H:%M") if not ist_ganztaegig else "",
                     "ende_uhrzeit": s_ende.strftime("%H:%M") if not ist_ganztaegig else "",
                     "ist_ganztaegig": ist_ganztaegig,
-                    "ist_fsm": bool(s.fsm_id),
-                    "titel": s.grund or ("FSM-Termin" if s.fsm_id else "Sperrzeit"),
+                    "ist_fsm": ist_fsm_sperre,
+                    "ist_regel_sperre": ist_regel_sperre,
+                    "regel_id": s.regel_id,
+                    "titel": s.grund or ("Regel-Blocker" if ist_regel_sperre else ("FSM-Termin" if ist_fsm_sperre else "Sperrzeit")),
                     "sperre": s,
                 }
             )
@@ -593,14 +600,27 @@ def termin_loeschen(request, pk: int):
 @require_POST
 def generieren(request):
     """Stößt den Slot-Generator von Hand an."""
+    erlaubt = _erlaubte_fahrlehrer(request.user)
+    if request.POST.get("alle") == "1":
+        from ..services.planung import Bericht
+
+        gesamt = Bericht(fahrlehrer="alle")
+        for fl in erlaubt:
+            gesamt = gesamt + generiere_termine(fl)
+        messages.success(
+            request,
+            f"Terminplanung für alle Fahrlehrer aktualisiert: {gesamt.als_text()}.",
+        )
+        return redirect(_sicheres_ziel(request, "termine:regeln"))
+
     fahrlehrer, _ = _gewaehlter_fahrlehrer(request)
     slug = request.POST.get("fahrlehrer")
     if slug:
-        fahrlehrer = _erlaubte_fahrlehrer(request.user).filter(slug=slug).first()
+        fahrlehrer = erlaubt.filter(slug=slug).first()
 
     if fahrlehrer is None:
         messages.error(request, "Kein Fahrlehrer ausgewählt.")
-        return redirect("termine:tagesplanung")
+        return redirect(_sicheres_ziel(request, "termine:tagesplanung"))
 
     bericht = generiere_termine(fahrlehrer)
     messages.success(
@@ -608,4 +628,7 @@ def generieren(request):
         f"Terminplanung für {fahrlehrer.name} bis {date_format(bericht.bis, 'j. F Y')}: "
         f"{bericht.als_text()}.",
     )
-    return redirect(f"/intern/planung/?fahrlehrer={fahrlehrer.slug}")
+    standard_ziel = f"/intern/planung/?fahrlehrer={fahrlehrer.slug}"
+    if request.POST.get("next") or request.GET.get("next"):
+        return redirect(_sicheres_ziel(request, "termine:tagesplanung"))
+    return redirect(standard_ziel)

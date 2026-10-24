@@ -394,3 +394,70 @@ class SperrzeitRegelnTests(BasisDaten):
         self.assertIn("16:30", uhrzeiten)
         self.assertIn("17:00", uhrzeiten)
         self.assertIn("17:30", uhrzeiten)
+        self.assertEqual(sperre.herkunft, Sperrzeit.Herkunft.REGEL)
+
+    def test_sperrzeit_regel_aktualisiert_ende_und_raeumt_freie_termine_ab(self):
+        self.regel(
+            wochentage=[self.montag.weekday()],
+            beginn=dt.time(14, 0),
+            ende=dt.time(18, 0),
+        )
+        blocker = RhythmusRegel.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            regel_art=RhythmusRegel.RegelArt.SPERRE,
+            sperrzeit_typ=Sperrzeit.Typ.PRIVAT,
+            grund="Pause",
+            beginn=dt.time(15, 0),
+            ende=dt.time(16, 0),
+            wochentage=[self.montag.weekday()],
+            gueltig_ab=self.montag,
+            intervall_wochen=1,
+            aktiv=True,
+        )
+        generiere_termine(self.fahrlehrer, wochen=1, ab=self.montag)
+        uhrzeiten_vorher = [
+            timezone.localtime(t.beginn).strftime("%H:%M")
+            for t in termine_am(self.montag)
+        ]
+        self.assertIn("16:00", uhrzeiten_vorher)
+
+        # Blocker-Ende auf 17:00 verlängern -> bestehende Sperre wird aktualisiert
+        # und freie Termine zwischen 16:00 und 17:00 werden entfernt.
+        blocker.ende = dt.time(17, 0)
+        blocker.save()
+        generiere_termine(self.fahrlehrer, wochen=1, ab=self.montag)
+
+        uhrzeiten_nachher = [
+            timezone.localtime(t.beginn).strftime("%H:%M")
+            for t in termine_am(self.montag)
+        ]
+        self.assertNotIn("16:00", uhrzeiten_nachher)
+        self.assertNotIn("16:30", uhrzeiten_nachher)
+        self.assertIn("17:00", uhrzeiten_nachher)
+
+    def test_identisches_zeitfenster_mit_zweiter_terminart_wirft_keinen_type_error(self):
+        zweite_art = Terminart.objects.create(name="Aufbauseminar", dauer_minuten=30)
+        self.regel(
+            terminart=self.art,
+            wochentage=[self.montag.weekday()],
+            beginn=dt.time(10, 0),
+            ende=dt.time(11, 0),
+        )
+        self.regel(
+            terminart=zweite_art,
+            wochentage=[self.montag.weekday()],
+            beginn=dt.time(10, 0),
+            ende=dt.time(11, 0),
+        )
+        bericht = generiere_termine(self.fahrlehrer, wochen=1, ab=self.montag)
+        self.assertEqual(bericht.erstellt, 2)
+        self.assertGreaterEqual(bericht.konflikte_uebersprungen, 2)
+
+    def test_vorschau_einer_regel_meldet_zu_kurzes_zeitfenster(self):
+        from termine.services.planung import vorschau_einer_regel
+
+        kurze_regel = self.regel(beginn=dt.time(10, 0), ende=dt.time(10, 15))
+        daten = vorschau_einer_regel(kurze_regel, wochen=1, ab=self.montag)
+        self.assertTrue(daten["fenster_zu_kurz"])
+        self.assertEqual(daten["slots_pro_tag"], 0)
+        self.assertEqual(len(daten["eintraege"]), 0)

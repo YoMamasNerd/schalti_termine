@@ -31,11 +31,32 @@ from .common import _erlaubte_fahrlehrer, _sicheres_ziel, mitarbeiter
 @mitarbeiter
 def buchungsliste(request):
     erlaubt = _erlaubte_fahrlehrer(request.user)
+    alle_fahrlehrer = list(erlaubt.order_by("reihenfolge", "name"))
     status = request.GET.get("status", "aktiv")
+    gewaehlter_slug = request.GET.get("fahrlehrer", "").strip()
+    suchbegriff = request.GET.get("q", "").strip()
 
     buchungen = Buchung.objects.filter(termin__fahrlehrer__in=erlaubt).select_related(
         "termin", "termin__terminart", "termin__fahrlehrer"
     )
+    if gewaehlter_slug:
+        fl_obj = erlaubt.filter(slug=gewaehlter_slug).first()
+        if fl_obj:
+            buchungen = buchungen.filter(termin__fahrlehrer=fl_obj)
+        else:
+            gewaehlter_slug = ""
+
+    if suchbegriff:
+        q_clean = suchbegriff.lstrip("#").strip()
+        filter_q = (
+            Q(name__icontains=suchbegriff)
+            | Q(email__icontains=suchbegriff)
+            | Q(telefon__icontains=suchbegriff)
+            | Q(nachricht__icontains=suchbegriff)
+            | Q(token__istartswith=q_clean)
+        )
+        buchungen = buchungen.filter(filter_q)
+
     if status == "aktiv":
         buchungen = buchungen.filter(
             status__in=Buchung.AKTIVE_STATUS, termin__beginn__gte=timezone.now()
@@ -56,6 +77,9 @@ def buchungsliste(request):
             "buchungen": buchungen[:200],
             "status": status,
             "status_optionen": Buchung.Status.choices,
+            "alle_fahrlehrer": alle_fahrlehrer,
+            "gewaehlter_slug": gewaehlter_slug,
+            "q": suchbegriff,
         },
     )
 

@@ -47,7 +47,13 @@ from .planung import (
     termin_loeschen,
     termine_anlegen,
 )
-from .regeln import regel_bearbeiten, regel_loeschen, regelliste
+from .regeln import (
+    regel_bearbeiten,
+    regel_loeschen,
+    regel_toggle_aktiv,
+    regel_vorschau,
+    regelliste,
+)
 from .stammdaten import (
     fahrlehrer_neu,
     klasse_bearbeiten,
@@ -86,6 +92,8 @@ __all__ = [
     "mitarbeiter",
     "regel_bearbeiten",
     "regel_loeschen",
+    "regel_toggle_aktiv",
+    "regel_vorschau",
     "regelliste",
     "smtp_test_ajax",
     "sperrzeit_anlegen",

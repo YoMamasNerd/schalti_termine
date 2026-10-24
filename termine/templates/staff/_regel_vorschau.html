@@ -1,0 +1,76 @@
+<div id="regel-vorschau-box" class="karte" style="margin-bottom:1.25rem">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.6rem">
+    <h2 style="margin:0; font-size:1.1rem; display:flex; align-items:center; gap:0.45rem">
+      <sl-icon name="eye" style="color:var(--marke)"></sl-icon>
+      Vorschau im Horizont
+    </h2>
+    {% if vorschau_tage %}
+      <span class="status-pill success">
+        {{ vorschau_anzahl_gesamt|default:vorschau_tage|length }}
+        {% if ist_sperre %}Blocker{% else %}Termin{{ vorschau_anzahl_gesamt|pluralize:"e" }}{% endif %}
+      </span>
+    {% endif %}
+  </div>
+
+  {% if fenster_zu_kurz %}
+    <div class="hinweis hinweis--warnung" style="margin-bottom:0.85rem; font-size:0.88rem">
+      {% if ist_sperre %}
+        <strong>Zeitfenster ungültig:</strong> Das Ende muss nach dem Beginn liegen.
+      {% else %}
+        <strong>Zeitfenster zu kurz:</strong> Das gewählte Fenster ({{ fenster_minuten }} Min.) ist kürzer als die Termindauer ({{ dauer_minuten }} Min.) – es entstehen <strong>0 Termine</strong>!
+      {% endif %}
+    </div>
+  {% elif slots_pro_tag and not ist_sperre %}
+    <div style="background:var(--flaeche-dunkler); border-radius:var(--radius-klein); padding:0.55rem 0.75rem; margin-bottom:0.85rem; font-size:0.86rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem">
+      <span>Raster pro aktivem Tag:</span>
+      <strong>{{ slots_pro_tag }} Termin{{ slots_pro_tag|pluralize:"e" }} ({{ fenster_minuten }} Min. Fenster)</strong>
+    </div>
+  {% elif ist_sperre and fenster_minuten > 0 %}
+    <div style="background:var(--flaeche-dunkler); border-radius:var(--radius-klein); padding:0.55rem 0.75rem; margin-bottom:0.85rem; font-size:0.86rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem">
+      <span>Sperrdauer pro aktivem Tag:</span>
+      <strong>{{ fenster_minuten }} Minuten geblockt</strong>
+    </div>
+  {% endif %}
+
+  {% if vorschau_tage %}
+    <p class="leer" style="font-size:0.85rem; margin:0 0 0.65rem">
+      Nächste aktive Tage im aktuellen Planungshorizont:
+    </p>
+    <ul style="list-style:none; padding:0; margin:0; font-size:0.88rem; max-height:280px; overflow-y:auto">
+      {% for tag, anzahl in vorschau_tage %}
+        <li style="display:flex; justify-content:space-between; align-items:center; padding:0.35rem 0; border-bottom:1px solid var(--linie)">
+          <span><strong>{{ tag|date:"D" }}</strong>, {{ tag|date:"d.m.Y" }}</span>
+          {% if ist_sperre or regel and regel.regel_art == 'sperre' %}
+            <span class="regel-art-badge regel-art-badge--sperre">
+              Blocker ({{ regel.beginn|time:"H:i" }}–{{ regel.ende|time:"H:i" }})
+            </span>
+          {% else %}
+            <span class="regel-art-badge regel-art-badge--angebot">
+              {{ anzahl }} Termin{{ anzahl|pluralize:"e" }}
+            </span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    {% if bericht and bericht.sperrzeiten_uebersprungen or bericht and bericht.feiertage_uebersprungen %}
+      <p class="leer" style="font-size:0.8rem; margin:0.65rem 0 0">
+        {% if bericht.feiertage_uebersprungen %}
+          {{ bericht.feiertage_uebersprungen }} wegen Feiertag ausgelassen.
+        {% endif %}
+        {% if bericht.sperrzeiten_uebersprungen %}
+          {{ bericht.sperrzeiten_uebersprungen }} wegen bestehender Sperrzeit ausgelassen.
+        {% endif %}
+      </p>
+    {% endif %}
+  {% else %}
+    <p class="leer" style="font-size:0.88rem; margin:0">
+      {% if vorschau_bereit == False %}
+        Wählen Sie mindestens einen Wochentag und ein gültiges Zeitfenster aus, um die Vorschau zu berechnen.
+      {% elif regel and not regel.aktiv %}
+        Diese Regel ist aktuell <strong>deaktiviert</strong> und erzeugt daher keine Einträge.
+      {% else %}
+        Im aktuellen Planungshorizont entstehen keine Einträge (z. B. wegen Sperrzeiten, Feiertagen oder Gültigkeitszeitraum).
+      {% endif %}
+    </p>
+  {% endif %}
+</div>

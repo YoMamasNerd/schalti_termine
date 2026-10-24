@@ -17,8 +17,8 @@
           🗑️ Alte Logs bereinigen
         </button>
       </form>
-      <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:einstellungen' %}">
-        ⚙️ Einstellungen
+      <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:einstellungen' %}#tab-system">
+        &larr; Zurück zu den Einstellungen
       </a>
     </div>
   </div>
@@ -120,11 +120,11 @@
                 </td>
                 <td data-label="Level">
                   {% if log.level == 'INFO' %}
-                    <span class="abzeichen" style="background:#e0f2fe; color:#0369a1; font-weight:600">INFO</span>
+                    <span class="abzeichen" style="background:var(--marke-hell); color:var(--marke-dunkel); font-weight:600">INFO</span>
                   {% elif log.level == 'WARNING' %}
-                    <span class="abzeichen" style="background:#fef3c7; color:#b45309; font-weight:600">WARNUNG</span>
+                    <span class="abzeichen" style="background:var(--gelb-hell); color:var(--gelb); font-weight:600">WARNUNG</span>
                   {% elif log.level == 'ERROR' or log.level == 'CRITICAL' %}
-                    <span class="abzeichen" style="background:#fee2e2; color:#b91c1c; font-weight:600">FEHLER</span>
+                    <span class="abzeichen" style="background:var(--rot-hell); color:var(--rot); font-weight:600">FEHLER</span>
                   {% else %}
                     <span class="abzeichen">{{ log.level }}</span>
                   {% endif %}

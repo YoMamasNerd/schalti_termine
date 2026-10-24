@@ -548,6 +548,52 @@ class FsmEinstellungenViewTests(TestCase):
         self.assertEqual(kwargs["terminart"], "PP")
         self.assertIn("Kinder aus Kita abholen", kwargs["titel"])
 
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_regel_sperrzeit_bleibt_beim_fsm_sync_als_regel_erhalten(self):
+        from termine.models import RhythmusRegel
+
+        jetzt = timezone.now()
+        von = jetzt + dt.timedelta(days=1, hours=2)
+        bis = von + dt.timedelta(hours=1, minutes=30)
+
+        regel = RhythmusRegel.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            regel_art=RhythmusRegel.RegelArt.SPERRE,
+            sperrzeit_typ=Sperrzeit.Typ.PRIVAT,
+            grund="Kita abholen",
+            wochentage=[von.weekday()],
+            beginn=dt.time(15, 0),
+            ende=dt.time(16, 30),
+        )
+        sperre = Sperrzeit.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            regel=regel,
+            beginn=von,
+            ende=bis,
+            grund="Kita abholen",
+            typ=Sperrzeit.Typ.PRIVAT,
+            herkunft=Sperrzeit.Herkunft.REGEL,
+            fsm_id="fsm-regel-blocker-123",
+        )
+
+        mock_client = MagicMock()
+        mock_client.get_termine.return_value = [
+            FsmTermin(
+                id="fsm-regel-blocker-123",
+                von=von,
+                bis=bis,
+                fahrlehrer_id=self.fahrlehrer.fsm_id,
+                terminart="PP",
+                titel="Kita abholen",
+            )
+        ]
+
+        sync_blocker_fuer_fahrlehrer(self.fahrlehrer, client=mock_client)
+        sperre.refresh_from_db()
+        self.assertEqual(sperre.herkunft, Sperrzeit.Herkunft.REGEL)
+        self.assertEqual(sperre.grund, "Kita abholen")
+        self.assertEqual(sperre.regel_id, regel.pk)
+
     def test_is_theorie_termin(self):
         from termine.services.fsm_sync import is_theorie_termin
 

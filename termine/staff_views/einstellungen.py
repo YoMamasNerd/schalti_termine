@@ -168,13 +168,33 @@ def einstellungen(request):
     alle_sperren = list(
         Sperrzeit.objects.filter(fahrlehrer=fahrlehrer, ende__gte=jetzt).order_by("beginn")
     )
-    manuelle_sperren = [s for s in alle_sperren if not s.fsm_id]
-    fsm_sperren_count = sum(1 for s in alle_sperren if s.fsm_id)
-    alle_lehrer_sperren = list(
-        Sperrzeit.objects.filter(fahrlehrer__in=erlaubt, ende__gte=jetzt, fsm_id="")
+
+    def _ist_manuelle_sperre(s: Sperrzeit) -> bool:
+        if s.regel_id or s.herkunft in (Sperrzeit.Herkunft.REGEL, Sperrzeit.Herkunft.FSM):
+            return False
+        if s.fsm_id and (s.grund or "").strip().startswith("FSM:"):
+            return False
+        return True
+
+    manuelle_sperren = [s for s in alle_sperren if _ist_manuelle_sperre(s)]
+    fsm_sperren_count = sum(
+        1
+        for s in alle_sperren
+        if s.herkunft == Sperrzeit.Herkunft.FSM
+        or (s.fsm_id and not _ist_manuelle_sperre(s) and not s.regel_id)
+    )
+    alle_lehrer_sperren = [
+        s
+        for s in Sperrzeit.objects.filter(
+            fahrlehrer__in=erlaubt,
+            ende__gte=jetzt,
+            herkunft=Sperrzeit.Herkunft.MANUELL,
+            regel__isnull=True,
+        )
         .select_related("fahrlehrer")
         .order_by("beginn")
-    )
+        if _ist_manuelle_sperre(s)
+    ]
 
     from allauth.socialaccount.models import SocialAccount
     social_account = SocialAccount.objects.filter(user=request.user).first()

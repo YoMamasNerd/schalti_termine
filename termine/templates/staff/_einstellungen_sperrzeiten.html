@@ -108,14 +108,14 @@
 
           <div class="karte" style="{% if fsm_sperren_count %}margin-top:1.25rem{% endif %}">
             <h2 style="margin:0 0 0.5rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem">
-              <sl-icon name="geo-alt" style="color:var(--marke)"></sl-icon> Feiertage
+              <sl-icon name="arrow-repeat" style="color:var(--marke)"></sl-icon> Regelmäßige Abwesenheiten
             </h2>
-            <p class="leer" style="margin:0 0 0.8rem; line-height:1.55">
-              Gesetzliche Feiertage für das Bundesland <strong>{{ fahrlehrer.get_bundesland_display }}</strong> werden bei Rhythmus-Regeln automatisch berücksichtigt und freigehalten.
+            <p class="leer" style="margin:0 0 0.85rem; line-height:1.55">
+              Wiederkehrende Sperrzeiten (z. B. feste Pausen, Bürozeiten oder wöchentliche Termine) pflegen Sie als Blocker in den Rhythmus-Regeln.
             </p>
-            <p style="margin:0; font-size:0.88rem; color:var(--text-leise)">
-              Das Bundesland kann im Reiter <em>„Fahrlehrer-Zeiten“</em> angepasst werden.
-            </p>
+            <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:regeln' %}?fahrlehrer={{ fahrlehrer.slug }}&amp;art=sperre">
+              Regelmäßige Blocker verwalten &rarr;
+            </a>
           </div>
         </div>
       </div>

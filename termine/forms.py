@@ -209,10 +209,15 @@ class RhythmusRegelForm(forms.ModelForm):
             self.fields["sperrzeit_typ"].required = False
         if "regel_art" in self.fields:
             self.fields["regel_art"].required = False
+        if "referenzwoche" in self.fields:
+            self.fields["referenzwoche"].required = False
         if not self.instance.pk:
+            heute = timezone.localdate()
             self.initial.setdefault("beginn", dt.time(15, 30))
             self.initial.setdefault("ende", dt.time(17, 0))
             self.initial.setdefault("regel_art", RhythmusRegel.RegelArt.ANGEBOT)
+            self.initial.setdefault("gueltig_ab", heute)
+            self.initial["referenzwoche"] = self.initial.get("gueltig_ab") or heute
         vorhanden = self.initial.get("wochentage") or []
         if vorhanden:
             self.initial["wochentage"] = [str(tag) for tag in vorhanden]
@@ -224,8 +229,29 @@ class RhythmusRegelForm(forms.ModelForm):
         daten = super().clean()
         art = daten.get("regel_art") or RhythmusRegel.RegelArt.ANGEBOT
         daten["regel_art"] = art
-        if art == RhythmusRegel.RegelArt.ANGEBOT and not daten.get("terminart"):
-            self.add_error("terminart", "Für Terminangebote ist eine Terminart erforderlich.")
+        if art == RhythmusRegel.RegelArt.ANGEBOT:
+            if not daten.get("terminart"):
+                self.add_error("terminart", "Für Terminangebote ist eine Terminart erforderlich.")
+            daten["sperrzeit_typ"] = ""
+            daten["grund"] = ""
+        else:
+            daten["terminart"] = None
+            if not daten.get("sperrzeit_typ"):
+                daten["sperrzeit_typ"] = Sperrzeit.Typ.PRIVAT
+
+        gueltig_ab = daten.get("gueltig_ab") or timezone.localdate()
+        intervall = daten.get("intervall_wochen") or 1
+        ref = daten.get("referenzwoche")
+        if intervall <= 1 or not ref or (
+            ref == dt.date(2024, 1, 1) and not self.data.get("referenzwoche")
+        ):
+            daten["referenzwoche"] = gueltig_ab
+
+        self.instance.regel_art = art
+        self.instance.terminart = daten.get("terminart")
+        self.instance.sperrzeit_typ = daten.get("sperrzeit_typ", "")
+        self.instance.grund = daten.get("grund", "")
+        self.instance.referenzwoche = daten["referenzwoche"]
         return daten
 
 

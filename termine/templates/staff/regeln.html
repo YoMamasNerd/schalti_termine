@@ -3,64 +3,164 @@
 {% block titel %}Rhythmus-Regeln – {{ SITE_NAME }}{% endblock %}
 
 {% block inhalt %}
-  <h1>Rhythmus-Regeln</h1>
-  <p>
-    Eine Regel beschreibt eine wiederkehrende Verfügbarkeit – zum Beispiel
-    „dienstags und donnerstags 14:00–18:00“. Der Generator rollt sie für den
-    eingestellten Horizont in einzelne Termine aus und lässt dabei Feiertage
-    und Sperrzeiten aus.
-  </p>
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem">
+    <div>
+      <h1 style="margin:0 0 0.25rem">Rhythmus-Regeln</h1>
+      <p class="leer" style="margin:0; font-size:0.95rem">
+        Wiederkehrende Terminangebote und regelmäßige Blocker (z. B. Pausen, Bürozeit, Abholzeiten).
+      </p>
+    </div>
+    <div class="knopfreihe" style="margin:0">
+      <a class="knopf" href="{% url 'termine:regel_neu' %}{% if gewaehlter_slug %}?fahrlehrer={{ gewaehlter_slug }}{% endif %}">
+        + Neue Regel anlegen
+      </a>
+      {% if anzahl_gesamt > 0 %}
+        <form method="post" action="{% url 'termine:generieren' %}" style="margin:0">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          {% if gewaehlter_slug %}
+            <input type="hidden" name="fahrlehrer" value="{{ gewaehlter_slug }}">
+          {% else %}
+            <input type="hidden" name="alle" value="1">
+          {% endif %}
+          <button class="knopf knopf--leise" type="submit" title="Rollt alle aktiven Regeln sofort im Planungshorizont aus">
+            ⚡ Jetzt vorausplanen
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
 
-  <p class="knopfreihe">
-    <a class="knopf" href="{% url 'termine:regel_neu' %}">Neue Regel</a>
-    <a class="knopf knopf--leise" href="{% url 'termine:tagesplanung' %}">Zur Tagesplanung</a>
-  </p>
+  {# --- Filterleiste (Fahrlehrer & Regel-Art) --- #}
+  {% if alle_fahrlehrer|length > 1 or anzahl_gesamt > 0 %}
+    <div class="karte" style="padding:0.85rem 1.1rem; margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.85rem">
+      {% if alle_fahrlehrer|length > 1 %}
+        <div class="lehrer-auswahl" style="margin:0">
+          <a class="knopf {% if gewaehlter_slug %}knopf--leise{% endif %} knopf--klein"
+             href="?{% if gewaehlte_art %}art={{ gewaehlte_art }}{% endif %}">
+            Alle Fahrlehrer
+          </a>
+          {% for fl in alle_fahrlehrer %}
+            <a class="knopf {% if gewaehlter_slug != fl.slug %}knopf--leise{% endif %} knopf--klein"
+               href="?fahrlehrer={{ fl.slug }}{% if gewaehlte_art %}&amp;art={{ gewaehlte_art }}{% endif %}">
+              {{ fl.name }}
+            </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:center">
+        <a class="knopf {% if gewaehlte_art %}knopf--leise{% endif %} knopf--klein"
+           href="?{% if gewaehlter_slug %}fahrlehrer={{ gewaehlter_slug }}{% endif %}">
+          Alle ({{ anzahl_gesamt }})
+        </a>
+        <a class="knopf {% if gewaehlte_art != 'angebot' %}knopf--leise{% endif %} knopf--klein"
+           href="?{% if gewaehlter_slug %}fahrlehrer={{ gewaehlter_slug }}&amp;{% endif %}art=angebot">
+          Termine ({{ anzahl_angebote }})
+        </a>
+        <a class="knopf {% if gewaehlte_art != 'sperre' %}knopf--leise{% endif %} knopf--klein"
+           href="?{% if gewaehlter_slug %}fahrlehrer={{ gewaehlter_slug }}&amp;{% endif %}art=sperre">
+          Blocker ({{ anzahl_sperren }})
+        </a>
+      </div>
+    </div>
+  {% endif %}
 
   <div class="karte">
     <div class="tabelle-huelle">
       <table class="liste als-karten">
         <thead>
           <tr>
-            <th>Fahrlehrer</th><th>Wochentage</th><th>Zeit</th><th>Rhythmus</th>
-            <th>Art / Zweck</th><th>Gültig</th><th>Feiertage</th><th>Status</th><th></th>
+            <th>Fahrlehrer</th>
+            <th>Art &amp; Details</th>
+            <th>Wochentage</th>
+            <th>Uhrzeit</th>
+            <th>Rhythmus &amp; Gültigkeit</th>
+            <th>Status</th>
+            <th style="text-align:right">Aktionen</th>
           </tr>
         </thead>
         <tbody>
           {% for regel in regeln %}
-            <tr>
-              <td data-label="Fahrlehrer">{{ regel.fahrlehrer.name }}</td>
-              <td data-label="Wochentage">{{ regel.wochentage_kurz }}</td>
-              <td data-label="Zeit">{{ regel.beginn|time:"H:i" }}–{{ regel.ende|time:"H:i" }}</td>
-              <td data-label="Rhythmus">
-                {% if regel.intervall_wochen == 1 %}wöchentlich
-                {% else %}alle {{ regel.intervall_wochen }} Wochen{% endif %}
+            <tr {% if not regel.aktiv %}style="opacity:0.65"{% endif %}>
+              <td data-label="Fahrlehrer">
+                <strong>{{ regel.fahrlehrer.name }}</strong>
               </td>
-              <td data-label="Art / Zweck">
-                {% if regel.regel_art == "sperre" %}
-                  <span class="marke-status" style="background:#fee2e2; color:#991b1b; font-size:0.75rem">Blocker</span>
-                  {% if regel.grund %}<br><strong>{{ regel.grund }}</strong>{% endif %}
-                  <br><span class="leer">{{ regel.get_sperrzeit_typ_display }}</span>
-                {% else %}
-                  <span class="marke-status" style="background:#dcfce7; color:#166534; font-size:0.75rem">Termine</span>
-                  {% if regel.terminart %}<br><strong>{{ regel.terminart.name }}</strong><br><span class="leer">{{ regel.terminart.dauer_minuten }} Min.</span>{% endif %}
+              <td data-label="Art &amp; Details">
+                <div style="display:flex; align-items:center; gap:0.45rem; flex-wrap:wrap">
+                  {% if regel.regel_art == 'sperre' %}
+                    <span class="regel-art-badge regel-art-badge--sperre">Blocker</span>
+                    <strong>{{ regel.grund|default:regel.get_sperrzeit_typ_display }}</strong>
+                    <span class="leer" style="font-size:0.8rem">({{ regel.get_sperrzeit_typ_display }})</span>
+                  {% else %}
+                    <span class="regel-art-badge regel-art-badge--angebot">Termine</span>
+                    <strong>{{ regel.terminart.name }}</strong>
+                    <span class="leer" style="font-size:0.8rem">({{ regel.terminart.dauer_minuten }} Min.)</span>
+                  {% endif %}
+                </div>
+                {% if regel.bezeichnung %}
+                  <div class="leer" style="font-size:0.82rem; margin-top:0.2rem">
+                    {{ regel.bezeichnung }}
+                  </div>
                 {% endif %}
               </td>
-              <td data-label="Gültig">
-                ab {{ regel.gueltig_ab|date:"SHORT_DATE_FORMAT" }}
-                {% if regel.gueltig_bis %}<br>bis {{ regel.gueltig_bis|date:"SHORT_DATE_FORMAT" }}{% endif %}
+              <td data-label="Wochentage">
+                <div class="wt-chips" title="{{ regel.wochentage_kurz }}">
+                  {% for chip in regel.wochentage_chips %}
+                    <span class="wt-chip {% if chip.aktiv %}wt-chip--aktiv{% endif %}">{{ chip.kuerzel }}</span>
+                  {% endfor %}
+                </div>
               </td>
-              <td data-label="Feiertage">{% if regel.feiertage_auslassen %}auslassen{% else %}mitplanen{% endif %}</td>
+              <td data-label="Uhrzeit" style="white-space:nowrap; font-variant-numeric:tabular-nums">
+                <strong>{{ regel.beginn|time:"H:i" }}–{{ regel.ende|time:"H:i" }}</strong> Uhr
+              </td>
+              <td data-label="Rhythmus">
+                <div>
+                  {% if regel.intervall_wochen == 1 %}
+                    jede Woche
+                  {% else %}
+                    alle {{ regel.intervall_wochen }} Wochen
+                    {% if regel.aktiv %}
+                      {% if regel.ist_diese_woche_aktiv %}
+                        <span class="regel-woche-badge regel-woche-badge--aktiv">diese Woche</span>
+                      {% else %}
+                        <span class="regel-woche-badge">nächste Woche</span>
+                      {% endif %}
+                    {% endif %}
+                  {% endif %}
+                </div>
+                <div class="leer" style="font-size:0.8rem; margin-top:0.15rem">
+                  ab {{ regel.gueltig_ab|date:"SHORT_DATE_FORMAT" }}{% if regel.gueltig_bis %} bis {{ regel.gueltig_bis|date:"SHORT_DATE_FORMAT" }}{% endif %}
+                  {% if not regel.feiertage_auslassen %} · inkl. Feiertage{% endif %}
+                </div>
+              </td>
               <td data-label="Status">
-                <span class="marke-status {% if regel.aktiv %}status-frei{% else %}status-gebucht{% endif %}">
-                  {% if regel.aktiv %}aktiv{% else %}inaktiv{% endif %}
-                </span>
+                <form method="post" action="{% url 'termine:regel_toggle_aktiv' regel.pk %}?next={{ request.get_full_path|urlencode }}" style="margin:0; display:inline">
+                  {% csrf_token %}
+                  <button type="submit"
+                          class="marke-status {% if regel.aktiv %}status-frei{% else %}status-gebucht{% endif %}"
+                          style="border:0; cursor:pointer; font-family:inherit"
+                          title="Klicken zum {% if regel.aktiv %}Pausieren{% else %}Aktivieren{% endif %}">
+                    {% if regel.aktiv %}✓ aktiv{% else %}⏸ inaktiv{% endif %}
+                  </button>
+                </form>
               </td>
-              <td class="ohne-label" style="text-align:right">
-                <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:regel_bearbeiten' regel.pk %}">Bearbeiten</a>
+              <td class="ohne-label" style="text-align:right; white-space:nowrap">
+                <div style="display:inline-flex; gap:0.35rem; align-items:center">
+                  <a class="knopf knopf--leise knopf--klein"
+                     href="{% url 'termine:regel_bearbeiten' regel.pk %}">Bearbeiten</a>
+                  <a class="knopf knopf--leise knopf--klein"
+                     href="{% url 'termine:regel_neu' %}?kopie_von={{ regel.pk }}"
+                     title="Regel als Vorlage duplizieren">Kopieren</a>
+                </div>
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="9" class="leer">Noch keine Regel angelegt.</td></tr>
+            <tr>
+              <td colspan="7" class="leer" style="text-align:center; padding:2rem 1rem">
+                Noch keine Rhythmus-Regeln für diese Auswahl angelegt.
+              </td>
+            </tr>
           {% endfor %}
         </tbody>
       </table>

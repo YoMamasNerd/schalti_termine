@@ -3,18 +3,22 @@
 {% block titel %}Terminarten – {{ SITE_NAME }}{% endblock %}
 
 {% block inhalt %}
-  <h1>Terminarten</h1>
-  <p>
-    Eine Terminart legt fest, was gebucht werden kann und wie lange es dauert –
-    zum Beispiel „Erstberatung, 30 Minuten“. Dauer und Puffer bestimmen das
-    Raster: Aus einem Fenster von 14:00 bis 17:00 werden mit 30 Minuten Dauer
-    sechs Termine.
-  </p>
+  <div style="margin-bottom:1rem">
+    <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:einstellungen' %}#tab-stammdaten">
+      &larr; Zurück zu den Einstellungen
+    </a>
+  </div>
 
-  <p class="knopfreihe">
-    <a class="knopf" href="{% url 'termine:terminart_neu' %}">Neue Terminart</a>
-    <a class="knopf knopf--leise" href="{% url 'termine:einstellungen' %}">Zu den Einstellungen</a>
-  </p>
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem">
+    <div>
+      <h1 style="margin:0 0 0.25rem">Terminarten</h1>
+      <p class="leer" style="margin:0; max-width:58ch">
+        Eine Terminart legt fest, was gebucht werden kann und wie lange es dauert –
+        zum Beispiel „Erstberatung, 30 Minuten“.
+      </p>
+    </div>
+    <a class="knopf" href="{% url 'termine:terminart_neu' %}">+ Neue Terminart</a>
+  </div>
 
   <div class="karte">
     <div class="tabelle-huelle">

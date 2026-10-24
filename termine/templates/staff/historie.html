@@ -4,13 +4,16 @@
 {% block titel %}Historie & Aktivitäten – {{ SITE_NAME }}{% endblock %}
 
 {% block inhalt %}
-  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem">
     <div>
       <h1 style="margin:0 0 0.25rem">Historie &amp; Aktivitäten</h1>
       <p class="leer" style="margin:0; font-size:0.92rem">
         Lückenlose Übersicht aller gebuchten, bestätigten und stornierten Termine.
       </p>
     </div>
+    <a class="knopf knopf--leise knopf--klein" href="{% url 'termine:buchungen' %}{% if gewaehlter_slug %}?fahrlehrer={{ gewaehlter_slug }}{% endif %}">
+      &larr; Zur Buchungsliste
+    </a>
   </div>
 
   <!-- KPI Kennzahlen -->
