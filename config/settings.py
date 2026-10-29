@@ -42,7 +42,7 @@ CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 # Öffentliche Basis-URL. Wird für Links in E-Mails und für den ICS-Feed gebraucht,
 # weil diese außerhalb eines Requests erzeugt werden (Hintergrundjobs).
 SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "http://localhost:8000").rstrip("/")
-SITE_NAME = os.environ.get("SITE_NAME", "Fahrschule – Beratungstermine")
+SITE_NAME = os.environ.get("SITE_NAME", "Termine")
 SCHALTI_APPS_REGISTRY_URL = os.environ.get(
     "SCHALTI_APPS_REGISTRY_URL", "https://apps.arbeits-zimmer.de/apps.json"
 )
