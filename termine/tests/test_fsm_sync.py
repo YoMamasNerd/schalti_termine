@@ -826,5 +826,85 @@ class LazyFsmSyncTests(TestCase):
         self.assertNotContains(antwort, "frisch=")
 
 
+class FsmRetrySchutzTest(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.fahrlehrer = Fahrlehrer.objects.create(
+            name="Louis Seifert",
+            slug="louis-seifert",
+            email="louis@example.com",
+            fsm_id="fsm-lehrer-ls",
+            fsm_sync_aktiv=True,
+        )
+        self.terminart = Terminart.objects.create(
+            name="Beratung",
+            slug="beratung-retry-test",
+            dauer_minuten=30,
+        )
+
+    def test_loesche_termin_aus_fsm_404_leert_fsm_id(self):
+        from termine.services.fsm_client import FsmApiError
+        from termine.services.fsm_sync import loesche_termin_aus_fsm
+
+        jetzt = timezone.now()
+        termin = Termin.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            terminart=self.terminart,
+            beginn=jetzt + dt.timedelta(days=1),
+            ende=jetzt + dt.timedelta(days=1, hours=1),
+            status=Termin.Status.ENTFALLEN,
+            fsm_termin_id="9bb050a9-bc51-4d56-852f-a6f1ba96be39",
+        )
+        mock_client = MagicMock()
+        mock_client.termin_loeschen.side_effect = FsmApiError(404, "HTTP 404")
+
+        self.assertTrue(loesche_termin_aus_fsm(termin, client=mock_client))
+        termin.refresh_from_db()
+        self.assertEqual(termin.fsm_termin_id, "")
+
+    def test_loesche_termin_aus_fsm_502_behaelt_fsm_id(self):
+        from termine.services.fsm_client import FsmApiError
+        from termine.services.fsm_sync import loesche_termin_aus_fsm
+
+        jetzt = timezone.now()
+        termin = Termin.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            terminart=self.terminart,
+            beginn=jetzt + dt.timedelta(days=1),
+            ende=jetzt + dt.timedelta(days=1, hours=1),
+            status=Termin.Status.ENTFALLEN,
+            fsm_termin_id="keep-me-uuid",
+        )
+        mock_client = MagicMock()
+        mock_client.termin_loeschen.side_effect = FsmApiError(502, "Bad Gateway")
+
+        self.assertFalse(loesche_termin_aus_fsm(termin, client=mock_client))
+        termin.refresh_from_db()
+        self.assertEqual(termin.fsm_termin_id, "keep-me-uuid")
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_exportiere_sperrzeit_400_konflikt_setzt_cooldown(self):
+        from termine.services.fsm_client import FsmApiError
+        from termine.services.fsm_sync import exportiere_sperrzeit_nach_fsm
+
+        basis_tag = timezone.localdate() + dt.timedelta(days=3)
+        sperre = Sperrzeit.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            beginn=timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(15, 0))),
+            ende=timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(18, 0))),
+            grund="Urlaub",
+            typ=Sperrzeit.Typ.PRIVAT,
+        )
+        mock_client = MagicMock()
+        mock_client.termin_anlegen.side_effect = FsmApiError(
+            400, "Fahrlehrer am 21.12.2026 bereits verplant von 15:00 bis 18:00 Uhr."
+        )
+
+        self.assertEqual(exportiere_sperrzeit_nach_fsm(sperre, client=mock_client), [])
+        self.assertEqual(exportiere_sperrzeit_nach_fsm(sperre, client=mock_client), [])
+        self.assertEqual(mock_client.termin_anlegen.call_count, 1)
+
+
+
 
 

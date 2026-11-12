@@ -12,11 +12,12 @@ import logging
 from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 
 from ..models import Fahrlehrer, FahrschulEinstellungen, Sperrzeit, Termin
-from .fsm_client import FsmClient, FsmError
+from .fsm_client import FsmApiError, FsmClient, FsmError
 
 if TYPE_CHECKING:
     from ..models import Buchung
@@ -278,6 +279,11 @@ def exportiere_sperrzeit_nach_fsm(
 
     erstellte_ids: list[str] = []
     for von_dt, bis_dt in abschnitte:
+        konflikt_key = (
+            f"fsm_sync:sperrzeit_konflikt:{sperre.pk}:{von_dt.isoformat()}:{bis_dt.isoformat()}"
+        )
+        if sperre.pk and cache.get(konflikt_key):
+            continue
         try:
             fsm_id = client.termin_anlegen(
                 fahrlehrer_fsm_id=sperre.fahrlehrer.fsm_id,
@@ -288,6 +294,25 @@ def exportiere_sperrzeit_nach_fsm(
             )
             if fsm_id:
                 erstellte_ids.append(fsm_id)
+        except FsmApiError as exc:
+            if exc.status_code == 400 and "bereits verplant" in str(exc).lower() and sperre.pk:
+                cache.set(konflikt_key, True, timeout=6 * 3600)
+                logger.warning(
+                    "FSM-Sync: Konnte Sperrzeit (%s - %s) für %s nicht in FSM eintragen "
+                    "(6h Cooldown aktiv): %s",
+                    von_dt,
+                    bis_dt,
+                    sperre.fahrlehrer,
+                    exc,
+                )
+            else:
+                logger.warning(
+                    "FSM-Sync: Konnte Sperrzeit (%s - %s) für %s nicht in FSM eintragen: %s",
+                    von_dt,
+                    bis_dt,
+                    sperre.fahrlehrer,
+                    exc,
+                )
         except FsmError as exc:
             logger.warning(
                 "FSM-Sync: Konnte Sperrzeit (%s - %s) für %s nicht in FSM eintragen: %s",
@@ -316,6 +341,12 @@ def loesche_fsm_termin_by_id(fsm_termin_id: str, client: FsmClient | None = None
         client.termin_loeschen(fsm_termin_id)
         logger.info("FSM-Sync: FSM-Termin %s gelöscht", fsm_termin_id)
         return True
+    except FsmApiError as exc:
+        if exc.status_code == 404:
+            logger.info("FSM-Sync: FSM-Termin %s in FSM bereits nicht mehr vorhanden (404)", fsm_termin_id)
+            return True
+        logger.warning("FSM-Sync: Konnte FSM-Termin %s nicht löschen: %s", fsm_termin_id, exc)
+        return False
     except FsmError as exc:
         logger.warning("FSM-Sync: Konnte FSM-Termin %s nicht löschen: %s", fsm_termin_id, exc)
         return False
