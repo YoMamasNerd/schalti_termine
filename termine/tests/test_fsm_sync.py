@@ -904,6 +904,101 @@ class FsmRetrySchutzTest(TestCase):
         self.assertEqual(exportiere_sperrzeit_nach_fsm(sperre, client=mock_client), [])
         self.assertEqual(mock_client.termin_anlegen.call_count, 1)
 
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_sync_ueberspringt_eigene_sperrzeit_bei_bestehendem_fsm_termin(self):
+        """Eigene Sperrzeit ohne fsm_id darf keinen 400-Konflikt erzeugen, wenn
+        der Zeitraum im FSM bereits belegt ist – und wird nachgereicht, sobald
+        der fremde Blocker im FSM entfällt."""
+        basis_tag = timezone.localdate() + dt.timedelta(days=5)
+        sperre = Sperrzeit.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            beginn=timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(15, 0))),
+            ende=timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(18, 0))),
+            grund="Kita Elara",
+            typ=Sperrzeit.Typ.PRIVAT,
+            herkunft=Sperrzeit.Herkunft.REGEL,
+        )
+        mock_client = MagicMock()
+        mock_client.get_termine.return_value = [
+            FsmTermin(
+                id="fsm-ganztag-privat",
+                von=timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(8, 0))),
+                bis=timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(18, 30))),
+                fahrlehrer_id=self.fahrlehrer.fsm_id,
+                terminart="PP",
+                titel="PRIVAT!",
+            )
+        ]
+
+        sync_blocker_fuer_fahrlehrer(self.fahrlehrer, client=mock_client)
+        mock_client.termin_anlegen.assert_not_called()
+        sperre.refresh_from_db()
+        self.assertEqual(sperre.fsm_id, "")
+
+        # Sobald der fremde FSM-Blocker weg ist, wird die Regel-Sperrzeit automatisch exportiert.
+        mock_client.get_termine.return_value = []
+        mock_client.termin_anlegen.return_value = "fsm-kita-neu"
+        sync_blocker_fuer_fahrlehrer(self.fahrlehrer, client=mock_client)
+        mock_client.termin_anlegen.assert_called_once()
+        sperre.refresh_from_db()
+        self.assertEqual(sperre.fsm_id, "fsm-kita-neu")
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_exportiere_sperrzeit_ueberspringt_bei_lokaler_fsm_sperrzeit(self):
+        from termine.services.fsm_sync import exportiere_sperrzeit_nach_fsm
+
+        basis_tag = timezone.localdate() + dt.timedelta(days=6)
+        Sperrzeit.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            beginn=timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(8, 0))),
+            ende=timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(18, 30))),
+            grund="FSM: PRIVAT!",
+            herkunft=Sperrzeit.Herkunft.FSM,
+            fsm_id="fsm-existing-1",
+        )
+        sperre = Sperrzeit.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            beginn=timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(15, 0))),
+            ende=timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(18, 0))),
+            grund="Kita Elara",
+            typ=Sperrzeit.Typ.PRIVAT,
+            herkunft=Sperrzeit.Herkunft.REGEL,
+        )
+        mock_client = MagicMock()
+        self.assertEqual(exportiere_sperrzeit_nach_fsm(sperre, client=mock_client), [])
+        mock_client.termin_anlegen.assert_not_called()
+
+    @override_settings(FSM_SYNC_ENABLED=True)
+    def test_exportiere_sperrzeit_exportiert_bei_angrenzendem_fsm_termin(self):
+        from termine.services.fsm_sync import exportiere_sperrzeit_nach_fsm
+
+        basis_tag = timezone.localdate() + dt.timedelta(days=7)
+        sperre = Sperrzeit.objects.create(
+            fahrlehrer=self.fahrlehrer,
+            beginn=timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(15, 0))),
+            ende=timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(18, 0))),
+            grund="Kita Elara",
+            typ=Sperrzeit.Typ.PRIVAT,
+            herkunft=Sperrzeit.Herkunft.REGEL,
+        )
+        angrenzend = [
+            FsmTermin(
+                id="fsm-davor",
+                von=timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(13, 0))),
+                bis=timezone.make_aware(dt.datetime.combine(basis_tag, dt.time(15, 0))),
+                fahrlehrer_id=self.fahrlehrer.fsm_id,
+                terminart="PS",
+                titel="Fahrstunde",
+            )
+        ]
+        mock_client = MagicMock()
+        mock_client.termin_anlegen.return_value = "fsm-ok-1"
+        self.assertEqual(
+            exportiere_sperrzeit_nach_fsm(sperre, client=mock_client, bestehende_fsm_termine=angrenzend),
+            ["fsm-ok-1"],
+        )
+        mock_client.termin_anlegen.assert_called_once()
+
 
 
 

@@ -21,6 +21,7 @@ from .fsm_client import FsmApiError, FsmClient, FsmError
 
 if TYPE_CHECKING:
     from ..models import Buchung
+    from .fsm_client import FsmTermin
 
 logger = logging.getLogger(__name__)
 
@@ -250,9 +251,42 @@ def zerlege_zeitraum_fuer_fsm(
     return abschnitte
 
 
+def _als_aware(wert: dt.datetime) -> dt.datetime:
+    return timezone.localtime(wert) if timezone.is_aware(wert) else timezone.make_aware(wert)
+
+
+def _hat_fsm_konflikt(
+    fahrlehrer: Fahrlehrer,
+    von_dt: dt.datetime,
+    bis_dt: dt.datetime,
+    bestehende_fsm_termine: list[FsmTermin] | None = None,
+) -> bool:
+    """Prüft, ob der Zeitraum im FSM-Kalender bereits belegt ist.
+
+    Verhindert wiederholte 400-Konflikte („bereits verplant“) beim Export
+    eigener Sperrzeiten, wenn im FSM bereits ein überlappender Termin liegt.
+    """
+    von_aware = _als_aware(von_dt)
+    bis_aware = _als_aware(bis_dt)
+
+    if bestehende_fsm_termine is not None:
+        return any(
+            _als_aware(termin.von) < bis_aware and _als_aware(termin.bis) > von_aware
+            for termin in bestehende_fsm_termine
+        )
+
+    return Sperrzeit.objects.filter(
+        fahrlehrer=fahrlehrer,
+        herkunft=Sperrzeit.Herkunft.FSM,
+        beginn__lt=bis_aware,
+        ende__gt=von_aware,
+    ).exists()
+
+
 def exportiere_sperrzeit_nach_fsm(
     sperre: Sperrzeit,
     client: FsmClient | None = None,
+    bestehende_fsm_termine: list[FsmTermin] | None = None,
 ) -> list[str]:
     """Exportiert eine Sperrzeit (Urlaub/Abwesenheit oder Privat) nach FSM.
 
@@ -279,6 +313,15 @@ def exportiere_sperrzeit_nach_fsm(
 
     erstellte_ids: list[str] = []
     for von_dt, bis_dt in abschnitte:
+        if _hat_fsm_konflikt(sperre.fahrlehrer, von_dt, bis_dt, bestehende_fsm_termine):
+            logger.debug(
+                "FSM-Sync: Sperrzeit %s (%s - %s) für %s übersprungen – Zeitraum im FSM bereits belegt",
+                sperre.pk,
+                von_dt,
+                bis_dt,
+                sperre.fahrlehrer,
+            )
+            continue
         konflikt_key = (
             f"fsm_sync:sperrzeit_konflikt:{sperre.pk}:{von_dt.isoformat()}:{bis_dt.isoformat()}"
         )
@@ -523,7 +566,11 @@ def sync_blocker_fuer_fahrlehrer(
         fsm_id="",
     )
     for s in eigene_sperren:
-        created_ids = exportiere_sperrzeit_nach_fsm(s, client=client)
+        created_ids = exportiere_sperrzeit_nach_fsm(
+            s,
+            client=client,
+            bestehende_fsm_termine=fsm_termine,
+        )
         eigene_fsm_ids.update(created_ids)
 
     gueltige_fsm_sperren: set[str] = set()
